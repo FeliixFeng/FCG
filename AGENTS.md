@@ -2,6 +2,10 @@
 
 > 家庭健康管理系统 - 毕业设计项目
 
+**Generated:** 2026-02-19  
+**Commit:** 43a54c2  
+**Branch:** main
+
 ## Project Overview
 
 - **Type**: Full-stack web application (Spring Boot + Vue 3)
@@ -105,6 +109,25 @@ fcg/
         └── main.js
 ```
 
+## Code Map
+
+### Backend Entry Points
+
+| Symbol | Type | Location | Purpose |
+|--------|------|----------|---------|
+| `FcgApplication` | Class | `fcg-server/src/main/java/com/ghf/fcg/FcgApplication.java` | Spring Boot 启动类 |
+| `Knife4jConfig` | Class | `fcg-server/.../config/Knife4jConfig.java` | Swagger/OpenAPI 文档配置 |
+| `MybatisPlusConfig` | Class | `fcg-server/.../config/MybatisPlusConfig.java` | MyBatis-Plus 配置 |
+| `GlobalExceptionHandler` | Class | `fcg-server/.../common/exception/GlobalExceptionHandler.java` | 全局异常处理 |
+| `R` | Class | `fcg-server/.../common/result/R.java` | 统一响应封装 |
+
+### Frontend Entry Points
+
+| Symbol | Type | Location | Purpose |
+|--------|------|----------|---------|
+| `App` | Component | `fcg-client/src/App.vue` | 根组件 |
+| `main` | Script | `fcg-client/src/main.js` | 应用入口 |
+
 ## Key Configuration Files
 
 - **Backend**: `fcg-server/src/main/resources/application.yml`
@@ -142,6 +165,7 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - MyBatis-Plus (ORM)
 - MySQL Connector
 - Lombok
+- Knife4j (Swagger/OpenAPI 文档)
 
 ### Frontend
 - Vue 3 (Composition API)
