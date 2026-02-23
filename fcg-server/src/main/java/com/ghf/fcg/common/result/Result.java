@@ -13,8 +13,13 @@ import java.io.Serializable;
 public class Result<T> implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    /** 状态码: 200=成功, 400=参数错误, 500=服务器错误 */
     private Integer code;
+
+    /** 提示信息 */
     private String msg;
+
+    /** 响应数据 */
     private T data;
 
     public static <T> Result<T> ok() {
