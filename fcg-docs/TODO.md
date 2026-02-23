@@ -12,19 +12,19 @@
 - [x] Swagger/Knife4j 基础配置
 
 ## 里程碑 1：认证闭环
-- [ ] JWT 认证拦截器（解析 token、设置当前用户上下文）
-- [ ] 统一处理未登录/无权限异常
-- [ ] CORS 配置
-- [ ] 登录/注册接口单测
+- [x] JWT 认证拦截器（解析 token、设置当前用户上下文）
+- [x] 统一处理未登录/无权限异常
+- [x] CORS 配置
+- [x] 登录/注册接口单测
 
 ## 里程碑 2：用户与家庭模块完善
-- [ ] UserController `/info`：读取当前用户信息
-- [ ] UserController `/update`：更新用户资料（昵称/头像/手机号等）
-- [ ] UserController `/care-mode`：切换关怀模式
-- [ ] 用户修改密码接口
-- [ ] Family Controller：创建家庭、加入家庭（邀请码）
-- [ ] Family DTO/VO：请求与返回模型
-- [ ] 用户与家庭关系逻辑校验（加入、退出、切换）
+- [x] UserController `/info`：读取当前用户信息
+- [x] UserController `/update`：更新用户资料（昵称/头像/手机号等）
+- [x] UserController `/care-mode`：切换关怀模式
+- [x] 用户修改密码接口
+- [x] Family Controller：创建家庭、加入家庭（邀请码）
+- [x] Family DTO/VO：请求与返回模型
+- [x] 用户与家庭关系逻辑校验（加入、退出、切换）
 
 ## 里程碑 3：药品模块基础 API
 - [ ] Medicine Controller：增删改查
