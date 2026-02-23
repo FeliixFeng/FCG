@@ -2,12 +2,15 @@ package com.ghf.fcg.modules.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ghf.fcg.common.exception.BusinessException;
+import com.ghf.fcg.common.utils.JwtUtils;
 import com.ghf.fcg.common.utils.PasswordEncoder;
+import com.ghf.fcg.modules.system.dto.UserLoginDTO;
 import com.ghf.fcg.modules.system.dto.UserRegisterDTO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.mapper.UserMapper;
 import com.ghf.fcg.modules.system.service.IUserService;
-import org.apache.ibatis.annotations.Lang;
+import com.ghf.fcg.modules.system.vo.UserVO;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,7 +22,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         wrapper.eq(User::getUsername, registerDTO.getUsername());
         Long count = this.count(wrapper);
         if(count > 0){
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException("用户名已存在");
         }
 
         // 加密密码
@@ -37,5 +40,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 保存
         this.save(user);
         return user.getId();
+    }
+
+    @Override
+    public UserVO login(UserLoginDTO loginDTO) {
+        // 1. 根据用户名查询用户
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getUsername, loginDTO.getUsername());
+        User user = this.getOne(wrapper);
+        if(user == null){
+            throw new BusinessException("用户名或密码错误");
+        }
+
+        // 2. 验证密码
+        if(!PasswordEncoder.matches(loginDTO.getPassword(), user.getPassword())){
+            throw new BusinessException("用户名或密码错误");
+        }
+        // 3. 生成token
+        String token = JwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole());
+
+        // 4. 返回userVO
+        return UserVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .nickname(user.getNickname())
+                .role(user.getRole())
+                .token(token)
+                .build();
     }
 }

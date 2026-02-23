@@ -17,13 +17,21 @@ import java.util.Date;
 @Component
 public class JwtUtils {
 
+    private static String secret;
+
+    private static long expiration;
+
     @Value("${jwt.secret}")
-    private String secret;
+    public void setSecret(String secret) {
+        JwtUtils.secret = secret;
+    }
 
     @Value("${jwt.expiration}")
-    private long expiration;
+    public void setExpiration(long expiration) {
+        JwtUtils.expiration = expiration;
+    }
 
-    public String generateToken(Long userId, String username, Integer role) {
+    public static String generateToken(Long userId, String username, Integer role) {
         Date now = new Date();
         Date expireTime = new Date(now.getTime() + expiration);
 
@@ -37,7 +45,7 @@ public class JwtUtils {
                 .compact();
     }
 
-    public Claims parseToken(String token) {
+    public static Claims parseToken(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
@@ -45,7 +53,7 @@ public class JwtUtils {
                 .getPayload();
     }
 
-    public boolean validateToken(String token) {
+    public static boolean validateToken(String token) {
         try {
             parseToken(token);
             return true;
@@ -54,7 +62,7 @@ public class JwtUtils {
         }
     }
 
-    private SecretKey getSigningKey() {
+    private static SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 }

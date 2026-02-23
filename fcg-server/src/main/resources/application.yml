@@ -32,3 +32,10 @@ logging:
 jwt:
   secret: fcg-jwt-secret-key-change-this-in-production-2026
   expiration: 86400000
+
+---
+# Knife4j 配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn

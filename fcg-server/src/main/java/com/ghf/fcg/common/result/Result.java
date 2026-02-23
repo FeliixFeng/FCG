@@ -22,11 +22,11 @@ public class Result<T> implements Serializable {
     /** 响应数据 */
     private T data;
 
-    public static <T> Result<T> ok() {
-        return ok(null);
+    public static <T> Result<T> success() {
+        return success(null);
     }
 
-    public static <T> Result<T> ok(T data) {
+    public static <T> Result<T> success(T data) {
         Result<T> r = new Result<>();
         r.code = 200;
         r.msg = "success";
