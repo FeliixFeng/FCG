@@ -1,8 +1,10 @@
 package com.ghf.fcg.modules.system.controller;
 
+import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.system.dto.UserLoginDTO;
 import com.ghf.fcg.modules.system.dto.UserRegisterDTO;
+import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.vo.UserVO;
 import com.ghf.fcg.modules.system.service.IUserService;
 import jakarta.validation.Valid;
@@ -32,20 +34,26 @@ public class UserController {
     }
 
     @GetMapping("/info")
+    @Operation(summary = "获取当前用户信息")
     public Result<UserVO> getUserInfo() {
-        // TODO: 获取当前登录用户信息
-        return Result.success();
+        Long userId = UserContext.get().getUserId();
+        UserVO userVO = userService.getUserInfo(userId);
+        return Result.success(userVO);
     }
 
     @PutMapping("/update")
-    public Result<Void> updateUserInfo() {
-        // TODO: 更新用户信息
+    @Operation(summary = "更新用户信息")
+    public Result<Void> updateUserInfo(@RequestBody @Valid UserUpdateDTO updateDTO) {
+        Long userId = UserContext.get().getUserId();
+        userService.updateUserInfo(userId, updateDTO);
         return Result.success();
     }
 
     @PutMapping("/care-mode/{mode}")
+    @Operation(summary = "切换关怀模式")
     public Result<Void> switchCareMode(@PathVariable Integer mode) {
-        // TODO: 切换关怀模式
+        Long userId = UserContext.get().getUserId();
+        userService.switchCareMode(userId, mode);
         return Result.success();
     }
 }

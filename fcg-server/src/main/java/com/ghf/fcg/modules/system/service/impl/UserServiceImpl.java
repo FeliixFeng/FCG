@@ -7,6 +7,7 @@ import com.ghf.fcg.common.utils.JwtUtils;
 import com.ghf.fcg.common.utils.PasswordEncoder;
 import com.ghf.fcg.modules.system.dto.UserLoginDTO;
 import com.ghf.fcg.modules.system.dto.UserRegisterDTO;
+import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.mapper.UserMapper;
 import com.ghf.fcg.modules.system.service.IUserService;
@@ -67,5 +68,49 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 .role(user.getRole())
                 .token(token)
                 .build();
+    }
+
+    @Override
+    public UserVO getUserInfo(Long userId) {
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        return UserVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .nickname(user.getNickname())
+                .phone(user.getPhone())
+                .avatar(user.getAvatar())
+                .role(user.getRole())
+                .familyId(user.getFamilyId())
+                .careMode(user.getCareMode())
+                .createTime(user.getCreateTime())
+                .build();
+    }
+
+    @Override
+    public void updateUserInfo(Long userId, UserUpdateDTO updateDTO) {
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        user.setNickname(updateDTO.getNickname());
+        user.setPhone(updateDTO.getPhone());
+        user.setAvatar(updateDTO.getAvatar());
+        this.updateById(user);
+    }
+
+    @Override
+    public void switchCareMode(Long userId, Integer mode) {
+        if (mode != User.CARE_MODE_OFF && mode != User.CARE_MODE_ON) {
+            throw new BusinessException("关怀模式参数错误");
+        }
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        user.setCareMode(mode);
+        this.updateById(user);
     }
 }
