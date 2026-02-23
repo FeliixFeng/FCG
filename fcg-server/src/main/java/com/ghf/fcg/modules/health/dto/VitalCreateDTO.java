@@ -1,6 +1,8 @@
 package com.ghf.fcg.modules.health.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -16,6 +18,8 @@ public class VitalCreateDTO {
 
     @Schema(description = "类型 1-血压 2-血糖 3-心率 4-体温 5-体重")
     @NotNull(message = "体征类型不能为空")
+    @Min(value = 1, message = "体征类型范围为1-5")
+    @Max(value = 5, message = "体征类型范围为1-5")
     private Integer type;
 
     @Schema(description = "收缩压")
@@ -35,6 +39,8 @@ public class VitalCreateDTO {
     private LocalDateTime measureTime;
 
     @Schema(description = "测量时点 1-空腹 2-餐后")
+    @Min(value = 1, message = "测量时点范围为1-2")
+    @Max(value = 2, message = "测量时点范围为1-2")
     private Integer measurePoint;
 
     @Schema(description = "备注")

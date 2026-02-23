@@ -94,7 +94,9 @@ CREATE TABLE `med_plan` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_family_id` (`family_id`),
-    KEY `idx_status` (`status`)
+    KEY `idx_status` (`status`),
+    KEY `idx_family_user` (`family_id`, `user_id`),
+    KEY `idx_family_status` (`family_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用药计划表';
 
 -- 5. 服药记录表
@@ -116,7 +118,8 @@ CREATE TABLE `med_record` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_family_id` (`family_id`),
-    KEY `idx_scheduled_date` (`scheduled_date`)
+    KEY `idx_scheduled_date` (`scheduled_date`),
+    KEY `idx_family_user_date` (`family_id`, `user_id`, `scheduled_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服药记录表';
 
 -- ============================================
@@ -144,7 +147,8 @@ CREATE TABLE `health_vital` (
     KEY `idx_user_id` (`user_id`),
     KEY `idx_family_id` (`family_id`),
     KEY `idx_type` (`type`),
-    KEY `idx_measure_time` (`measure_time`)
+    KEY `idx_measure_time` (`measure_time`),
+    KEY `idx_family_user_type_time` (`family_id`, `user_id`, `type`, `measure_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='体征数据表';
 
 -- 7. 健康周报表
@@ -165,6 +169,7 @@ CREATE TABLE `health_report` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_family_id` (`family_id`),
+    KEY `idx_family_user_week` (`family_id`, `user_id`, `week_start`),
     UNIQUE KEY `uk_user_week` (`user_id`, `week_start`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='健康周报表';
 

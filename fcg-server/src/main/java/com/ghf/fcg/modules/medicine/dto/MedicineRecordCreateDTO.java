@@ -1,6 +1,8 @@
 package com.ghf.fcg.modules.medicine.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -35,6 +37,8 @@ public class MedicineRecordCreateDTO {
     private LocalDateTime actualTime;
 
     @Schema(description = "状态 0-未服 1-已服 2-跳过")
+    @Min(value = 0, message = "状态范围为0-2")
+    @Max(value = 2, message = "状态范围为0-2")
     private Integer status;
 
     @Schema(description = "备注")

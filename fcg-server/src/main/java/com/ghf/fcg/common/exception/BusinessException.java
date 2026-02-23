@@ -1,6 +1,7 @@
 package com.ghf.fcg.common.exception;
 
 import lombok.Getter;
+import com.ghf.fcg.common.constant.ResultCode;
 
 /**
  * 业务异常
@@ -12,7 +13,7 @@ public class BusinessException extends RuntimeException {
 
     public BusinessException(String message) {
         super(message);
-        this.code = 400;
+        this.code = ResultCode.PARAM_ERROR;
     }
 
     public BusinessException(Integer code, String message) {

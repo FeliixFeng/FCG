@@ -1,6 +1,7 @@
 package com.ghf.fcg.modules.medicine.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -104,7 +105,7 @@ public class MedicineController {
     private Long requireFamilyId(Long userId) {
         User user = userService.getById(userId);
         if (user == null || user.getFamilyId() == null) {
-            throw new BusinessException("用户未加入家庭");
+            throw new BusinessException(MessageConstant.USER_NOT_IN_FAMILY);
         }
         return user.getFamilyId();
     }
@@ -112,7 +113,7 @@ public class MedicineController {
     private Medicine getFamilyMedicine(Long id, Long familyId) {
         Medicine medicine = medicineService.getById(id);
         if (medicine == null || !familyId.equals(medicine.getFamilyId())) {
-            throw new BusinessException("药品不存在");
+            throw new BusinessException(MessageConstant.MEDICINE_NOT_EXIST);
         }
         return medicine;
     }

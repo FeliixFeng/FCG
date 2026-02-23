@@ -27,25 +27,25 @@
 - [x] 用户与家庭关系逻辑校验（加入、退出、切换）
 
 ## 里程碑 3：药品模块基础 API
-- [ ] Medicine Controller：增删改查
-- [ ] Medicine DTO/VO
-- [ ] MedicinePlan Controller：增删改查
-- [ ] MedicinePlan DTO/VO
-- [ ] MedicineRecord Controller：增删改查
-- [ ] MedicineRecord DTO/VO
-- [ ] 简单联表查询：计划 + 记录
+- [x] Medicine Controller：增删改查
+- [x] Medicine DTO/VO
+- [x] MedicinePlan Controller：增删改查
+- [x] MedicinePlan DTO/VO
+- [x] MedicineRecord Controller：增删改查
+- [x] MedicineRecord DTO/VO
+- [x] 简单联表查询：计划 + 记录
 
 ## 里程碑 4：健康模块基础 API
-- [ ] Vital Controller：增删改查
-- [ ] Vital DTO/VO
-- [ ] HealthReport Controller：增删改查
-- [ ] HealthReport DTO/VO
-- [ ] 近一周体征查询接口
+- [x] Vital Controller：增删改查
+- [x] Vital DTO/VO
+- [x] HealthReport Controller：增删改查
+- [x] HealthReport DTO/VO
+- [x] 近一周体征查询接口
 
 ## 里程碑 5：系统完善与稳定性
-- [ ] 参数校验覆盖（所有 DTO）
-- [ ] 统一异常码与消息常量化
-- [ ] 接口鉴权覆盖（除登录/注册外）
-- [ ] 数据库索引与慢查询检查
-- [ ] 最小集成测试（登录 -> 获取用户信息）
-- [ ] 文档与配置核对（启动说明、环境变量）
+- [x] 参数校验覆盖（所有 DTO）
+- [x] 统一异常码与消息常量化
+- [x] 接口鉴权覆盖（除登录/注册外）
+- [x] 数据库索引与慢查询检查
+- [x] 最小集成测试（登录 -> 获取用户信息）
+- [x] 文档与配置核对（启动说明、环境变量）

@@ -2,6 +2,7 @@ package com.ghf.fcg.modules.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.modules.system.entity.Family;
 import com.ghf.fcg.modules.system.entity.User;
@@ -29,7 +30,7 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
     public FamilyVO createFamily(Long userId, String familyName) {
         User user = userService.getById(userId);
         if (user.getFamilyId() != null) {
-            throw new BusinessException("用户已加入家庭，无法创建");
+            throw new BusinessException(MessageConstant.USER_ALREADY_IN_FAMILY_CREATE);
         }
 
         Family family = new Family();
@@ -54,14 +55,14 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
     public FamilyVO joinFamily(Long userId, String inviteCode) {
         User user = userService.getById(userId);
         if (user.getFamilyId() != null) {
-            throw new BusinessException("用户已加入家庭");
+            throw new BusinessException(MessageConstant.USER_ALREADY_IN_FAMILY);
         }
 
         LambdaQueryWrapper<Family> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Family::getInviteCode, inviteCode);
         Family family = this.getOne(wrapper);
         if (family == null) {
-            throw new BusinessException("邀请码无效");
+            throw new BusinessException(MessageConstant.INVITE_CODE_INVALID);
         }
 
         user.setFamilyId(family.getId());
@@ -80,12 +81,12 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
     public FamilyVO getFamilyInfo(Long userId) {
         User user = userService.getById(userId);
         if (user.getFamilyId() == null) {
-            throw new BusinessException("用户未加入家庭");
+            throw new BusinessException(MessageConstant.USER_NOT_IN_FAMILY);
         }
 
         Family family = this.getById(user.getFamilyId());
         if (family == null) {
-            throw new BusinessException("家庭不存在");
+            throw new BusinessException(MessageConstant.FAMILY_NOT_EXIST);
         }
 
         return FamilyVO.builder()
@@ -100,7 +101,7 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
     public List<FamilyVO.MemberInfo> getFamilyMembers(Long userId) {
         User user = userService.getById(userId);
         if (user.getFamilyId() == null) {
-            throw new BusinessException("用户未加入家庭");
+            throw new BusinessException(MessageConstant.USER_NOT_IN_FAMILY);
         }
 
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();

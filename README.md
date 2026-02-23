@@ -27,6 +27,17 @@
   - **标准模式**：功能全面，适合子女/管理员使用。
   - **关怀模式**：大字体、高对比度、扁平化路径，专为长辈设计。
 
+## 当前进度
+
+### 后端
+- ✅ 认证闭环（JWT + 拦截器 + CORS）
+- ✅ 用户与家庭模块（登录/注册、用户信息、关怀模式、家庭创建/加入/成员）
+- ✅ 药品模块基础 API（药品/计划/记录增删改查 + 计划记录联表）
+- ✅ 健康模块基础 API（体征/周报增删改查 + 近一周体征查询）
+
+### 前端
+- 🔄 基础脚手架已完成，页面与状态管理待完善
+
 ## 技术栈
 
 ### 后端 (fcg-server)
@@ -70,6 +81,21 @@ fcg/
 1. `cd fcg-client`
 2. `npm install`
 3. `npm run dev`
+
+## 配置说明
+
+### 本地配置文件
+后端默认启用 `local` profile，请在 `fcg-server/src/main/resources/application-local.yml` 中配置数据库连接。
+示例见：`fcg-server/src/main/resources/application-local.yml.example`。
+
+### 常用环境变量（可选）
+Spring Boot 支持用环境变量覆盖配置，常用项如下：
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `JWT_SECRET`
+- `JWT_EXPIRATION`
+- `SERVER_PORT`
 
 ## 作者与致谢
 - **作者**：管海峰 (2204240115)

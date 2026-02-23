@@ -1,6 +1,7 @@
 package com.ghf.fcg.modules.medicine.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -131,7 +132,7 @@ public class MedicineRecordController {
     private Long requireFamilyId(Long userId) {
         User user = userService.getById(userId);
         if (user == null || user.getFamilyId() == null) {
-            throw new BusinessException("用户未加入家庭");
+            throw new BusinessException(MessageConstant.USER_NOT_IN_FAMILY);
         }
         return user.getFamilyId();
     }
@@ -139,38 +140,38 @@ public class MedicineRecordController {
     private void validateFamilyUser(Long familyId, Long userId) {
         User user = userService.getById(userId);
         if (user == null || !familyId.equals(user.getFamilyId())) {
-            throw new BusinessException("使用者不存在或不属于当前家庭");
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
         }
     }
 
     private void validateFamilyMedicine(Long familyId, Long medicineId) {
         Medicine medicine = medicineService.getById(medicineId);
         if (medicine == null || !familyId.equals(medicine.getFamilyId())) {
-            throw new BusinessException("药品不存在或不属于当前家庭");
+            throw new BusinessException(MessageConstant.MEDICINE_FAMILY_MISMATCH);
         }
     }
 
     private MedicinePlan validatePlan(Long familyId, Long planId) {
         MedicinePlan plan = planService.getById(planId);
         if (plan == null || !familyId.equals(plan.getFamilyId())) {
-            throw new BusinessException("用药计划不存在或不属于当前家庭");
+            throw new BusinessException(MessageConstant.PLAN_FAMILY_MISMATCH);
         }
         return plan;
     }
 
     private void ensurePlanRelation(MedicinePlan plan, Long userId, Long medicineId) {
         if (!plan.getUserId().equals(userId)) {
-            throw new BusinessException("记录使用者与计划不一致");
+            throw new BusinessException(MessageConstant.RECORD_PLAN_USER_MISMATCH);
         }
         if (!plan.getMedicineId().equals(medicineId)) {
-            throw new BusinessException("记录药品与计划不一致");
+            throw new BusinessException(MessageConstant.RECORD_PLAN_MEDICINE_MISMATCH);
         }
     }
 
     private MedicineRecord getFamilyRecord(Long id, Long familyId) {
         MedicineRecord record = recordService.getById(id);
         if (record == null || !familyId.equals(record.getFamilyId())) {
-            throw new BusinessException("服药记录不存在");
+            throw new BusinessException(MessageConstant.RECORD_NOT_EXIST);
         }
         return record;
     }

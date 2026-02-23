@@ -1,6 +1,7 @@
 package com.ghf.fcg.modules.health.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -120,7 +121,7 @@ public class HealthReportController {
     private Long requireFamilyId(Long userId) {
         User user = userService.getById(userId);
         if (user == null || user.getFamilyId() == null) {
-            throw new BusinessException("用户未加入家庭");
+            throw new BusinessException(MessageConstant.USER_NOT_IN_FAMILY);
         }
         return user.getFamilyId();
     }
@@ -128,14 +129,14 @@ public class HealthReportController {
     private void validateFamilyUser(Long familyId, Long userId) {
         User user = userService.getById(userId);
         if (user == null || !familyId.equals(user.getFamilyId())) {
-            throw new BusinessException("用户不存在或不属于当前家庭");
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
         }
     }
 
     private HealthReport getFamilyReport(Long id, Long familyId) {
         HealthReport report = reportService.getById(id);
         if (report == null || !familyId.equals(report.getFamilyId())) {
-            throw new BusinessException("健康周报不存在");
+            throw new BusinessException(MessageConstant.REPORT_NOT_EXIST);
         }
         return report;
     }

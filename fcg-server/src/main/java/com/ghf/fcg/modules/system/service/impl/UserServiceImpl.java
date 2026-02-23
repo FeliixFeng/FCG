@@ -2,6 +2,7 @@ package com.ghf.fcg.modules.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.utils.JwtUtils;
 import com.ghf.fcg.common.utils.PasswordEncoder;
@@ -23,7 +24,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         wrapper.eq(User::getUsername, registerDTO.getUsername());
         Long count = this.count(wrapper);
         if(count > 0){
-            throw new BusinessException("用户名已存在");
+            throw new BusinessException(MessageConstant.USERNAME_EXIST);
         }
 
         // 加密密码
@@ -50,12 +51,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         wrapper.eq(User::getUsername, loginDTO.getUsername());
         User user = this.getOne(wrapper);
         if(user == null){
-            throw new BusinessException("用户名或密码错误");
+            throw new BusinessException(MessageConstant.LOGIN_FAILED);
         }
 
         // 2. 验证密码
         if(!PasswordEncoder.matches(loginDTO.getPassword(), user.getPassword())){
-            throw new BusinessException("用户名或密码错误");
+            throw new BusinessException(MessageConstant.LOGIN_FAILED);
         }
         // 3. 生成token
         String token = JwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole());
@@ -74,7 +75,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public UserVO getUserInfo(Long userId) {
         User user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException("用户不存在");
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
         return UserVO.builder()
                 .id(user.getId())
@@ -93,7 +94,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public void updateUserInfo(Long userId, UserUpdateDTO updateDTO) {
         User user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException("用户不存在");
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
         user.setNickname(updateDTO.getNickname());
         user.setPhone(updateDTO.getPhone());
@@ -104,11 +105,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Override
     public void switchCareMode(Long userId, Integer mode) {
         if (mode != User.CARE_MODE_OFF && mode != User.CARE_MODE_ON) {
-            throw new BusinessException("关怀模式参数错误");
+            throw new BusinessException(MessageConstant.CARE_MODE_PARAM_ERROR);
         }
         User user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException("用户不存在");
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
         user.setCareMode(mode);
         this.updateById(user);

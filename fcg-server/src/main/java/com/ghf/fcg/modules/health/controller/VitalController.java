@@ -1,6 +1,7 @@
 package com.ghf.fcg.modules.health.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -151,7 +152,7 @@ public class VitalController {
     private Long requireFamilyId(Long userId) {
         User user = userService.getById(userId);
         if (user == null || user.getFamilyId() == null) {
-            throw new BusinessException("用户未加入家庭");
+            throw new BusinessException(MessageConstant.USER_NOT_IN_FAMILY);
         }
         return user.getFamilyId();
     }
@@ -159,14 +160,14 @@ public class VitalController {
     private void validateFamilyUser(Long familyId, Long userId) {
         User user = userService.getById(userId);
         if (user == null || !familyId.equals(user.getFamilyId())) {
-            throw new BusinessException("用户不存在或不属于当前家庭");
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
         }
     }
 
     private Vital getFamilyVital(Long id, Long familyId) {
         Vital vital = vitalService.getById(id);
         if (vital == null || !familyId.equals(vital.getFamilyId())) {
-            throw new BusinessException("体征记录不存在");
+            throw new BusinessException(MessageConstant.VITAL_NOT_EXIST);
         }
         return vital;
     }
