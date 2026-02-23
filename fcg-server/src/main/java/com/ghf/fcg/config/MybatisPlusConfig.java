@@ -11,7 +11,11 @@ import org.springframework.context.annotation.Configuration;
  * MyBatis Plus 配置
  */
 @Configuration
-@MapperScan("com.ghf.fcg.module.*.mapper")
+@MapperScan({
+        "com.ghf.fcg.modules.system.mapper",
+        "com.ghf.fcg.modules.medicine.mapper",
+        "com.ghf.fcg.modules.health.mapper"
+})
 public class MybatisPlusConfig {
 
     @Bean

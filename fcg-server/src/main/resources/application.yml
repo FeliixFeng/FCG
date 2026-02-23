@@ -26,3 +26,9 @@ mybatis-plus:
 logging:
   level:
     com.ghf.fcg: debug
+
+---
+# JWT 配置
+jwt:
+  secret: fcg-jwt-secret-key-change-this-in-production-2026
+  expiration: 86400000
