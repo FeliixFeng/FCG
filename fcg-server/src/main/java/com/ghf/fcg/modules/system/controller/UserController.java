@@ -10,11 +10,13 @@ import com.ghf.fcg.modules.system.service.IUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
+@Tag(name = "用户模块", description = "用户注册、登录与个人信息")
 public class UserController {
 
     private final IUserService userService;

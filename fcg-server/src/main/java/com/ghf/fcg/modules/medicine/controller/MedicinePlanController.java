@@ -18,6 +18,7 @@ import com.ghf.fcg.modules.medicine.vo.MedicinePlanVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/medicine/plan")
 @RequiredArgsConstructor
+@Tag(name = "用药计划模块", description = "用药计划管理与计划记录联表查询")
 public class MedicinePlanController {
 
     private final IMedicinePlanService planService;

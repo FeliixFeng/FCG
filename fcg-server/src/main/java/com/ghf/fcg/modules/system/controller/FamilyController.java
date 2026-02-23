@@ -5,6 +5,7 @@ import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.system.service.IFamilyService;
 import com.ghf.fcg.modules.system.vo.FamilyVO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/family")
 @RequiredArgsConstructor
+@Tag(name = "家庭模块", description = "家庭创建、加入与成员管理")
 public class FamilyController {
 
     private final IFamilyService familyService;

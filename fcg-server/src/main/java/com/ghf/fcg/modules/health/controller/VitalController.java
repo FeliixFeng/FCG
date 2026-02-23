@@ -13,6 +13,7 @@ import com.ghf.fcg.modules.health.vo.VitalVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/health/vital")
 @RequiredArgsConstructor
+@Tag(name = "体征模块", description = "体征数据采集与查询")
 public class VitalController {
 
     private final IVitalService vitalService;

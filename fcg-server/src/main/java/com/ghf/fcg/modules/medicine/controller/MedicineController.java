@@ -13,6 +13,7 @@ import com.ghf.fcg.modules.medicine.vo.MedicineVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/medicine")
 @RequiredArgsConstructor
+@Tag(name = "药品模块", description = "药品基础信息管理")
 public class MedicineController {
 
     private final IMedicineService medicineService;

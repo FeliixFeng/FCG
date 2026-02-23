@@ -17,6 +17,7 @@ import com.ghf.fcg.modules.medicine.vo.MedicineRecordVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/medicine/record")
 @RequiredArgsConstructor
+@Tag(name = "服药记录模块", description = "服药记录管理")
 public class MedicineRecordController {
 
     private final IMedicineRecordService recordService;

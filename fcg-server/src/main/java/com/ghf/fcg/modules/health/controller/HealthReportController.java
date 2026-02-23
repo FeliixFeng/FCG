@@ -13,6 +13,7 @@ import com.ghf.fcg.modules.health.vo.HealthReportVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/health/report")
 @RequiredArgsConstructor
+@Tag(name = "健康周报模块", description = "健康周报管理")
 public class HealthReportController {
 
     private final IHealthReportService reportService;
