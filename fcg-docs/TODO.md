@@ -2,25 +2,49 @@
 
 > 从 PROJECT_CONTEXT.md 恢复
 
-## 高优先级（基础架构）
-- [x] 数据库表结构设计（用户、家庭、药品、用药计划、体征等）
-- [x] 后端统一返回结果封装（R/Result）
-- [x] 后端全局异常处理
-- [ ] JWT认证拦截器
-- [ ] 跨域配置（CORS）
-- [ ] 前端路由配置（admin/family区分）
-- [ ] Axios封装（统一拦截、错误处理）
-- [ ] Pinia状态管理
-- [ ] 用户认证模块（注册/登录接口 + 登录页）
+## 里程碑 0：现状对齐（后端）
+- [x] 数据库表结构设计（7 张核心表）
+- [x] 统一返回结果封装（Result）
+- [x] 全局异常处理
+- [x] 实体/Mapper/Service（system/medicine/health）
+- [x] 登录/注册基础接口
+- [x] JWT/BCrypt 工具类
+- [x] Swagger/Knife4j 基础配置
 
-## 中优先级（开发效率）
-- [ ] MyBatis-Plus Generator 代码生成器
-- [ ] 管理员后台基础布局（Element Plus）
-- [ ] 家庭端"标准/关怀"双模式框架（Tailwind CSS）
+## 里程碑 1：认证闭环
+- [ ] JWT 认证拦截器（解析 token、设置当前用户上下文）
+- [ ] 统一处理未登录/无权限异常
+- [ ] CORS 配置
+- [ ] 登录/注册接口单测
 
-## 功能模块
-- [ ] 平台运营管理模块（药品字典、监控看板）
-- [ ] 家庭与档案管理模块（1+N家庭组、关怀模式）
-- [ ] 智慧药箱与用药辅助模块（OCR、库存预警、LLM配伍禁忌）
-- [ ] 智能计划与执行模块（服药规则、多端打卡）
-- [ ] 健康体征监测模块（血压/血糖/心率、ECharts可视化、AI周报）
+## 里程碑 2：用户与家庭模块完善
+- [ ] UserController `/info`：读取当前用户信息
+- [ ] UserController `/update`：更新用户资料（昵称/头像/手机号等）
+- [ ] UserController `/care-mode`：切换关怀模式
+- [ ] 用户修改密码接口
+- [ ] Family Controller：创建家庭、加入家庭（邀请码）
+- [ ] Family DTO/VO：请求与返回模型
+- [ ] 用户与家庭关系逻辑校验（加入、退出、切换）
+
+## 里程碑 3：药品模块基础 API
+- [ ] Medicine Controller：增删改查
+- [ ] Medicine DTO/VO
+- [ ] MedicinePlan Controller：增删改查
+- [ ] MedicinePlan DTO/VO
+- [ ] MedicineRecord Controller：增删改查
+- [ ] MedicineRecord DTO/VO
+- [ ] 简单联表查询：计划 + 记录
+
+## 里程碑 4：健康模块基础 API
+- [ ] Vital Controller：增删改查
+- [ ] Vital DTO/VO
+- [ ] HealthReport Controller：增删改查
+- [ ] HealthReport DTO/VO
+- [ ] 近一周体征查询接口
+
+## 里程碑 5：系统完善与稳定性
+- [ ] 参数校验覆盖（所有 DTO）
+- [ ] 统一异常码与消息常量化
+- [ ] 接口鉴权覆盖（除登录/注册外）
+- [ ] 数据库索引与慢查询检查
+- [ ] 最小集成测试（登录 -> 获取用户信息）
