@@ -10,35 +10,35 @@ import java.io.Serializable;
  */
 @Data
 @NoArgsConstructor
-public class R<T> implements Serializable {
+public class Result<T> implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Integer code;
     private String msg;
     private T data;
 
-    public static <T> R<T> ok() {
+    public static <T> Result<T> ok() {
         return ok(null);
     }
 
-    public static <T> R<T> ok(T data) {
-        R<T> r = new R<>();
+    public static <T> Result<T> ok(T data) {
+        Result<T> r = new Result<>();
         r.code = 200;
         r.msg = "success";
         r.data = data;
         return r;
     }
 
-    public static <T> R<T> error() {
+    public static <T> Result<T> error() {
         return error(500, "未知异常，请联系管理员");
     }
 
-    public static <T> R<T> error(String msg) {
+    public static <T> Result<T> error(String msg) {
         return error(500, msg);
     }
 
-    public static <T> R<T> error(Integer code, String msg) {
-        R<T> r = new R<>();
+    public static <T> Result<T> error(Integer code, String msg) {
+        Result<T> r = new Result<>();
         r.code = code;
         r.msg = msg;
         return r;

@@ -1,6 +1,6 @@
 package com.ghf.fcg.common.exception;
 
-import com.ghf.fcg.common.result.R;
+import com.ghf.fcg.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -17,19 +17,19 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
-    public R<String> handleException(Exception e) {
+    public Result<String> handleException(Exception e) {
         log.error("系统异常", e);
-        return R.error(e.getMessage());
+        return Result.error(e.getMessage());
     }
 
     /**
      * 参数校验异常处理
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public R<String> handleBindException(MethodArgumentNotValidException e) {
+    public Result<String> handleBindException(MethodArgumentNotValidException e) {
         String msg = e.getBindingResult().getAllErrors().stream()
                 .map(error -> error.getDefaultMessage())
                 .collect(Collectors.joining(","));
-        return R.error(400, msg);
+        return Result.error(400, msg);
     }
 }
