@@ -25,9 +25,8 @@ public class UserController {
 
     @PostMapping("/register")
     public Result<Long> register(@RequestBody @Valid UserRegisterDTO registerDTO) {
-        // TODO: 调用 Service 注册逻辑
-        userService.register(registerDTO);
-        return Result.ok();
+        Long userId = userService.register(registerDTO);
+        return Result.ok(userId);
     }
 
     @GetMapping("/info")
