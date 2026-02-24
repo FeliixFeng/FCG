@@ -51,6 +51,10 @@ cd fcg-server && mvn spring-boot:run
 cd fcg-client && npm install && npm run dev
 ```
 
+## 测试账号
+- 账号：test01
+- 密码：123456
+
 ## 关键文件位置
 - 后端入口: `fcg-server/src/main/java/com/ghf/fcg/FcgApplication.java`
 - UserController: `fcg-server/src/main/java/com/ghf/fcg/modules/system/controller/UserController.java`

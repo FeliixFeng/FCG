@@ -9,6 +9,7 @@ import com.ghf.fcg.modules.medicine.dto.MedicineCreateDTO;
 import com.ghf.fcg.modules.medicine.dto.MedicineUpdateDTO;
 import com.ghf.fcg.modules.medicine.entity.Medicine;
 import com.ghf.fcg.modules.medicine.service.IMedicineService;
+import com.ghf.fcg.modules.medicine.vo.MedicineOcrVO;
 import com.ghf.fcg.modules.medicine.vo.MedicineVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
@@ -16,7 +17,17 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,6 +40,9 @@ public class MedicineController {
 
     private final IMedicineService medicineService;
     private final IUserService userService;
+
+    @Value("${ocr.base-url}")
+    private String ocrBaseUrl;
 
     @PostMapping
     @Operation(summary = "新增药品")
@@ -102,6 +116,40 @@ public class MedicineController {
                 .map(this::toMedicineVO)
                 .collect(Collectors.toList());
         return Result.success(list);
+    }
+
+    @PostMapping("/ocr")
+    @Operation(summary = "药品图片OCR识别")
+    public Result<MedicineOcrVO> ocr(@RequestPart("files") MultipartFile[] files) {
+        if (files == null || files.length == 0) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        for (MultipartFile file : files) {
+            try {
+                ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
+                    @Override
+                    public String getFilename() {
+                        return file.getOriginalFilename();
+                    }
+                };
+                body.add("files", resource);
+            } catch (Exception e) {
+                throw new BusinessException(MessageConstant.OCR_FAILED);
+            }
+        }
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        try {
+            MedicineOcrVO response = restTemplate.postForObject(ocrBaseUrl + "/smart-ocr", requestEntity, MedicineOcrVO.class);
+            return Result.success(response);
+        } catch (RestClientException e) {
+            throw new BusinessException(MessageConstant.OCR_FAILED);
+        }
     }
 
     private Long requireFamilyId(Long userId) {

@@ -29,4 +29,7 @@ public class MessageConstant {
     public static final String OPERATION_SUCCESS = "操作成功";
     public static final String OPERATION_FAILED = "操作失败";
     public static final String SYSTEM_ERROR = "系统异常，请联系管理员";
+    public static final String OCR_FAILED = "OCR识别失败";
+    public static final String OSS_CONFIG_MISSING = "OSS配置缺失";
+    public static final String OSS_UPLOAD_FAILED = "OSS上传失败";
 }

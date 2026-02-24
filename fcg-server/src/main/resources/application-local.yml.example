@@ -4,3 +4,11 @@ spring:
     username: YOUR_USERNAME
     password: YOUR_PASSWORD
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+oss:
+  endpoint: oss-cn-hangzhou.aliyuncs.com
+  access-key-id: YOUR_OSS_ACCESS_KEY_ID
+  access-key-secret: YOUR_OSS_ACCESS_KEY_SECRET
+  bucket: YOUR_OSS_BUCKET
+  domain: https://YOUR_OSS_BUCKET.oss-cn-hangzhou.aliyuncs.com
+  prefix: fcg
