@@ -15,6 +15,8 @@
 - ✅ 健康模块：Vital/HealthReport 增删改查、近一周体征查询
 - ✅ JWT 认证拦截器
 - ✅ 全局异常处理
+- ✅ OCR 识别接口（药品图片识别）
+- ✅ OSS 上传接口（图片上传）
 
 ### 数据库
 - 7 张核心表：sys_user, sys_family, medicine, medicine_plan, medicine_record, vital, health_report
@@ -54,6 +56,10 @@ cd fcg-client && npm install && npm run dev
 ## 测试账号
 - 账号：test01
 - 密码：123456
+
+## 关键接口
+- OCR 识别：`POST /api/medicine/ocr`（multipart/form-data，字段 `files`）
+- OSS 上传：`POST /api/oss/upload?dir=medicine`（multipart/form-data，字段 `file`）
 
 ## 关键文件位置
 - 后端入口: `fcg-server/src/main/java/com/ghf/fcg/FcgApplication.java`
