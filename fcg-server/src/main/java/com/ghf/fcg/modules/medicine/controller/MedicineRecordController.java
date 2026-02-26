@@ -3,6 +3,7 @@ package com.ghf.fcg.modules.medicine.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.dto.PageQuery;
 import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
@@ -21,6 +22,7 @@ import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -107,8 +109,7 @@ public class MedicineRecordController {
             @RequestParam(required = false) Long planId,
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
-            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
-            @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
+            @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -129,7 +130,7 @@ public class MedicineRecordController {
         wrapper.orderByDesc(MedicineRecord::getScheduledDate)
                 .orderByDesc(MedicineRecord::getScheduledTime);
 
-        Page<MedicineRecord> pageResult = recordService.page(new Page<>(page, size), wrapper);
+        Page<MedicineRecord> pageResult = recordService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
         return Result.success(PageResult.of(pageResult,
                 pageResult.getRecords().stream().map(this::toRecordVO).collect(Collectors.toList())));
     }

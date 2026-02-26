@@ -3,6 +3,7 @@ package com.ghf.fcg.modules.medicine.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.dto.PageQuery;
 import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
@@ -18,6 +19,7 @@ import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -107,16 +109,14 @@ public class MedicineController {
 
     @GetMapping("/list")
     @Operation(summary = "药品列表")
-    public Result<PageResult<MedicineVO>> list(
-            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
-            @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
+    public Result<PageResult<MedicineVO>> list(@ParameterObject PageQuery query) {
         Long userId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(userId);
 
         LambdaQueryWrapper<Medicine> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Medicine::getFamilyId, familyId)
                 .orderByDesc(Medicine::getCreateTime);
-        Page<Medicine> pageResult = medicineService.page(new Page<>(page, size), wrapper);
+        Page<Medicine> pageResult = medicineService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
         return Result.success(PageResult.of(pageResult,
                 pageResult.getRecords().stream().map(this::toMedicineVO).collect(Collectors.toList())));
     }
