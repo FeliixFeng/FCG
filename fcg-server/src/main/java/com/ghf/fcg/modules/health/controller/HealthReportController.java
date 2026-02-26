@@ -92,10 +92,10 @@ public class HealthReportController {
     @GetMapping("/list")
     @Operation(summary = "健康周报列表")
     public Result<PageResult<HealthReportVO>> list(
-            @Parameter(description = "成员ID") @RequestParam(required = false) Long userId,
-            @Parameter(description = "周开始日期") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-            @Parameter(description = "周结束日期") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd,
-            @Parameter(description = "风险等级 0-低 1-中 2-高") @RequestParam(required = false) Integer riskLevel,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd,
+            @RequestParam(required = false) Integer riskLevel,
             @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
             @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
         Long currentUserId = UserContext.get().getUserId();
