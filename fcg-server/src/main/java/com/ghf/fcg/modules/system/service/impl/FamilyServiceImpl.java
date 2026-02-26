@@ -69,9 +69,10 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
         admin.setCareMode(User.CARE_MODE_OFF);
         userService.save(admin);
 
-        // 回填 creatorId
+        // 回填 creatorId，重新查询拿到完整数据（含 createTime）
         family.setCreatorId(admin.getId());
         this.updateById(family);
+        family = this.getById(family.getId());
 
         return FamilyVO.builder()
                 .id(family.getId())

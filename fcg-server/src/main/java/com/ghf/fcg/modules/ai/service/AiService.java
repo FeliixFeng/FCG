@@ -1,0 +1,150 @@
+package com.ghf.fcg.modules.ai.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ghf.fcg.config.AiProperties;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+
+import java.util.*;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AiService {
+
+    private final AiProperties aiProperties;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * 文本补全（对话）
+     */
+    public String chat(String prompt) {
+        return chat(prompt, null);
+    }
+
+    /**
+     * 文本补全（带系统提示）
+     */
+    public String chat(String systemPrompt, String userPrompt) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", aiProperties.getModel());
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            Map<String, Object> systemMsg = new HashMap<>();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", systemPrompt);
+            messages.add(systemMsg);
+        }
+
+        Map<String, Object> userMsg = new HashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", userPrompt);
+        messages.add(userMsg);
+
+        requestBody.put("messages", messages);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + aiProperties.getApiKey());
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+
+        try {
+            String url = aiProperties.getBaseUrl() + "/chat/completions";
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+                    return (String) message.get("content");
+                }
+            }
+            log.warn("AI response is empty: {}", response.getBody());
+            return null;
+        } catch (Exception e) {
+            log.error("AI chat failed: {}", e.getMessage(), e);
+            throw new RuntimeException("AI服务调用失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 优化药品OCR结果
+     * 将OCR识别的文字优化为结构化信息
+     */
+    public String optimizeMedicineInfo(String ocrText) {
+        String systemPrompt = """
+            你是一个专业的药品信息提取助手。
+            你的任务是从OCR识别的文本中提取准确的药品信息，并以JSON格式返回。
+            只返回JSON，不要其他内容。
+            """;
+
+        String userPrompt = """
+            以下是OCR识别的药品信息文本：
+            
+            %s
+            
+            请提取以下信息并返回JSON格式：
+            {
+                "name": "药品名称",
+                "specification": "规格",
+                "manufacturer": "生产厂家",
+                "dosageForm": "剂型",
+                "expirationDate": "过期日期(YYYY-MM-DD格式，如果看不到则返回null)",
+                "usage": "主要用途/适应症",
+                "contraindications": "禁忌人群/药物",
+                "sideEffects": "常见副作用",
+                "dosage": "用法用量"
+            }
+            
+            如果某项无法识别，请返回null。只返回JSON。
+            """.formatted(ocrText);
+
+        return chat(systemPrompt, userPrompt);
+    }
+
+    /**
+     * 生成用药建议
+     */
+    public String generateMedicineAdvice(String medicineName, String userInfo) {
+        String userPrompt = """
+            药品名称：%s
+            用户信息：%s
+            
+            请给出合理的用药建议，包括：
+            1. 注意事项
+            2. 可能的不良反应
+            3. 与其他药物的相互作用提醒
+            
+            请用通俗易懂的语言回答，适合老年人理解。
+            """.formatted(medicineName, userInfo);
+
+        return chat("你是一个专业的用药顾问，请给出安全、合理的建议。", userPrompt);
+    }
+
+    /**
+     * 生成健康周报AI总结
+     */
+    public String generateHealthReportSummary(String vitalData, String medicineData) {
+        String userPrompt = """
+            体征数据：%s
+            用药数据：%s
+            
+            请分析以上数据，生成一份健康周报总结，包括：
+            1. 本周健康状况概述
+            2. 需要注意的健康风险
+            3. 用药依从性评估
+            4. 具体的健康建议
+            
+            请用通俗易懂的语言回答。
+            """.formatted(vitalData, medicineData);
+
+        return chat("你是一个专业的健康顾问，请给出科学、合理的健康建议。", userPrompt);
+    }
+}

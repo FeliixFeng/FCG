@@ -177,8 +177,8 @@ CREATE TABLE `health_report` (
 
 -- 测试家庭（密码 test123 的BCrypt hash）
 INSERT INTO `sys_family` (`family_name`, `username`, `password`, `creator_id`) VALUES
-('张家', 'zhangfamily', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1),
-('李家', 'lifamily',   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 4);
+('张家', 'zhangfamily', '$2a$12$Lmi6OtRgo6Po5fk7w.gWYOg3vZLLxZG5Y5DaQ.rtN3pIZHC5W8fUq', 1),
+('李家', 'lifamily',   '$2a$12$Lmi6OtRgo6Po5fk7w.gWYOg3vZLLxZG5Y5DaQ.rtN3pIZHC5W8fUq', 4);
 
 -- 张家成员
 INSERT INTO `sys_user` (`nickname`, `phone`, `role`, `family_id`, `relation`, `care_mode`) VALUES
