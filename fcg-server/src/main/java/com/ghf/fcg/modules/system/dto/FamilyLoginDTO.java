@@ -4,14 +4,18 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+/**
+ * 家庭账号登录请求 DTO
+ */
 @Data
-public class UserLoginDTO {
+@Schema(description = "家庭账号登录请求")
+public class FamilyLoginDTO {
 
-    @Schema(description = "用户名")
-    @NotBlank(message = "用户名不能为空")
+    @NotBlank(message = "账号不能为空")
+    @Schema(description = "家庭账号")
     private String username;
 
-    @Schema(description = "密码")
     @NotBlank(message = "密码不能为空")
+    @Schema(description = "家庭密码")
     private String password;
 }

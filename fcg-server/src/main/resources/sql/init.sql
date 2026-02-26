@@ -10,40 +10,38 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 系统模块
 -- ============================================
 
--- 1. 家庭表
+-- 1. 家庭表（家庭账号登录，一个家庭一个账号）
 DROP TABLE IF EXISTS `sys_family`;
 CREATE TABLE `sys_family` (
     `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '家庭ID',
     `family_name` VARCHAR(100) NOT NULL COMMENT '家庭名称',
-    `invite_code` VARCHAR(20)  NOT NULL COMMENT '邀请码（用于家庭成员加入）',
-    `creator_id`  BIGINT       NOT NULL COMMENT '创建者用户ID',
+    `username`    VARCHAR(50)  NOT NULL COMMENT '家庭账号（登录用）',
+    `password`    VARCHAR(100) NOT NULL COMMENT '家庭密码（BCrypt加密）',
+    `creator_id`  BIGINT       NOT NULL COMMENT '创建者成员ID',
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
     `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_invite_code` (`invite_code`)
+    UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家庭表';
 
--- 2. 用户表
+-- 2. 成员表（家庭下的成员，无独立登录账号）
 DROP TABLE IF EXISTS `sys_user`;
 CREATE TABLE `sys_user` (
-    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
-    `username`    VARCHAR(50)  NOT NULL COMMENT '用户名',
-    `password`    VARCHAR(100) NOT NULL COMMENT '密码（加密）',
-    `nickname`    VARCHAR(50)  DEFAULT NULL COMMENT '昵称',
+    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '成员ID',
+    `nickname`    VARCHAR(50)  NOT NULL COMMENT '昵称（必填，选人页展示用）',
     `phone`       VARCHAR(20)  DEFAULT NULL COMMENT '手机号',
-    `avatar`      VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
-    `role`        TINYINT      NOT NULL DEFAULT 2 COMMENT '角色 0-管理员 1-普通成员 2-受控成员',
-    `family_id`   BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
-    `relation`    VARCHAR(20)  DEFAULT NULL COMMENT '家庭关系（如：本人/父亲/母亲/儿子/女儿）',
-    `care_mode`   TINYINT      NOT NULL DEFAULT 0 COMMENT '关怀模式 0-关闭 1-开启',
+    `avatar`      VARCHAR(255) DEFAULT NULL COMMENT '头像URL（存OSS地址）',
+    `role`        TINYINT      NOT NULL DEFAULT 1 COMMENT '角色 0-管理员 1-普通成员 2-关怀成员（老人）',
+    `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+    `relation`    VARCHAR(20)  DEFAULT NULL COMMENT '家庭关系（父亲/母亲/爷爷等）',
+    `care_mode`   TINYINT      NOT NULL DEFAULT 0 COMMENT '关怀模式 0-关闭 1-开启（关怀成员自动开启）',
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
     `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_username` (`username`),
     KEY `idx_family_id` (`family_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家庭成员表';
 
 -- ============================================
 -- 药品模块
@@ -174,11 +172,22 @@ CREATE TABLE `health_report` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='健康周报表';
 
 -- ============================================
--- 初始化数据
+-- 测试数据（密码均为 test123）
 -- ============================================
 
--- 插入默认管理员（密码: admin123，实际项目需加密）
-INSERT INTO `sys_user` (`username`, `password`, `nickname`, `role`, `care_mode`) 
-VALUES ('admin', 'admin123', '系统管理员', 0, 0);
+-- 测试家庭（密码 test123 的BCrypt hash）
+INSERT INTO `sys_family` (`family_name`, `username`, `password`, `creator_id`) VALUES
+('张家', 'zhangfamily', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1),
+('李家', 'lifamily',   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 4);
+
+-- 张家成员
+INSERT INTO `sys_user` (`nickname`, `phone`, `role`, `family_id`, `relation`, `care_mode`) VALUES
+('张爸爸', '13800000001', 0, 1, '父亲', 0),  -- 管理员
+('张妈妈', '13800000002', 1, 1, '母亲', 0),  -- 普通成员
+('张爷爷', '13800000003', 2, 1, '爷爷', 1);  -- 关怀成员
+
+-- 李家成员
+INSERT INTO `sys_user` (`nickname`, `phone`, `role`, `family_id`, `relation`, `care_mode`) VALUES
+('李爸爸', '13800000004', 0, 2, '父亲', 0);  -- 管理员
 
 SET FOREIGN_KEY_CHECKS = 1;

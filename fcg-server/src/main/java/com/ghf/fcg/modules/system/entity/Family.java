@@ -11,10 +11,16 @@ public class Family {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 家庭名称 */
     private String familyName;
 
-    private String inviteCode;
+    /** 家庭账号（登录用，全局唯一） */
+    private String username;
 
+    /** 家庭密码（BCrypt加密） */
+    private String password;
+
+    /** 创建者成员ID */
     private Long creatorId;
 
     @TableLogic

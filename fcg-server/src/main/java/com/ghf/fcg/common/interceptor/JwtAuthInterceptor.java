@@ -12,6 +12,9 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
  * JWT 认证拦截器
+ * 支持两种 token：
+ *   - 家庭级 token（tokenType=family）：登录后获取，只能访问 /api/family/members 和 /api/family/switch-member
+ *   - 成员级 token（tokenType=member）：选人后获取，可访问所有业务接口
  */
 @Component
 public class JwtAuthInterceptor implements HandlerInterceptor {
@@ -45,15 +48,26 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             throw new BusinessException(401, MessageConstant.UNAUTHORIZED);
         }
 
-        Long userId = claims.get("userId", Long.class);
-        String username = claims.get("username", String.class);
-        Integer role = claims.get("role", Integer.class);
-
-        if (userId == null || username == null || role == null) {
+        Long familyId = claims.get("familyId", Long.class);
+        if (familyId == null) {
             throw new BusinessException(401, MessageConstant.UNAUTHORIZED);
         }
 
-        UserContext.set(new UserContext.UserInfo(userId, username, role));
+        if (JwtUtils.isFamilyToken(claims)) {
+            // 家庭级 token：memberId 和 role 为 null，只允许访问选人相关接口
+            UserContext.set(new UserContext.UserInfo(familyId, null, null));
+        } else if (JwtUtils.isMemberToken(claims)) {
+            // 成员级 token：携带 memberId 和 role
+            Long memberId = claims.get("memberId", Long.class);
+            Integer role = claims.get("role", Integer.class);
+            if (memberId == null || role == null) {
+                throw new BusinessException(401, MessageConstant.UNAUTHORIZED);
+            }
+            UserContext.set(new UserContext.UserInfo(familyId, memberId, role));
+        } else {
+            throw new BusinessException(401, MessageConstant.UNAUTHORIZED);
+        }
+
         return true;
     }
 
