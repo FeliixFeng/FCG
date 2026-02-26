@@ -20,6 +20,7 @@ import com.ghf.fcg.modules.medicine.vo.MedicinePlanVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -102,10 +103,10 @@ public class MedicinePlanController {
     @GetMapping("/list")
     @Operation(summary = "用药计划列表")
     public Result<PageResult<MedicinePlanVO>> list(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size) {
+            @Parameter(description = "成员ID") @RequestParam(required = false) Long userId,
+            @Parameter(description = "状态 0-停用 1-启用") @RequestParam(required = false) Integer status,
+            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
+            @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -127,11 +128,11 @@ public class MedicinePlanController {
     @GetMapping("/records")
     @Operation(summary = "计划记录联表查询")
     public Result<PageResult<MedicinePlanRecordVO>> listPlanRecords(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size) {
+            @Parameter(description = "成员ID") @RequestParam(required = false) Long userId,
+            @Parameter(description = "状态 0-未服 1-已服 2-跳过") @RequestParam(required = false) Integer status,
+            @Parameter(description = "应服药日期") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
+            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
+            @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 

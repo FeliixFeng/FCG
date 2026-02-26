@@ -15,6 +15,7 @@ import com.ghf.fcg.modules.health.vo.VitalVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -93,12 +94,12 @@ public class VitalController {
     @GetMapping("/list")
     @Operation(summary = "体征记录列表")
     public Result<PageResult<VitalVO>> list(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) Integer type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size) {
+            @Parameter(description = "成员ID") @RequestParam(required = false) Long userId,
+            @Parameter(description = "类型 1-血压 2-血糖 3-心率 4-体温 5-体重") @RequestParam(required = false) Integer type,
+            @Parameter(description = "开始时间") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @Parameter(description = "结束时间") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
+            @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 

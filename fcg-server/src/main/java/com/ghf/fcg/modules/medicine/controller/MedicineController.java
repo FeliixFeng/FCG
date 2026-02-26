@@ -16,6 +16,7 @@ import com.ghf.fcg.modules.medicine.vo.MedicineVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -107,8 +108,8 @@ public class MedicineController {
     @GetMapping("/list")
     @Operation(summary = "药品列表")
     public Result<PageResult<MedicineVO>> list(
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size) {
+            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") long page,
+            @Parameter(description = "每页条数，默认20") @RequestParam(defaultValue = "20") long size) {
         Long userId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(userId);
 
