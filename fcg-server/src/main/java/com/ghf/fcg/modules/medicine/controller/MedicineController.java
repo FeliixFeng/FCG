@@ -1,7 +1,9 @@
 package com.ghf.fcg.modules.medicine.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -104,18 +106,18 @@ public class MedicineController {
 
     @GetMapping("/list")
     @Operation(summary = "药品列表")
-    public Result<List<MedicineVO>> list() {
+    public Result<PageResult<MedicineVO>> list(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "20") long size) {
         Long userId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(userId);
 
         LambdaQueryWrapper<Medicine> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Medicine::getFamilyId, familyId)
                 .orderByDesc(Medicine::getCreateTime);
-        List<MedicineVO> list = medicineService.list(wrapper)
-                .stream()
-                .map(this::toMedicineVO)
-                .collect(Collectors.toList());
-        return Result.success(list);
+        Page<Medicine> pageResult = medicineService.page(new Page<>(page, size), wrapper);
+        return Result.success(PageResult.of(pageResult,
+                pageResult.getRecords().stream().map(this::toMedicineVO).collect(Collectors.toList())));
     }
 
     @PostMapping("/ocr")

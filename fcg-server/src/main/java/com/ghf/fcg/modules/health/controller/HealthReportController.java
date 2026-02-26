@@ -1,7 +1,9 @@
 package com.ghf.fcg.modules.health.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -88,12 +90,13 @@ public class HealthReportController {
 
     @GetMapping("/list")
     @Operation(summary = "健康周报列表")
-    public Result<List<HealthReportVO>> list(@RequestParam(required = false) Long userId,
-                                             @RequestParam(required = false)
-                                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-                                             @RequestParam(required = false)
-                                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd,
-                                             @RequestParam(required = false) Integer riskLevel) {
+    public Result<PageResult<HealthReportVO>> list(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd,
+            @RequestParam(required = false) Integer riskLevel,
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "20") long size) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -113,11 +116,9 @@ public class HealthReportController {
         }
         wrapper.orderByDesc(HealthReport::getWeekStart);
 
-        List<HealthReportVO> list = reportService.list(wrapper)
-                .stream()
-                .map(this::toReportVO)
-                .collect(Collectors.toList());
-        return Result.success(list);
+        Page<HealthReport> pageResult = reportService.page(new Page<>(page, size), wrapper);
+        return Result.success(PageResult.of(pageResult,
+                pageResult.getRecords().stream().map(this::toReportVO).collect(Collectors.toList())));
     }
 
     private Long requireFamilyId(Long userId) {
