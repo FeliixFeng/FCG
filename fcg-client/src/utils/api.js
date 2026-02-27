@@ -33,3 +33,20 @@ export const updateUserInfo = (data) => http.put('/api/user/update', data)
 
 /** 切换关怀模式 */
 export const switchCareMode = (mode) => http.put(`/api/user/care-mode/${mode}`)
+
+// ========== 药品模块 ==========
+
+/** 药品列表（分页） */
+export const fetchMedicineList = (params) => http.get('/api/medicine/list', { params })
+
+/** 新增药品 */
+export const createMedicine = (data) => http.post('/api/medicine', data)
+
+/** 更新药品 */
+export const updateMedicine = (id, data) => http.put(`/api/medicine/${id}`, data)
+
+/** 删除药品 */
+export const deleteMedicine = (id) => http.delete(`/api/medicine/${id}`)
+
+/** 药品详情 */
+export const fetchMedicine = (id) => http.get(`/api/medicine/${id}`)
