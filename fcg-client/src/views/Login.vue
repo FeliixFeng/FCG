@@ -17,15 +17,14 @@ const error = ref('')
 const submit = async () => {
   error.value = ''
   if (!form.username || !form.password) {
-    error.value = '请输入用户名与密码'
+    error.value = '请输入账号与密码'
     return
   }
   try {
     loading.value = true
     await userStore.login({ ...form })
-    await userStore.fetchProfile()
-    const redirect = route.query.redirect || '/'
-    router.replace(redirect)
+    // 登录成功后跳转选人页
+    router.replace({ name: 'select-member' })
   } catch (err) {
     error.value = err?.message || '登录失败'
   } finally {
@@ -40,13 +39,13 @@ const submit = async () => {
       <div class="login-header">
         <div class="brand-mark">FCG</div>
         <div>
-          <div class="login-title">登录</div>
+          <div class="login-title">家庭账号登录</div>
           <div class="muted">进入家庭健康管理系统</div>
         </div>
       </div>
       <form class="login-form" @submit.prevent="submit">
         <label class="field">
-          <span>用户名</span>
+          <span>家庭账号</span>
           <input v-model="form.username" class="input" autocomplete="username" />
         </label>
         <label class="field">
@@ -57,6 +56,9 @@ const submit = async () => {
         <button class="btn" type="submit" :disabled="loading">
           {{ loading ? '登录中...' : '登录' }}
         </button>
+        <p class="muted center">
+          没有账号？<a @click="router.push({ name: 'register' })">注册家庭账号</a>
+        </p>
       </form>
     </div>
   </div>

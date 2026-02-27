@@ -31,14 +31,35 @@ public class JwtUtils {
         JwtUtils.expiration = expiration;
     }
 
-    public static String generateToken(Long userId, String username, Integer role) {
+    /**
+     * 生成家庭级 token（登录后使用，只含 familyId）
+     * 用途：获取成员列表（选人页）
+     */
+    public static String generateFamilyToken(Long familyId, String username) {
         Date now = new Date();
         Date expireTime = new Date(now.getTime() + expiration);
-
         return Jwts.builder()
-                .claim("userId", userId)
+                .claim("familyId", familyId)
                 .claim("username", username)
+                .claim("tokenType", "family")   // 标记 token 类型
+                .issuedAt(now)
+                .expiration(expireTime)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    /**
+     * 生成成员级 token（选人后使用，含 familyId + memberId + role）
+     * 用途：访问所有业务接口
+     */
+    public static String generateMemberToken(Long familyId, Long memberId, Integer role) {
+        Date now = new Date();
+        Date expireTime = new Date(now.getTime() + expiration);
+        return Jwts.builder()
+                .claim("familyId", familyId)
+                .claim("memberId", memberId)
                 .claim("role", role)
+                .claim("tokenType", "member")   // 标记 token 类型
                 .issuedAt(now)
                 .expiration(expireTime)
                 .signWith(getSigningKey())
@@ -60,6 +81,16 @@ public class JwtUtils {
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    /** 判断是否为家庭级 token */
+    public static boolean isFamilyToken(Claims claims) {
+        return "family".equals(claims.get("tokenType", String.class));
+    }
+
+    /** 判断是否为成员级 token */
+    public static boolean isMemberToken(Claims claims) {
+        return "member".equals(claims.get("tokenType", String.class));
     }
 
     private static SecretKey getSigningKey() {

@@ -1,13 +1,8 @@
 package com.ghf.fcg.modules.system.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.exception.BusinessException;
-import com.ghf.fcg.common.utils.JwtUtils;
-import com.ghf.fcg.common.utils.PasswordEncoder;
-import com.ghf.fcg.modules.system.dto.UserLoginDTO;
-import com.ghf.fcg.modules.system.dto.UserRegisterDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.mapper.UserMapper;
@@ -17,82 +12,35 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
+
+    /**
+     * 获取成员信息
+     */
     @Override
-    public Long register(UserRegisterDTO registerDTO) {
-        // 检查用户名是否存在
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getUsername, registerDTO.getUsername());
-        Long count = this.count(wrapper);
-        if(count > 0){
-            throw new BusinessException(MessageConstant.USERNAME_EXIST);
-        }
-
-        // 加密密码
-        String encodedPassword = PasswordEncoder.encode(registerDTO.getPassword());
-
-        // 创建用户
-        User user = new User();
-        user.setUsername(registerDTO.getUsername());
-        user.setPassword(encodedPassword);
-        user.setNickname(registerDTO.getNickname());
-        user.setPhone(registerDTO.getPhone());
-        user.setRole(User.ROLE_MEMBER);
-        user.setCareMode(User.CARE_MODE_OFF);
-
-        // 保存
-        this.save(user);
-        return user.getId();
-    }
-
-    @Override
-    public UserVO login(UserLoginDTO loginDTO) {
-        // 1. 根据用户名查询用户
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getUsername, loginDTO.getUsername());
-        User user = this.getOne(wrapper);
-        if(user == null){
-            throw new BusinessException(MessageConstant.LOGIN_FAILED);
-        }
-
-        // 2. 验证密码
-        if(!PasswordEncoder.matches(loginDTO.getPassword(), user.getPassword())){
-            throw new BusinessException(MessageConstant.LOGIN_FAILED);
-        }
-        // 3. 生成token
-        String token = JwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole());
-
-        // 4. 返回userVO
-        return UserVO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .nickname(user.getNickname())
-                .role(user.getRole())
-                .token(token)
-                .build();
-    }
-
-    @Override
-    public UserVO getUserInfo(Long userId) {
-        User user = this.getById(userId);
+    public UserVO getUserInfo(Long memberId) {
+        User user = this.getById(memberId);
         if (user == null) {
             throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
         return UserVO.builder()
                 .id(user.getId())
-                .username(user.getUsername())
                 .nickname(user.getNickname())
                 .phone(user.getPhone())
                 .avatar(user.getAvatar())
                 .role(user.getRole())
                 .familyId(user.getFamilyId())
+                .relation(user.getRelation())
                 .careMode(user.getCareMode())
                 .createTime(user.getCreateTime())
                 .build();
     }
 
+    /**
+     * 更新成员信息（昵称/手机号/头像）
+     */
     @Override
-    public void updateUserInfo(Long userId, UserUpdateDTO updateDTO) {
-        User user = this.getById(userId);
+    public void updateUserInfo(Long memberId, UserUpdateDTO updateDTO) {
+        User user = this.getById(memberId);
         if (user == null) {
             throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
@@ -102,12 +50,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         this.updateById(user);
     }
 
+    /**
+     * 切换关怀模式
+     */
     @Override
-    public void switchCareMode(Long userId, Integer mode) {
+    public void switchCareMode(Long memberId, Integer mode) {
         if (mode != User.CARE_MODE_OFF && mode != User.CARE_MODE_ON) {
             throw new BusinessException(MessageConstant.CARE_MODE_PARAM_ERROR);
         }
-        User user = this.getById(userId);
+        User user = this.getById(memberId);
         if (user == null) {
             throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }

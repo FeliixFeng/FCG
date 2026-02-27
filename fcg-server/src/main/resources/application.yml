@@ -28,9 +28,9 @@ logging:
     com.ghf.fcg: debug
 
 ---
-# JWT 配置
+# JWT 配置（secret 在 application-local.yml 中覆盖）
 jwt:
-  secret: fcg-jwt-secret-key-change-this-in-production-2026
+  secret: please-set-jwt-secret-in-application-local-yml
   expiration: 86400000
 
 ---

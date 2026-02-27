@@ -1,0 +1,60 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build backend jar
+        working-directory: fcg-server
+        run: mvn package -DskipTests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        run: |
+          docker build -t fcg-server:latest ./fcg-server
+          docker save fcg-server:latest | gzip > fcg-server.tar.gz
+
+      - name: Build frontend image
+        run: |
+          docker build -t fcg-web:latest ./fcg-client
+          docker save fcg-web:latest | gzip > fcg-web.tar.gz
+
+      - name: Copy images to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "fcg-server.tar.gz,fcg-web.tar.gz,docker-compose.yml"
+          target: "/home/user/apps/fcg"
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/user/apps/fcg
+            docker load < fcg-server.tar.gz
+            docker load < fcg-web.tar.gz
+            docker compose up -d --force-recreate
+            rm -f fcg-server.tar.gz fcg-web.tar.gz

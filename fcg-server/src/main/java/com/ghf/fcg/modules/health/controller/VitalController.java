@@ -1,7 +1,10 @@
 package com.ghf.fcg.modules.health.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.dto.PageQuery;
+import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -13,7 +16,9 @@ import com.ghf.fcg.modules.health.vo.VitalVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -90,12 +95,12 @@ public class VitalController {
 
     @GetMapping("/list")
     @Operation(summary = "体征记录列表")
-    public Result<List<VitalVO>> list(@RequestParam(required = false) Long userId,
-                                      @RequestParam(required = false) Integer type,
-                                      @RequestParam(required = false)
-                                      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
-                                      @RequestParam(required = false)
-                                      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+    public Result<PageResult<VitalVO>> list(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Integer type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -115,11 +120,9 @@ public class VitalController {
         }
         wrapper.orderByDesc(Vital::getMeasureTime);
 
-        List<VitalVO> list = vitalService.list(wrapper)
-                .stream()
-                .map(this::toVitalVO)
-                .collect(Collectors.toList());
-        return Result.success(list);
+        Page<Vital> pageResult = vitalService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
+        return Result.success(PageResult.of(pageResult,
+                pageResult.getRecords().stream().map(this::toVitalVO).collect(Collectors.toList())));
     }
 
     @GetMapping("/weekly")

@@ -1,7 +1,10 @@
 package com.ghf.fcg.modules.medicine.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.dto.PageQuery;
+import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -18,7 +21,9 @@ import com.ghf.fcg.modules.medicine.vo.MedicinePlanVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -99,8 +104,10 @@ public class MedicinePlanController {
 
     @GetMapping("/list")
     @Operation(summary = "用药计划列表")
-    public Result<List<MedicinePlanVO>> list(@RequestParam(required = false) Long userId,
-                                             @RequestParam(required = false) Integer status) {
+    public Result<PageResult<MedicinePlanVO>> list(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Integer status,
+            @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -114,19 +121,18 @@ public class MedicinePlanController {
         }
         wrapper.orderByDesc(MedicinePlan::getCreateTime);
 
-        List<MedicinePlanVO> list = planService.list(wrapper)
-                .stream()
-                .map(this::toPlanVO)
-                .collect(Collectors.toList());
-        return Result.success(list);
+        Page<MedicinePlan> pageResult = planService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
+        return Result.success(PageResult.of(pageResult,
+                pageResult.getRecords().stream().map(this::toPlanVO).collect(Collectors.toList())));
     }
 
     @GetMapping("/records")
     @Operation(summary = "计划记录联表查询")
-    public Result<List<MedicinePlanRecordVO>> listPlanRecords(
+    public Result<PageResult<MedicinePlanRecordVO>> listPlanRecords(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
+            @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -144,9 +150,10 @@ public class MedicinePlanController {
         wrapper.orderByDesc(MedicineRecord::getScheduledDate)
                 .orderByDesc(MedicineRecord::getScheduledTime);
 
-        List<MedicineRecord> records = recordService.list(wrapper);
+        Page<MedicineRecord> pageResult = recordService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
+        List<MedicineRecord> records = pageResult.getRecords();
         if (records.isEmpty()) {
-            return Result.success(List.of());
+            return Result.success(PageResult.of(pageResult, List.of()));
         }
 
         Set<Long> planIds = records.stream().map(MedicineRecord::getPlanId).collect(Collectors.toSet());
@@ -185,7 +192,7 @@ public class MedicinePlanController {
                     .planStatus(plan.getStatus())
                     .build());
         }
-        return Result.success(list);
+        return Result.success(PageResult.of(pageResult, list));
     }
 
     private Long requireFamilyId(Long userId) {

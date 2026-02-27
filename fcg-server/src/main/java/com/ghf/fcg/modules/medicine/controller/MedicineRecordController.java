@@ -1,7 +1,10 @@
 package com.ghf.fcg.modules.medicine.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ghf.fcg.common.constant.MessageConstant;
+import com.ghf.fcg.common.dto.PageQuery;
+import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
@@ -17,7 +20,9 @@ import com.ghf.fcg.modules.medicine.vo.MedicineRecordVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -99,11 +104,12 @@ public class MedicineRecordController {
 
     @GetMapping("/list")
     @Operation(summary = "服药记录列表")
-    public Result<List<MedicineRecordVO>> list(@RequestParam(required = false) Long userId,
-                                               @RequestParam(required = false) Long planId,
-                                               @RequestParam(required = false) Integer status,
-                                               @RequestParam(required = false)
-                                               @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate) {
+    public Result<PageResult<MedicineRecordVO>> list(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long planId,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
+            @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
@@ -124,11 +130,9 @@ public class MedicineRecordController {
         wrapper.orderByDesc(MedicineRecord::getScheduledDate)
                 .orderByDesc(MedicineRecord::getScheduledTime);
 
-        List<MedicineRecordVO> list = recordService.list(wrapper)
-                .stream()
-                .map(this::toRecordVO)
-                .collect(Collectors.toList());
-        return Result.success(list);
+        Page<MedicineRecord> pageResult = recordService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
+        return Result.success(PageResult.of(pageResult,
+                pageResult.getRecords().stream().map(this::toRecordVO).collect(Collectors.toList())));
     }
 
     private Long requireFamilyId(Long userId) {
