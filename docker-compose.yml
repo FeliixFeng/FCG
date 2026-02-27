@@ -3,6 +3,8 @@ services:
     image: fcg-server:latest
     container_name: fcg-server
     restart: always
+    networks:
+      - fcg-net
     volumes:
       - /home/user/apps/fcg/config/application-prod.yml:/app/config/application-prod.yml
     environment:
@@ -15,5 +17,11 @@ services:
     restart: always
     ports:
       - "5173:80"
+    networks:
+      - fcg-net
     depends_on:
       - fcg-server
+
+networks:
+  fcg-net:
+    driver: bridge
