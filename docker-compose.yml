@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - /home/user/fcg/config/application-prod.yml:/app/config/application-prod.yml
+      - /home/user/apps/fcg/config/application-prod.yml:/app/config/application-prod.yml
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/

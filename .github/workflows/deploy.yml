@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "fcg-server.tar.gz,fcg-web.tar.gz,docker-compose.yml"
-          target: "/home/user/fcg"
+          target: "/home/user/apps/fcg"
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
@@ -53,7 +53,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /home/user/fcg
+            cd /home/user/apps/fcg
             docker load < fcg-server.tar.gz
             docker load < fcg-web.tar.gz
             docker compose up -d --force-recreate
