@@ -22,17 +22,22 @@ jobs:
         working-directory: fcg-server
         run: mvn package -DskipTests
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build backend image
         run: |
-          docker build -t fcg-server:latest ./fcg-server
+          docker buildx build --platform linux/arm64 -t fcg-server:latest ./fcg-server --load
           docker save fcg-server:latest | gzip > fcg-server.tar.gz
 
       - name: Build frontend image
         run: |
-          docker build -t fcg-web:latest ./fcg-client
+          docker buildx build --platform linux/arm64 -t fcg-web:latest ./fcg-client --load
           docker save fcg-web:latest | gzip > fcg-web.tar.gz
 
       - name: Copy images to server
