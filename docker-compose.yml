@@ -1,0 +1,21 @@
+services:
+  fcg-server:
+    image: fcg-server:latest
+    container_name: fcg-server
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - /home/user/fcg/config/application-prod.yml:/app/config/application-prod.yml
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/
+
+  fcg-web:
+    image: fcg-web:latest
+    container_name: fcg-web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - fcg-server
