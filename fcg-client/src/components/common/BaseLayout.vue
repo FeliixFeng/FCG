@@ -11,7 +11,9 @@ const username = computed(() => userStore.profile?.nickname || userStore.profile
     <header class="topbar">
       <div class="container topbar-content">
         <div class="brand">
-          <div class="brand-mark">FCG</div>
+          <div class="brand-mark">
+            <img src="/fcg.png" alt="FCG" class="brand-logo" />
+          </div>
           <div>
             <div class="brand-title">Family Care Guardian</div>
             <div class="brand-sub">家庭健康管理系统</div>
@@ -54,10 +56,13 @@ const username = computed(() => userStore.profile?.nickname || userStore.profile
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: var(--primary);
-  color: var(--primary-ink);
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  overflow: hidden;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
 }
 
 .brand-title {
