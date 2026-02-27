@@ -22,33 +22,25 @@ jobs:
         working-directory: fcg-server
         run: mvn package -DskipTests
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          platforms: arm64
+          node-version: '20'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Build frontend
+        working-directory: fcg-client
+        run: npm install && npm run build
 
-      - name: Build backend image
-        run: |
-          docker buildx build --platform linux/arm64 -t fcg-server:latest ./fcg-server --load
-          docker save fcg-server:latest | gzip > fcg-server.tar.gz
-
-      - name: Build frontend image
-        run: |
-          docker buildx build --platform linux/arm64 -t fcg-web:latest ./fcg-client --load
-          docker save fcg-web:latest | gzip > fcg-web.tar.gz
-
-      - name: Copy images to server
+      - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "fcg-server.tar.gz,fcg-web.tar.gz,docker-compose.yml"
+          source: "fcg-server/target/fcg-server-1.0.0.jar,fcg-server/Dockerfile,fcg-client/dist,fcg-client/nginx.conf,fcg-client/Dockerfile,docker-compose.yml"
           target: "/home/user/apps/fcg"
+          strip_components: 0
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
@@ -59,7 +51,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/user/apps/fcg
-            docker load < fcg-server.tar.gz
-            docker load < fcg-web.tar.gz
+            docker build -t fcg-server:latest ./fcg-server
+            docker build -t fcg-web:latest ./fcg-client
             docker compose up -d --force-recreate
-            rm -f fcg-server.tar.gz fcg-web.tar.gz
