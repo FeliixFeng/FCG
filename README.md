@@ -34,7 +34,7 @@
 - ✅ 用户与家庭模块（登录/注册、用户信息、关怀模式、家庭创建/加入/成员）
 - ✅ 药品模块基础 API（药品/计划/记录增删改查 + 计划记录联表）
 - ✅ 健康模块基础 API（体征/周报增删改查 + 近一周体征查询）
-- ✅ OCR 识别接口（药品图片识别）
+- ✅ OCR + AI 一体化识别接口（药品图片识别并结构化提取）
 - ✅ OSS 上传接口（图片上传）
 
 ### 前端
@@ -62,7 +62,7 @@
 
 ## 关键接口
 
-- **OCR 识别**：`POST /api/medicine/ocr`（multipart/form-data，字段 `files`）
+- **OCR + AI 识别**：`POST /api/medicine/ocr`（multipart/form-data，字段 `files`，返回原始OCR与结构化药品信息）
 - **OSS 上传**：`POST /api/oss/upload?dir=medicine`（multipart/form-data，字段 `file`）
 
 ## 项目结构

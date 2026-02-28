@@ -8,16 +8,18 @@ import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
+import com.ghf.fcg.modules.ai.service.AiService;
 import com.ghf.fcg.modules.medicine.dto.MedicineCreateDTO;
 import com.ghf.fcg.modules.medicine.dto.MedicineUpdateDTO;
 import com.ghf.fcg.modules.medicine.entity.Medicine;
 import com.ghf.fcg.modules.medicine.service.IMedicineService;
+import com.ghf.fcg.modules.medicine.vo.MedicineOcrEnhancedVO;
+import com.ghf.fcg.modules.medicine.vo.MedicineOcrParsedVO;
 import com.ghf.fcg.modules.medicine.vo.MedicineOcrVO;
 import com.ghf.fcg.modules.medicine.vo.MedicineVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @RestController
@@ -45,6 +48,8 @@ public class MedicineController {
 
     private final IMedicineService medicineService;
     private final IUserService userService;
+    private final AiService aiService;
+    private final RestTemplate restTemplate;
 
     @Value("${ocr.base-url}")
     private String ocrBaseUrl;
@@ -122,12 +127,42 @@ public class MedicineController {
     }
 
     @PostMapping("/ocr")
-    @Operation(summary = "药品图片OCR识别")
-    public Result<MedicineOcrVO> ocr(@RequestPart("files") MultipartFile[] files) {
+    @Operation(summary = "药品图片OCR识别并AI结构化")
+    public Result<MedicineOcrEnhancedVO> ocr(@RequestPart("files") MultipartFile[] files) {
         if (files == null || files.length == 0) {
             throw new BusinessException(MessageConstant.PARAM_ERROR);
         }
-        RestTemplate restTemplate = new RestTemplate();
+
+        MedicineOcrVO ocrResponse = requestOcr(files);
+        String ocrText = resolveOcrText(ocrResponse);
+        if (ocrText == null) {
+            throw new BusinessException(MessageConstant.OCR_FAILED);
+        }
+
+        String aiRaw = null;
+        MedicineOcrParsedVO parsed = null;
+        boolean fallback = false;
+        try {
+            aiRaw = aiService.optimizeMedicineInfo(ocrText);
+            parsed = aiService.parseMedicineInfo(aiRaw);
+        } catch (RuntimeException e) {
+            fallback = true;
+        }
+
+        MedicineOcrEnhancedVO result = MedicineOcrEnhancedVO.builder()
+                .rawText(ocrResponse.getText())
+                .rawLines(ocrResponse.getLines())
+                .ocrError(ocrResponse.getError())
+                .parsed(parsed)
+                .model(aiService.currentModel())
+                .fallback(fallback)
+                .aiRaw(aiRaw)
+                .build();
+
+        return Result.success(result);
+    }
+
+    private MedicineOcrVO requestOcr(MultipartFile[] files) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
@@ -149,10 +184,36 @@ public class MedicineController {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
         try {
             MedicineOcrVO response = restTemplate.postForObject(ocrBaseUrl + "/smart-ocr", requestEntity, MedicineOcrVO.class);
-            return Result.success(response);
+            if (response == null) {
+                throw new BusinessException(MessageConstant.OCR_FAILED);
+            }
+            return response;
         } catch (RestClientException e) {
             throw new BusinessException(MessageConstant.OCR_FAILED);
         }
+    }
+
+    private String resolveOcrText(MedicineOcrVO ocrResponse) {
+        if (ocrResponse.getText() != null && !ocrResponse.getText().trim().isEmpty()) {
+            return ocrResponse.getText().trim();
+        }
+
+        if (ocrResponse.getLines() == null || ocrResponse.getLines().isEmpty()) {
+            return null;
+        }
+
+        String mergedLines = ocrResponse.getLines()
+                .stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .collect(Collectors.joining("\n"));
+
+        if (mergedLines.isEmpty()) {
+            return null;
+        }
+
+        return mergedLines;
     }
 
     private Long requireFamilyId(Long userId) {

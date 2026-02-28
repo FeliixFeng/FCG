@@ -2,12 +2,16 @@ package com.ghf.fcg.modules.ai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ghf.fcg.config.AiProperties;
+import com.ghf.fcg.modules.medicine.vo.MedicineOcrParsedVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Slf4j
@@ -96,7 +100,7 @@ public class AiService {
                 "specification": "规格",
                 "manufacturer": "生产厂家",
                 "dosageForm": "剂型",
-                "expirationDate": "过期日期(YYYY-MM-DD格式，如果看不到则返回null)",
+                "expireDate": "过期日期(YYYY-MM-DD格式，如果看不到则返回null)",
                 "usage": "主要用途/适应症",
                 "contraindications": "禁忌人群/药物",
                 "sideEffects": "常见副作用",
@@ -107,6 +111,114 @@ public class AiService {
             """.formatted(ocrText);
 
         return chat(systemPrompt, userPrompt);
+    }
+
+    public MedicineOcrParsedVO parseMedicineInfo(String aiRawResponse) {
+        String jsonPayload = extractJsonPayload(aiRawResponse);
+        if (jsonPayload == null) {
+            throw new RuntimeException("AI返回格式不正确，未找到JSON对象");
+        }
+
+        try {
+            Map<String, Object> map = objectMapper.readValue(jsonPayload, Map.class);
+            String usage = normalizeString(map.get("usage"));
+            String dosage = normalizeString(map.get("dosage"));
+            String instructions = normalizeString(map.get("instructions"));
+
+            if (instructions == null) {
+                instructions = buildInstructions(usage, dosage);
+            }
+
+            String expireDateRaw = normalizeString(map.get("expireDate"));
+            if (expireDateRaw == null) {
+                expireDateRaw = normalizeString(map.get("expirationDate"));
+            }
+
+            return MedicineOcrParsedVO.builder()
+                    .name(normalizeString(map.get("name")))
+                    .specification(normalizeString(map.get("specification")))
+                    .manufacturer(normalizeString(map.get("manufacturer")))
+                    .dosageForm(normalizeString(map.get("dosageForm")))
+                    .instructions(instructions)
+                    .contraindications(normalizeString(map.get("contraindications")))
+                    .sideEffects(normalizeString(map.get("sideEffects")))
+                    .usage(usage)
+                    .dosage(dosage)
+                    .expireDate(parseDate(expireDateRaw))
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("AI结构化结果解析失败: " + e.getMessage(), e);
+        }
+    }
+
+    public String currentModel() {
+        return aiProperties.getModel();
+    }
+
+    private String extractJsonPayload(String aiRawResponse) {
+        if (aiRawResponse == null) {
+            return null;
+        }
+
+        String trimmed = aiRawResponse.trim();
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start < 0 || end <= start) {
+            return null;
+        }
+
+        return trimmed.substring(start, end + 1);
+    }
+
+    private String normalizeString(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = String.valueOf(value).trim();
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+            return null;
+        }
+
+        return normalized;
+    }
+
+    private String buildInstructions(String usage, String dosage) {
+        if (usage == null && dosage == null) {
+            return null;
+        }
+
+        if (usage != null && dosage != null) {
+            return "适应症：" + usage + "\n用法用量：" + dosage;
+        }
+
+        if (usage != null) {
+            return "适应症：" + usage;
+        }
+
+        return "用法用量：" + dosage;
+    }
+
+    private LocalDate parseDate(String rawDate) {
+        if (rawDate == null) {
+            return null;
+        }
+
+        List<DateTimeFormatter> formatters = List.of(
+                DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+                DateTimeFormatter.ofPattern("yyyy/MM/dd"),
+                DateTimeFormatter.ofPattern("yyyy.MM.dd"),
+                DateTimeFormatter.ofPattern("yyyy年M月d日")
+        );
+
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                return LocalDate.parse(rawDate, formatter);
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+
+        return null;
     }
 
     /**
