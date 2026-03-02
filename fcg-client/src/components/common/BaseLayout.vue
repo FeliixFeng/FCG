@@ -3,7 +3,7 @@ import { useUserStore } from '../../stores/user'
 import { computed } from 'vue'
 
 const userStore = useUserStore()
-const username = computed(() => userStore.profile?.nickname || userStore.profile?.username || '访客')
+const username = computed(() => userStore.member?.nickname || userStore.family?.familyName || '访客')
 </script>
 
 <template>

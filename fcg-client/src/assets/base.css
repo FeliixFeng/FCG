@@ -11,6 +11,14 @@
   --card: #ffffff;
   --border: #e5dfd2;
   --shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+
+  --el-color-primary: #2d5f5d;
+  --el-color-primary-light-3: #5f8a88;
+  --el-color-primary-light-5: #80a4a2;
+  --el-color-primary-light-7: #abc4c3;
+  --el-color-primary-light-9: #eaf3f2;
+  --el-border-radius-base: 12px;
+  --el-font-family: 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif;
 }
 
 * {

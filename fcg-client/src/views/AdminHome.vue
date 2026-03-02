@@ -55,7 +55,7 @@ const handleAddMember = async () => {
 
 // 退出管理员界面，回到普通界面
 const exitAdmin = () => {
-  router.replace({ name: 'home' })
+    router.replace({ name: 'dashboard' })
 }
 
 onMounted(() => {
