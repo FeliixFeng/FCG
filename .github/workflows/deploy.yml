@@ -31,6 +31,17 @@ jobs:
         working-directory: fcg-client
         run: npm install && npm run build
 
+      - name: Clean old frontend dist on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /home/user/apps/fcg/fcg-client
+            rm -rf /home/user/apps/fcg/fcg-client/dist
+
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
