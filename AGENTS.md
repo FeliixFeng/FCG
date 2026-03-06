@@ -2,8 +2,8 @@
 
 > 家庭健康管理系统 - 毕业设计项目
 
-**Generated:** 2026-02-19  
-**Commit:** 4150cd7  
+**Generated:** 2026-03-06  
+**Commit:** b7a794f  
 **Branch:** dev
 
 ## Project Overview
@@ -204,6 +204,10 @@ fcg/
 |--------|------|----------|---------|
 | `App` | Component | `fcg-client/src/App.vue` | 根组件 |
 | `main` | Script | `fcg-client/src/main.js` | 应用入口 |
+| `Landing` | View | `fcg-client/src/views/Landing.vue` | 落地页（Hero + 功能介绍 + CTA）|
+| `AuthDialog` | Component | `fcg-client/src/components/auth/AuthDialog.vue` | 登录/注册弹窗 |
+| `Home` | View | `fcg-client/src/views/Home.vue` | 首页（成员选择后主页）|
+| `SelectMember` | View | `fcg-client/src/views/SelectMember.vue` | 成员选择页 |
 
 ## Key Configuration Files
 
@@ -229,7 +233,7 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 
 ## Development Status
 
-### Completed (2026-02-19)
+### Completed (2026-03-06)
 - ✅ Database schema design (7 tables)
 - ✅ MyBatis-Plus Generator configuration
 - ✅ Entity classes (7 entities)
@@ -237,12 +241,18 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ Service layer (7 interfaces + implementations)
 - ✅ Project structure documentation
 - ✅ dev branch created and synced
+- ✅ Landing page（Hero + Feature Cards + Steps + CTA + Footer）
+- ✅ AuthDialog（两栏登录/注册弹窗，支持注册）
+- ✅ 路由守卫（家庭级/成员级 token 双重校验）
+- ✅ 前端基础页面骨架（Home/SelectMember/FamilyHome/MedicineHome/AdminHome）
 
 ### Next Steps
-- 🔄 JWT authentication module
-- 🔄 Controller layer (REST APIs)
-- 🔄 DTO/VO objects
-- 🔄 Frontend scaffolding (Vue 3 + Pinia + Axios)
+- 🔄 药品页：药品列表、添加药品（含 OCR 识别）、用药计划
+- 🔄 健康页：体征录入、近一周趋势图表
+- 🔄 家庭页：成员列表、添加成员、关怀模式切换
+- 🔄 管理员页：成员管理完善
+- 🔄 关怀模式：大字体/简化 UI 适配
+- 🔄 健康周报：AI 生成摘要展示
 
 ## Notes
 
@@ -265,7 +275,7 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 ### Frontend
 - Vue 3 (Composition API)
 - Vite (build tool)
-- Planned: Element Plus, Axios, Pinia, Tailwind CSS
+- Installed: Element Plus, Axios, Pinia, Tailwind CSS
 
 ## Common Tasks
 
