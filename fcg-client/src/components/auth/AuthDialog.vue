@@ -132,7 +132,7 @@ const handleRegister = async () => {
             </li>
             <li>
               <span class="side-icon">👴</span>
-              <span>長辈关怀模式</span>
+              <span>长辈关怀模式</span>
             </li>
             <li>
               <span class="side-icon">❤️</span>

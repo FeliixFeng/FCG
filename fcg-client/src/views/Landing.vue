@@ -53,14 +53,14 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
     <!-- Hero -->
     <section class="hero">
       <div class="hero-inner">
-        <div class="hero-badge">家庭守护者 · Family Care Guardian</div>
+        <div class="hero-badge">家庭健康助手 · Family Care Guardian</div>
         <h1 class="hero-title">
           守护家人健康<br />
           <span class="hero-accent">从这一页开始</span>
         </h1>
         <p class="hero-desc">
           一套系统覆盖用药管理、健康追踪与家庭协同。<br class="br-pc" />
-          让居家养老的慢病管理，变得简单可靠。
+          让慢病管理与家庭健康，变得简单可靠。
         </p>
         <div class="hero-actions">
           <button class="btn-primary btn-lg" @click="handlePrimaryCta">{{ primaryCtaText }}</button>
