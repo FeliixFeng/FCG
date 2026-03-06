@@ -127,20 +127,20 @@ const handleRegister = async () => {
           <p class="side-desc">守护家人健康，从这一页开始</p>
           <ul class="side-list">
             <li>
-              <span class="side-icon">💊</span>
-              <span>AI 智能药品识别</span>
-            </li>
-            <li>
               <span class="side-icon">👨‍👩‍👧</span>
               <span>家庭多成员协同</span>
             </li>
             <li>
-              <span class="side-icon">📊</span>
-              <span>健康数据追踪与周报</span>
+              <span class="side-icon">👴</span>
+              <span>長辈关怀模式</span>
             </li>
             <li>
-              <span class="side-icon">👴</span>
-              <span>老人关怀模式</span>
+              <span class="side-icon">❤️</span>
+              <span>健康追踪与周报</span>
+            </li>
+            <li>
+              <span class="side-icon">💊</span>
+              <span>AI 智能药品识别</span>
             </li>
           </ul>
         </div>

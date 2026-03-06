@@ -53,7 +53,7 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
     <!-- Hero -->
     <section class="hero">
       <div class="hero-inner">
-        <div class="hero-badge">家庭健康管理系统</div>
+        <div class="hero-badge">家庭守护者 · Family Care Guardian</div>
         <h1 class="hero-title">
           守护家人健康<br />
           <span class="hero-accent">从这一页开始</span>
@@ -552,8 +552,8 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
 .step-line {
   position: absolute;
   top: 24px;
-  left: calc(16.67% + 12px);
-  right: calc(16.67% + 12px);
+  left: calc(16.67% + 24px);
+  right: calc(16.67% + 24px);
   height: 1px;
   background: linear-gradient(90deg, #2d5f5d 0%, rgba(45, 95, 93, 0.15) 100%);
   z-index: 0;
@@ -564,7 +564,7 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   padding: 0 32px 0 0;
 }
 
