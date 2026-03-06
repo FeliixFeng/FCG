@@ -1,436 +1,702 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import AuthDialog from '../components/auth/AuthDialog.vue'
-
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const showAuth = ref(false)
 const authTab = ref('login')
-const isMobile = ref(false)
-
 
 const primaryCtaText = computed(() => {
-  if (!userStore.isLoggedIn) {
-    return '登录家庭账号'
-  }
+  if (!userStore.isLoggedIn) return '登录家庭账号'
   return userStore.hasMember ? '进入系统' : '选择成员'
 })
 
 const handlePrimaryCta = () => {
-  if (!userStore.isLoggedIn) {
-    openLogin()
-    return
-  }
-
-  if (userStore.hasMember) {
-    router.push({ name: 'dashboard' })
-    return
-  }
-
+  if (!userStore.isLoggedIn) { openLogin(); return }
+  if (userStore.hasMember) { router.push({ name: 'dashboard' }); return }
   router.push({ name: 'select-member' })
 }
 
-const openLogin = () => {
-  authTab.value = 'login'
-  showAuth.value = true
-}
-
-const openRegister = () => {
-  authTab.value = 'register'
-  showAuth.value = true
-}
-
-const updateIsMobile = () => {
-  isMobile.value = window.innerWidth < 760
-}
-
-onMounted(() => {
-  updateIsMobile()
-  window.addEventListener('resize', updateIsMobile)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', updateIsMobile)
-})
+const openLogin = () => { authTab.value = 'login'; showAuth.value = true }
+const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
 </script>
 
 <template>
-  <div class="landing">
-    <div class="bg-layer bg-layer-a"></div>
-    <div class="bg-layer bg-layer-b"></div>
-    <div class="bg-layer bg-layer-c"></div>
-    <div class="bg-layer bg-layer-d"></div>
+  <div class="page">
+    <!-- 顶部光晕装饰 -->
+    <div class="hero-glow" aria-hidden="true"></div>
 
+    <!-- 导航 -->
     <header class="nav">
-      <div class="brand">
-        <span class="brand-chip">FCG</span>
-        <span class="brand-name">Family Care Guardian</span>
-      </div>
-      <div class="nav-actions">
-        <el-button v-if="!userStore.isLoggedIn" plain @click="openLogin">登录</el-button>
-        <el-button v-if="!userStore.isLoggedIn" type="primary" @click="openRegister">注册</el-button>
-        <el-button v-else plain @click="handlePrimaryCta">{{ primaryCtaText }}</el-button>
+      <div class="nav-inner">
+        <div class="brand">
+          <img src="/fcg.png" alt="FCG" class="brand-logo" />
+          <span class="brand-name">FCG</span>
+          <span class="brand-full">Family Care Guardian</span>
+        </div>
+        <nav class="nav-links">
+          <template v-if="!userStore.isLoggedIn">
+            <button class="btn-ghost" @click="openLogin">登录</button>
+            <button class="btn-primary" @click="openRegister">免费注册</button>
+          </template>
+          <template v-else>
+            <button class="btn-primary" @click="handlePrimaryCta">{{ primaryCtaText }}</button>
+          </template>
+        </nav>
       </div>
     </header>
 
-    <main class="content">
-      <section class="hero">
-        <div class="hero-text">
-          <h1>守护家人健康，从这一页开始</h1>
-          <p>一套系统覆盖药品识别、健康记录、家庭成员管理与关怀模式，简单易用。</p>
-          <div class="hero-actions">
-            <el-button type="primary" size="large" @click="handlePrimaryCta">{{ primaryCtaText }}</el-button>
-            <el-button plain size="large" @click="openRegister">了解注册流程</el-button>
-          </div>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-badge">家庭健康管理系统</div>
+        <h1 class="hero-title">
+          守护家人健康<br />
+          <span class="hero-accent">从这一页开始</span>
+        </h1>
+        <p class="hero-desc">
+          一套系统覆盖用药管理、健康追踪与家庭协同。<br class="br-pc" />
+          让居家养老的慢病管理，变得简单可靠。
+        </p>
+        <div class="hero-actions">
+          <button class="btn-primary btn-lg" @click="handlePrimaryCta">{{ primaryCtaText }}</button>
+          <button class="btn-outline btn-lg" @click="openRegister">了解更多</button>
         </div>
-        <div class="hero-card">
-          <div class="hero-card-title">系统能力一览</div>
-          <ul>
-            <li>OCR + AI 智能识别药品信息</li>
-            <li>家庭成员多身份切换与关怀模式</li>
-            <li>健康数据按周汇总与提醒</li>
-          </ul>
-        </div>
-      </section>
 
-      <section class="feature-grid">
-        <div class="feature-card">
-          <h3>药品智能识别</h3>
-          <p>拍照识别说明书，自动提取关键字段并生成用药建议。</p>
+        <!-- 能力卡片 -->
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-icon">👨‍👩‍👧</span>
+            <div>
+              <div class="stat-label">家庭协同</div>
+              <div class="stat-sub">多成员管理</div>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-icon">❤️</span>
+            <div>
+              <div class="stat-label">健康追踪</div>
+              <div class="stat-sub">体征记录与周报</div>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-icon">💊</span>
+            <div>
+              <div class="stat-label">用药管理</div>
+              <div class="stat-sub">闭环提醒打卡</div>
+            </div>
+          </div>
         </div>
-        <div class="feature-card">
-          <h3>健康数据管理</h3>
-          <p>体征记录、周报总结与异常提醒，随时掌握健康趋势。</p>
-        </div>
-        <div class="feature-card">
-          <h3>家庭协同</h3>
-          <p>管理员、普通成员、关怀成员三种身份清晰分工。</p>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="steps">
-        <div class="step">
-          <span>01</span>
-          <div>
-            <h4>创建家庭账号</h4>
-            <p>一个账号即可管理全家成员。</p>
-          </div>
-        </div>
-        <div class="step">
-          <span>02</span>
-          <div>
-            <h4>添加成员与关系</h4>
-            <p>为每位家人配置身份与关怀模式。</p>
-          </div>
-        </div>
-        <div class="step">
-          <span>03</span>
-          <div>
-            <h4>开始健康管理</h4>
-            <p>记录体征、跟踪用药、生成周报。</p>
-          </div>
-        </div>
-      </section>
-    </main>
+    <!-- Features -->
+    <section class="features">
+      <div class="section-inner">
+        <div class="section-tag">核心功能</div>
+        <h2 class="section-title">一个系统，照顾全家</h2>
+        <p class="section-desc">专为居家养老场景设计，聚焦用药安全与家庭协同</p>
 
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-icon">👴</div>
+            <h3>关怀模式</h3>
+            <p>专为长辈设计大字体高对比界面，扁平化操作路径，一键切换，子女远程配置。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⏰</div>
+            <h3>闭环用药提醒</h3>
+            <p>定时推送服药提醒，一键打卡确认，漏服自动记录，杜绝忘药风险。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">❤️</div>
+            <h3>健康数据追踪</h3>
+            <p>体征数据持续记录，自动生成周报，异常数据即时提醒家庭成员。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🏠</div>
+            <h3>家庭权限体系</h3>
+            <p>管理员、普通成员、关怀成员三级权限，清晰分工，子女随时掌握父母健康动态。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔬</div>
+            <h3>AI 药品识别</h3>
+            <p>拍照即可自动识别药品信息，OCR + 大模型联合分析，生成通俗用药建议与禁忌提醒。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">☁️</div>
+            <h3>云端同步</h3>
+            <p>数据安全存储，多设备实时同步，家庭成员随时随地查看健康状态。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Steps -->
+    <section class="steps-section">
+      <div class="section-inner">
+        <div class="section-tag">快速开始</div>
+        <h2 class="section-title">三步开始守护</h2>
+
+        <div class="steps">
+          <div class="step-line"></div>
+          <div class="step">
+            <div class="step-num">01</div>
+            <div class="step-body">
+              <h4>创建家庭账号</h4>
+              <p>注册一个家庭账号，设置家庭名称，即可管理所有成员。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">02</div>
+            <div class="step-body">
+              <h4>添加家庭成员</h4>
+              <p>为每位家人配置身份、关系与关怀模式，权限清晰分配。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">03</div>
+            <div class="step-body">
+              <h4>开始健康管理</h4>
+              <p>录入药品、记录体征、跟踪用药，系统自动生成健康周报。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Banner -->
+    <section class="cta-section">
+      <div class="section-inner">
+        <div class="cta-card">
+          <h2>现在开始守护家人健康</h2>
+          <p>免费注册，5 分钟完成配置</p>
+          <button class="btn-primary btn-lg" @click="openRegister">立即注册</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
     <footer class="footer">
-      <div>毕业设计 · 家庭健康管理系统</div>
-      <div>武汉纺织大学</div>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="brand-dot brand-dot-sm"></span>
+          <span>FCG · Family Care Guardian</span>
+        </div>
+        <div class="footer-info">
+          <span>© 2026 FCG · Family Care Guardian</span>
+        </div>
+      </div>
     </footer>
 
-    <AuthDialog v-model="showAuth" :fullscreen="isMobile" :initial-tab="authTab" />
+    <AuthDialog v-model="showAuth" :initial-tab="authTab" />
   </div>
 </template>
 
 <style scoped>
-.landing {
-  position: relative;
+/* ─── 全局容器 ─── */
+.page {
   min-height: 100vh;
-  overflow: hidden;
-  padding: 28px clamp(18px, 4vw, 56px) 56px;
-  background:
-    radial-gradient(124% 92% at 8% 4%, rgba(255, 255, 255, 0.84) 0%, transparent 55%),
-    radial-gradient(98% 76% at 100% 8%, rgba(84, 127, 124, 0.22) 0%, transparent 60%),
-    radial-gradient(88% 74% at 0% 100%, rgba(246, 228, 201, 0.68) 0%, transparent 64%),
-    linear-gradient(134deg, #fbf8f1 0%, #f2e9d8 56%, #e6ede9 100%);
-}
-
-.landing::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(135deg, rgba(69, 99, 97, 0.16) 0 1px, transparent 1px 30px),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.32) 0 1px, transparent 1px 30px);
-  opacity: 0.56;
-  -webkit-mask-image: radial-gradient(120% 94% at 50% 56%, #000 0%, rgba(0, 0, 0, 0.58) 66%, transparent 100%);
-  mask-image: radial-gradient(120% 94% at 50% 56%, #000 0%, rgba(0, 0, 0, 0.58) 66%, transparent 100%);
-  pointer-events: none;
-}
-
-.landing::after {
-  content: '';
-  position: absolute;
-  inset: -8% -10% -12% -10%;
-  background:
-    linear-gradient(118deg, rgba(45, 95, 93, 0.16) 0%, rgba(45, 95, 93, 0) 34%),
-    linear-gradient(304deg, rgba(45, 95, 93, 0.12) 0%, rgba(45, 95, 93, 0) 32%),
-    linear-gradient(146deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0) 32%),
-    linear-gradient(338deg, rgba(238, 224, 198, 0.34) 0%, rgba(238, 224, 198, 0) 30%);
-  opacity: 0.92;
-  pointer-events: none;
-}
-
-.bg-layer {
-  position: absolute;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.bg-layer-a {
-  width: min(44vw, 560px);
-  height: min(30vw, 360px);
-  left: -12%;
-  top: -8%;
-  clip-path: polygon(0 18%, 76% 0, 100% 44%, 60% 100%, 0 80%);
-  background: linear-gradient(138deg, rgba(229, 243, 241, 0.72) 0%, rgba(77, 124, 121, 0.22) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  opacity: 0.88;
-}
-
-.bg-layer-b {
-  width: min(48vw, 620px);
-  height: min(36vw, 430px);
-  right: -16%;
-  bottom: -18%;
-  clip-path: polygon(8% 0, 100% 24%, 92% 100%, 0 74%);
-  background: linear-gradient(142deg, rgba(45, 95, 93, 0.44) 0%, rgba(45, 95, 93, 0.14) 100%);
-  opacity: 0.62;
-}
-
-.bg-layer-c {
-  width: min(24vw, 300px);
-  height: min(20vw, 220px);
-  right: 10%;
-  top: 12%;
-  clip-path: polygon(0 24%, 80% 0, 100% 66%, 18% 100%);
-  background: linear-gradient(130deg, rgba(250, 244, 234, 0.9) 0%, rgba(45, 95, 93, 0.24) 100%);
-  opacity: 0.68;
-}
-
-.bg-layer-d {
-  width: min(30vw, 380px);
-  height: min(22vw, 260px);
-  left: -8%;
-  bottom: -12%;
-  clip-path: polygon(0 32%, 88% 0, 100% 86%, 12% 100%);
-  background: linear-gradient(132deg, rgba(232, 202, 161, 0.44) 0%, rgba(255, 255, 255, 0.1) 100%);
-  opacity: 0.58;
-}
-
-.nav {
+  background: #ffffff;
+  color: #0f0f0f;
   position: relative;
-  z-index: 1;
+  overflow-x: hidden;
+}
+
+/* ─── 顶部光晕 ─── */
+.hero-glow {
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 600px;
+  background: radial-gradient(ellipse at center, rgba(45, 95, 93, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── 导航 ─── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.nav-inner {
+  width: 100%;
+  padding: 0 40px;
+  height: 62px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 42px;
+}
+
+.brand-logo {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-weight: 700;
+  gap: 8px;
 }
 
-.brand-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(45, 95, 93, 0.23);
-  background: rgba(45, 95, 93, 0.09);
-  color: #2d5f5d;
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2d5f5d;
+  flex-shrink: 0;
+}
+
+.brand-dot-sm {
+  width: 8px;
+  height: 8px;
 }
 
 .brand-name {
+  font-weight: 800;
   font-size: 1rem;
-  color: #2d2b26;
+  color: #2d5f5d;
+  letter-spacing: 0.05em;
 }
 
-.nav-actions {
+.brand-full {
+  font-size: 0.83rem;
+  color: #aaa;
+  margin-left: 2px;
+}
+
+.nav-links {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
 
-.content {
+/* ─── 按钮 ─── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 20px;
+  background: #2d5f5d;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.btn-primary:hover {
+  background: #235250;
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  background: transparent;
+  color: #555;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-ghost:hover {
+  color: #2d5f5d;
+  background: rgba(45, 95, 93, 0.05);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 20px;
+  background: transparent;
+  color: #2d5f5d;
+  border: 1.5px solid rgba(45, 95, 93, 0.35);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.btn-outline:hover {
+  border-color: #2d5f5d;
+  background: rgba(45, 95, 93, 0.04);
+}
+
+.btn-lg {
+  padding: 12px 28px;
+  font-size: 1rem;
+  border-radius: 10px;
+}
+
+/* ─── Hero ─── */
+.hero {
   position: relative;
   z-index: 1;
-  display: grid;
-  gap: 48px;
+  padding: 108px 24px 88px;
 }
 
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  gap: 32px;
+.hero-inner {
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: 22px;
 }
 
-.hero-text h1 {
-  font-size: clamp(2rem, 3.6vw, 3rem);
-  margin: 0 0 16px;
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  background: rgba(45, 95, 93, 0.07);
+  border: 1px solid rgba(45, 95, 93, 0.15);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: #2d5f5d;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
-.hero-text p {
-  margin: 0 0 20px;
-  font-size: 1.05rem;
-  color: var(--muted);
+.hero-title {
+  margin: 0;
+  font-size: clamp(2.6rem, 5.5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: #0a0a0a;
 }
+
+.hero-accent {
+  background: linear-gradient(135deg, #2d5f5d 0%, #3c8a86 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-desc {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #666;
+  line-height: 1.75;
+  max-width: 500px;
+}
+
+.br-pc { display: inline; }
 
 .hero-actions {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
-.hero-card {
-  padding: 24px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.66);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 14px 40px rgba(26, 38, 37, 0.1);
+/* Hero 统计条 */
+.hero-stats {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 32px;
+  background: #f8f8f8;
+  border: 1px solid #efefef;
+  border-radius: 14px;
 }
 
-.hero-card-title {
-  font-weight: 700;
-  margin-bottom: 12px;
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.hero-card ul {
-  margin: 0;
-  padding-left: 18px;
-  color: #534c43;
-  display: grid;
-  gap: 8px;
+.stat-icon { font-size: 1.4rem; }
+
+.stat-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.stat-sub {
+  font-size: 0.74rem;
+  color: #aaa;
+  margin-top: 1px;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: #e5e5e5;
+  flex-shrink: 0;
+}
+
+/* ─── 通用 section ─── */
+.section-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+
+.section-tag {
+  display: inline-flex;
+  padding: 4px 12px;
+  background: rgba(45, 95, 93, 0.07);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  letter-spacing: 0.05em;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  margin: 0 0 10px;
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #0a0a0a;
+}
+
+.section-desc {
+  margin: 0 0 48px;
+  font-size: 0.98rem;
+  color: #888;
+  line-height: 1.6;
+}
+
+/* ─── Features ─── */
+.features {
+  padding: 88px 0;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
 .feature-card {
-  padding: 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 10px 30px rgba(26, 38, 37, 0.08);
+  padding: 26px 24px;
+  background: #ffffff;
+  border: 1px solid #ebebeb;
+  border-radius: 14px;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.feature-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  font-size: 1.6rem;
+  margin-bottom: 14px;
+  display: block;
 }
 
 .feature-card h3 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  font-size: 0.97rem;
+  font-weight: 700;
+  color: #0f0f0f;
 }
 
 .feature-card p {
   margin: 0;
-  color: #5a534a;
+  font-size: 0.86rem;
+  color: #777;
+  line-height: 1.68;
+}
+
+/* ─── Steps ─── */
+.steps-section {
+  padding: 88px 0;
 }
 
 .steps {
+  position: relative;
   display: grid;
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-top: 8px;
+}
+
+.step-line {
+  position: absolute;
+  top: 24px;
+  left: calc(16.67% + 12px);
+  right: calc(16.67% + 12px);
+  height: 1px;
+  background: linear-gradient(90deg, #2d5f5d 0%, rgba(45, 95, 93, 0.15) 100%);
+  z-index: 0;
 }
 
 .step {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  align-items: start;
-  padding: 18px 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.66);
-  background: rgba(255, 255, 255, 0.8);
-}
-
-.step span {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: rgba(45, 95, 93, 0.12);
-  color: #2d5f5d;
-  font-weight: 700;
-}
-
-.step h4 {
-  margin: 0 0 6px;
-}
-
-.step p {
-  margin: 0;
-  color: #5a534a;
-}
-
-.footer {
   position: relative;
   z-index: 1;
   display: flex;
-  justify-content: space-between;
-  margin-top: 46px;
-  color: #6b6459;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0 32px 0 0;
 }
 
-@media (max-width: 980px) {
-  .hero {
+.step:last-child { padding-right: 0; }
+
+.step-num {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #2d5f5d;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.step-body h4 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f0f0f;
+}
+
+.step-body p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #777;
+  line-height: 1.65;
+}
+
+/* ─── CTA ─── */
+.cta-section {
+  padding: 88px 0;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.cta-card {
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.cta-card h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #0a0a0a;
+}
+
+.cta-card p {
+  margin: 0;
+  color: #888;
+  font-size: 0.98rem;
+}
+
+/* ─── Footer ─── */
+.footer {
+  padding: 24px 0;
+  border-top: 1px solid #f0f0f0;
+}
+
+.footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.81rem;
+  color: #bbb;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── 响应式 ─── */
+@media (max-width: 900px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .steps {
     grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .step-line { display: none; }
+  .step { padding: 0; }
+}
+
+@media (max-width: 640px) {
+  .nav-inner { padding: 0 20px; }
+  .section-inner { padding: 0 20px; }
+  .hero { padding: 68px 20px 56px; }
+
+  .hero-stats {
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 16px 20px;
+  }
+
+  .stat-divider {
+    width: 100%;
+    height: 1px;
   }
 
   .feature-grid {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 760px) {
-  .landing {
-    padding: 20px 16px 40px;
-  }
+  .brand-full { display: none; }
+  .br-pc { display: none; }
 
-  .nav {
-    flex-direction: column;
-    gap: 16px;
-    align-items: flex-start;
-  }
-
-  .nav-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .footer {
+  .footer-inner {
     flex-direction: column;
     gap: 6px;
-  }
-
-  .bg-layer-a,
-  .bg-layer-b {
-    opacity: 0.36;
-  }
-
-  .bg-layer-c,
-  .bg-layer-d {
-    display: none;
+    text-align: center;
   }
 }
 </style>

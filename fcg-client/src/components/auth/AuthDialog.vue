@@ -8,7 +8,6 @@ import { registerFamily } from '../../utils/api'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  fullscreen: { type: Boolean, default: false },
   initialTab: { type: String, default: 'login' }
 })
 
@@ -19,23 +18,13 @@ const userStore = useUserStore()
 
 const activeTab = ref(props.initialTab)
 
-watch(() => props.initialTab, (newVal) => {
-  activeTab.value = newVal
-})
+watch(() => props.initialTab, (v) => { activeTab.value = v })
+watch(() => props.modelValue, (v) => { if (v) activeTab.value = props.initialTab })
 
-watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    activeTab.value = 'login'
-  }
-})
-
+/* ─── Login ─── */
 const loginFormRef = ref()
 const loginLoading = ref(false)
-const loginForm = reactive({
-  username: '',
-  password: ''
-})
-
+const loginForm = reactive({ username: '', password: '' })
 const loginRules = {
   username: [
     { required: true, message: '请输入家庭账号', trigger: 'blur' },
@@ -47,25 +36,14 @@ const loginRules = {
   ]
 }
 
+/* ─── Register ─── */
 const registerFormRef = ref()
 const registerLoading = ref(false)
-const registerForm = reactive({
-  familyName: '',
-  username: '',
-  password: '',
-  confirmPassword: '',
-  adminNickname: ''
-})
+const registerForm = reactive({ familyName: '', username: '', password: '', confirmPassword: '', adminNickname: '' })
 
 const validateConfirmPassword = (rule, value, callback) => {
-  if (!value) {
-    callback(new Error('请再次输入密码'))
-    return
-  }
-  if (value !== registerForm.password) {
-    callback(new Error('两次输入密码不一致'))
-    return
-  }
+  if (!value) { callback(new Error('请再次输入密码')); return }
+  if (value !== registerForm.password) { callback(new Error('两次密码不一致')); return }
   callback()
 }
 
@@ -78,31 +56,21 @@ const registerRules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, max: 20, message: '密码长度为 6-20 位', trigger: 'blur' }
   ],
-  confirmPassword: [
-    { required: true, validator: validateConfirmPassword, trigger: 'blur' }
-  ],
+  confirmPassword: [{ required: true, validator: validateConfirmPassword, trigger: 'blur' }],
   adminNickname: [
     { required: true, message: '请输入管理员昵称', trigger: 'blur' },
     { min: 2, max: 20, message: '昵称长度为 2-20 位', trigger: 'blur' }
   ],
-  familyName: [
-    { max: 30, message: '家庭名称最多 30 字', trigger: 'blur' }
-  ]
+  familyName: [{ max: 30, message: '家庭名称最多 30 字', trigger: 'blur' }]
 }
 
+/* ─── Actions ─── */
 const close = () => emit('update:modelValue', false)
-
-const switchTab = (tab) => {
-  activeTab.value = tab
-}
+const switchTab = (tab) => { activeTab.value = tab }
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return
-  try {
-    await loginFormRef.value.validate()
-  } catch {
-    return
-  }
+  try { await loginFormRef.value.validate() } catch { return }
   try {
     loginLoading.value = true
     await userStore.login({ ...loginForm })
@@ -119,11 +87,7 @@ const handleLogin = async () => {
 
 const handleRegister = async () => {
   if (!registerFormRef.value) return
-  try {
-    await registerFormRef.value.validate()
-  } catch {
-    return
-  }
+  try { await registerFormRef.value.validate() } catch { return }
   try {
     registerLoading.value = true
     await registerFamily({
@@ -147,51 +111,69 @@ const handleRegister = async () => {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :fullscreen="fullscreen"
-    width="90%"
-    :style="{ maxWidth: '900px' }"
+    width="860px"
     :show-close="false"
     append-to-body
     destroy-on-close
-    class="auth-dialog"
+    class="auth-dlg"
     @close="close"
   >
-    <div class="auth-container">
-      <div class="auth-decor">
-        <div class="decor-blob decor-blob-1"></div>
-        <div class="decor-blob decor-blob-2"></div>
-        <div class="decor-blob decor-blob-3"></div>
-        <div class="decor-content">
-          <div class="brand-badge">FCG</div>
-          <h2>Family Care Guardian</h2>
-          <p>守护家人健康，从这一页开始</p>
-          <div class="decor-features">
-            <span>🏠 家庭协同</span>
-            <span>💊 智能药箱</span>
-            <span>❤️ 健康关怀</span>
-          </div>
+    <div class="auth-wrap">
+      <!-- 左侧品牌区 -->
+      <div class="auth-side">
+        <div class="side-content">
+          <div class="side-logo"><img src="/fcg.png" alt="FCG" class="side-logo-img" /></div>
+          <h2 class="side-title">Family Care<br />Guardian</h2>
+          <p class="side-desc">守护家人健康，从这一页开始</p>
+          <ul class="side-list">
+            <li>
+              <span class="side-icon">💊</span>
+              <span>AI 智能药品识别</span>
+            </li>
+            <li>
+              <span class="side-icon">👨‍👩‍👧</span>
+              <span>家庭多成员协同</span>
+            </li>
+            <li>
+              <span class="side-icon">📊</span>
+              <span>健康数据追踪与周报</span>
+            </li>
+            <li>
+              <span class="side-icon">👴</span>
+              <span>老人关怀模式</span>
+            </li>
+          </ul>
         </div>
+        <!-- 装饰圆 -->
+        <div class="side-circle side-circle-1"></div>
+        <div class="side-circle side-circle-2"></div>
       </div>
 
-      <div class="auth-form-panel">
-        <button class="close-btn" @click="close">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <!-- 右侧表单区 -->
+      <div class="auth-main">
+        <!-- 关闭按钮 -->
+        <button class="close-btn" @click="close" aria-label="关闭">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
         </button>
 
-        <div class="auth-tabs">
-          <button class="tab-btn" :class="{ active: activeTab === 'login' }" @click="switchTab('login')">登录</button>
-          <button class="tab-btn" :class="{ active: activeTab === 'register' }" @click="switchTab('register')">注册</button>
-          <div class="tab-indicator" :class="{ register: activeTab === 'register' }"></div>
+        <!-- Tab -->
+        <div class="tabs">
+          <button class="tab" :class="{ active: activeTab === 'login' }" @click="switchTab('login')">登录</button>
+          <button class="tab" :class="{ active: activeTab === 'register' }" @click="switchTab('register')">注册</button>
+          <div class="tab-bar" :style="{ transform: activeTab === 'register' ? 'translateX(100%)' : 'translateX(0)' }"></div>
         </div>
 
-        <div class="form-stack">
-          <!-- Login Form -->
-          <div class="form-page" :class="{ active: activeTab === 'login' }">
-            <h3>欢迎回来</h3>
-            <p class="form-subtitle">登录您的家庭账号</p>
-            <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" label-position="top" status-icon @submit.prevent="handleLogin">
+        <!-- 表单容器：两个表单叠在一起，通过 opacity+visibility 切换 -->
+        <div class="form-wrap">
+          <!-- 登录 -->
+          <div class="form-pane" :class="{ visible: activeTab === 'login' }">
+            <div class="form-head">
+              <h3>欢迎回来</h3>
+              <p>登录您的家庭账号</p>
+            </div>
+            <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" label-position="top" @submit.prevent="handleLogin">
               <el-form-item label="家庭账号" prop="username">
                 <el-input v-model.trim="loginForm.username" placeholder="请输入家庭账号" size="large" clearable>
                   <template #prefix><el-icon><User /></el-icon></template>
@@ -202,17 +184,22 @@ const handleRegister = async () => {
                   <template #prefix><el-icon><Lock /></el-icon></template>
                 </el-input>
               </el-form-item>
-              <el-form-item>
-                <el-button type="primary" size="large" class="submit-btn" :loading="loginLoading" @click="handleLogin">登录</el-button>
-              </el-form-item>
+              <div class="form-footer-tip">
+                还没有账号？<button type="button" class="link-btn" @click="switchTab('register')">免费注册</button>
+              </div>
+              <el-button type="primary" size="large" class="submit-btn" :loading="loginLoading" @click="handleLogin">
+                登录
+              </el-button>
             </el-form>
           </div>
 
-          <!-- Register Form -->
-          <div class="form-page" :class="{ active: activeTab === 'register' }">
-            <h3>创建家庭</h3>
-            <p class="form-subtitle">注册您的第一个家庭账号</p>
-            <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-position="top" status-icon @submit.prevent="handleRegister">
+          <!-- 注册 -->
+          <div class="form-pane" :class="{ visible: activeTab === 'register' }">
+            <div class="form-head">
+              <h3>创建家庭</h3>
+              <p>注册您的第一个家庭账号</p>
+            </div>
+            <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-position="top" @submit.prevent="handleRegister">
               <div class="form-grid">
                 <el-form-item label="家庭账号" prop="username">
                   <el-input v-model.trim="registerForm.username" placeholder="4-20 位" size="large" clearable>
@@ -236,9 +223,12 @@ const handleRegister = async () => {
               <el-form-item label="家庭名称（可选）" prop="familyName">
                 <el-input v-model.trim="registerForm.familyName" placeholder="不填则系统自动生成" size="large" clearable />
               </el-form-item>
-              <el-form-item>
-                <el-button type="primary" size="large" class="submit-btn" :loading="registerLoading" @click="handleRegister">创建家庭</el-button>
-              </el-form-item>
+              <div class="form-footer-tip">
+                已有账号？<button type="button" class="link-btn" @click="switchTab('login')">直接登录</button>
+              </div>
+              <el-button type="primary" size="large" class="submit-btn" :loading="registerLoading" @click="handleRegister">
+                创建家庭
+              </el-button>
             </el-form>
           </div>
         </div>
@@ -248,201 +238,305 @@ const handleRegister = async () => {
 </template>
 
 <style>
-.auth-dialog .el-dialog__body { padding: 0; }
-.auth-dialog .el-dialog { border-radius: 24px; overflow: hidden; }
+/* 覆盖 Element Plus dialog 外层 */
+.el-dialog.auth-dlg {
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 0;
+}
+.el-dialog.auth-dlg .el-dialog__header { display: none; }
+.el-dialog.auth-dlg .el-dialog__body { padding: 0; }
 
-.auth-container {
+@media (max-width: 700px) {
+  .el-dialog.auth-dlg {
+    width: 95vw !important;
+    max-width: 440px !important;
+    margin: 5vh auto !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+  }
+  /* overlay 容器顶对齐，避免居中导致超出底部 */
+  .el-overlay-dialog:has(.auth-dlg) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 5vh;
+  }
+}
+</style>
+
+<style scoped>
+/* ─── 整体容器 ─── */
+.auth-wrap {
   display: flex;
-  min-height: 520px;
+  min-height: 540px;
 }
 
-.auth-decor {
+/* ─── 左侧品牌区 ─── */
+.auth-side {
   position: relative;
-  width: 340px;
-  min-height: 520px;
+  width: 280px;
+  flex-shrink: 0;
+  background: linear-gradient(160deg, #2d5f5d 0%, #1a3d3b 100%);
+  padding: 40px 32px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(145deg, #2d5f5d 0%, #1e4240 100%);
+  align-items: flex-start;
   overflow: hidden;
 }
 
-.decor-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(40px);
-  opacity: 0.6;
-}
-
-.decor-blob-1 { width: 200px; height: 200px; background: rgba(255, 255, 255, 0.15); top: -40px; left: -40px; }
-.decor-blob-2 { width: 180px; height: 180px; background: rgba(236, 206, 163, 0.25); bottom: 20px; right: -30px; }
-.decor-blob-3 { width: 120px; height: 120px; background: rgba(255, 255, 255, 0.1); top: 50%; left: 50%; transform: translate(-50%, -50%); }
-
-.decor-content {
+.side-content {
   position: relative;
   z-index: 1;
-  text-align: center;
+}
+
+.side-logo {
+  margin-bottom: 24px;
+}
+
+.side-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: block;
+}
+
+.side-title {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  font-weight: 800;
   color: #fff;
-  padding: 24px;
+  line-height: 1.2;
 }
 
-.brand-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 20px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  margin-bottom: 20px;
-  backdrop-filter: blur(10px);
+.side-desc {
+  margin: 0 0 28px;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
 }
 
-.decor-content h2 { margin: 0 0 12px; font-size: 1.5rem; font-weight: 700; }
-.decor-content p { margin: 0 0 24px; font-size: 0.95rem; opacity: 0.85; }
-
-.decor-features {
+.side-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.decor-features span {
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  font-size: 0.8rem;
-  backdrop-filter: blur(8px);
+.side-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.82);
 }
 
-.auth-form-panel {
+.side-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* 装饰圆 */
+.side-circle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.side-circle-1 {
+  width: 260px;
+  height: 260px;
+  background: #fff;
+  bottom: -60px;
+  right: -80px;
+}
+.side-circle-2 {
+  width: 140px;
+  height: 140px;
+  background: #fff;
+  top: -30px;
+  right: -20px;
+}
+
+/* ─── 右侧表单区 ─── */
+.auth-main {
   flex: 1;
-  padding: 40px 48px;
   position: relative;
-  background: linear-gradient(170deg, rgba(255, 255, 255, 0.98) 0%, rgba(251, 248, 241, 0.95) 100%);
+  padding: 36px 40px 36px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .close-btn {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 36px;
-  height: 36px;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
   border: none;
-  background: rgba(45, 95, 93, 0.06);
-  border-radius: 10px;
-  cursor: pointer;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b6459;
-  transition: all 0.2s ease;
+  cursor: pointer;
+  color: #888;
+  transition: background 0.15s, color 0.15s;
 }
+.close-btn:hover { background: rgba(0, 0, 0, 0.1); color: #333; }
 
-.close-btn:hover { background: rgba(45, 95, 93, 0.12); color: #2d5f5d; }
-
-.auth-tabs {
+/* ─── Tabs ─── */
+.tabs {
   display: flex;
   position: relative;
-  margin-bottom: 32px;
-  border-bottom: 1px solid rgba(45, 95, 93, 0.1);
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 28px;
+  width: fit-content;
+  gap: 0;
 }
 
-.tab-btn {
-  flex: 1;
-  padding: 12px 0;
+.tab {
+  padding: 10px 20px;
   border: none;
   background: none;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: #6b6459;
+  color: #aaa;
   cursor: pointer;
-  transition: color 0.3s ease;
+  transition: color 0.2s;
   position: relative;
   z-index: 1;
 }
 
-.tab-btn.active { color: #2d5f5d; }
+.tab.active { color: #2d5f5d; }
 
-.tab-indicator {
+.tab-bar {
   position: absolute;
   bottom: -1px;
   left: 0;
   width: 50%;
-  height: 3px;
-  background: linear-gradient(90deg, #2d5f5d, #3c7a77);
-  border-radius: 3px 3px 0 0;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 2px;
+  background: #2d5f5d;
+  border-radius: 2px 2px 0 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.tab-indicator.register { transform: translateX(100%); }
-
-/* Stack layout - both forms exist, positioned absolutely */
-.form-stack {
+/* ─── 表单切换 ─── */
+.form-wrap {
   position: relative;
-  min-height: 380px;
+  flex: 1;
 }
 
-.form-page {
+.form-pane {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease, visibility 0.2s ease;
+  overflow-y: auto;
 }
 
-.form-page.active {
+.form-pane.visible {
   opacity: 1;
   visibility: visible;
+  position: relative; /* 可见时脱出 absolute 让容器撑高 */
 }
 
-.form-page h3 { margin: 0 0 6px; font-size: 1.5rem; font-weight: 700; color: #2d2b26; }
-.form-subtitle { margin: 0 0 24px; color: #6b6459; font-size: 0.95rem; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.form-head h3 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f0f0f;
+}
 
-.auth-form-panel .el-form-item__label { color: #4b443a; font-size: 0.9rem; font-weight: 500; }
-.auth-form-panel .el-input__wrapper { min-height: 48px; border-radius: 12px; box-shadow: 0 0 0 1px #e5dfd2 inset; background: rgba(255, 255, 255, 0.9); transition: all 0.2s ease; }
-.auth-form-panel .el-input__wrapper:hover { box-shadow: 0 0 0 1px #c9c2b5 inset; }
-.auth-form-panel .el-input__wrapper.is-focus { box-shadow: 0 0 0 2px rgba(45, 95, 93, 0.2), 0 0 0 1px #2d5f5d inset; }
-.auth-form-panel .el-input__inner { color: #2d2b26; }
-.auth-form-panel .el-input__inner::placeholder { color: #a9a299; }
+.form-head p {
+  margin: 0 0 24px;
+  font-size: 0.88rem;
+  color: #999;
+}
 
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.form-footer-tip {
+  font-size: 0.82rem;
+  color: #aaa;
+  margin-bottom: 12px;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  color: #2d5f5d;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ─── 提交按钮 ─── */
 .submit-btn {
   width: 100%;
-  height: 48px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #2d5f5d 0%, #3c7a77 100%);
-  font-size: 1rem;
-  font-weight: 600;
-  box-shadow: 0 8px 20px rgba(45, 95, 93, 0.25);
-  transition: all 0.2s ease;
+  height: 46px;
+  border-radius: 10px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  background: #2d5f5d !important;
+  border-color: #2d5f5d !important;
 }
 
-.submit-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(45, 95, 93, 0.3); }
-.submit-btn:active { transform: translateY(0); }
+.submit-btn:hover {
+  background: #235250 !important;
+  border-color: #235250 !important;
+}
 
-@media (max-width: 768px) {
-  .auth-dialog .el-dialog { width: 95% !important; max-width: none !important; margin: 16px auto !important; border-radius: 16px; }
-  .auth-container { flex-direction: column; min-height: auto; }
-  .auth-decor { width: 100%; min-height: 100px; padding: 16px; }
-  .decor-blob { display: none; }
-  .decor-content { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 0; }
-  .decor-content h2, .decor-content p, .decor-features { display: none; }
-  .brand-badge { margin-bottom: 0; padding: 6px 14px; font-size: 0.75rem; }
-  .auth-form-panel { padding: 20px 16px; }
-  .form-grid { grid-template-columns: 1fr; }
-  .form-stack { min-height: 380px; }
-  .auth-tabs { margin-bottom: 16px; }
-  .tab-btn { padding: 8px 0; font-size: 0.9rem; }
-  .form-page h3 { font-size: 1.2rem; margin-bottom: 4px; }
-  .form-subtitle { margin-bottom: 12px; font-size: 0.85rem; }
-  .close-btn { top: 10px; right: 10px; width: 32px; height: 32px; }
+/* ─── Element Plus 覆盖 ─── */
+.auth-main :deep(.el-form-item__label) {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #555;
+  padding-bottom: 4px;
+}
+
+.auth-main :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #e8e8e8 inset;
+  background: #fafafa;
+}
+
+.auth-main :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #ccc inset;
+}
+
+.auth-main :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(45, 95, 93, 0.15), 0 0 0 1px #2d5f5d inset;
+  background: #fff;
+}
+
+/* ─── 手机端 ─── */
+@media (max-width: 700px) {
+  .auth-side {
+    display: none;
+  }
+
+  .auth-main {
+    padding: 28px 24px 24px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-wrap {
+    min-height: unset;
+  }
 }
 </style>
