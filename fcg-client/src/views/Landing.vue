@@ -206,7 +206,7 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   background: #ffffff;
   color: #0f0f0f;
   position: relative;
-  overflow-x: hidden;
+  /* overflow-x 由 html 统一控制，此处不设避免抢走滚动条归属 */
 }
 
 /* ─── 顶部光晕 ─── */

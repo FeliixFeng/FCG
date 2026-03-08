@@ -25,6 +25,12 @@
   box-sizing: border-box;
 }
 
+html {
+  /* 滚动条始终占位，防止有无滚动条时页面宽度跳变 */
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif;
