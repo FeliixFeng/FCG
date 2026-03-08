@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import AvatarIcon from '../components/common/AvatarIcon.vue'
@@ -10,6 +10,35 @@ const members = ref([])
 const loading = ref(false)
 const error = ref('')
 const switching = ref(null)
+
+// ── 关系词排序权重 ──
+// 优先级：老人(爷爷奶奶外公外婆) > 父母(爸爸妈妈) > 子女(兄弟姐妹/儿女)
+const RELATION_ORDER = {
+  '爷爷': 10, '奶奶': 11,
+  '外公': 12, '外婆': 13,
+  '姥爷': 12, '姥姥': 13,
+  '爸爸': 20, '父亲': 20,
+  '妈妈': 21, '母亲': 21,
+  '哥哥': 30, '姐姐': 31,
+  '弟弟': 32, '妹妹': 33,
+  '儿子': 34, '女儿': 35,
+}
+
+function sortWeight(m) {
+  const r = m.relation?.trim() || ''
+  if (r in RELATION_ORDER) return RELATION_ORDER[r]
+  for (const [key, w] of Object.entries(RELATION_ORDER)) {
+    if (r.includes(key)) return w
+  }
+  // 兜底：关怀模式（长辈）靠前
+  if (m.role === 2) return 15
+  if (m.role === 0) return 25
+  return 50
+}
+
+const sortedMembers = computed(() =>
+  [...members.value].sort((a, b) => sortWeight(a) - sortWeight(b))
+)
 
 // 加载成员列表
 const loadMembers = async () => {
@@ -99,7 +128,7 @@ onMounted(() => loadMembers())
       <!-- ── 成员列表 ── -->
       <div v-else-if="members.length > 0" class="member-grid">
         <button
-          v-for="m in members"
+          v-for="m in sortedMembers"
           :key="m.userId"
           class="member-card"
           :class="{
@@ -236,6 +265,7 @@ onMounted(() => loadMembers())
   width: min(720px, 100%);
   display: grid;
   gap: 24px;
+  align-content: start;
   padding: clamp(20px, 4vw, 32px);
   border-radius: 24px;
   border: 1px solid rgba(255,255,255,0.80);
@@ -319,7 +349,7 @@ onMounted(() => loadMembers())
 /* ── 成员卡片网格 ── */
 .member-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px;
 }
 
@@ -528,38 +558,54 @@ onMounted(() => loadMembers())
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
 /* ── 手机端适配 ── */
-@media (max-width: 480px) {
-  .shell { padding: 12px; }
-
-  .panel {
-    padding: 18px 14px;
-    border-radius: 20px;
-    gap: 18px;
+@media (max-width: 600px) {
+  /* 移动端：背景撑满屏幕，面板自适应内容高度，整体靠上 */
+  .shell {
+    padding: 16px 12px 32px;
+    align-items: start;
+    justify-items: center;
   }
 
-  .brand-logo { width: 30px; height: 30px; }
-  .brand-name { font-size: 0.9rem; }
-  .brand-sub  { display: none; }
+  .panel {
+    width: 100%;
+    padding: 20px 16px 24px;
+    border-radius: 20px;
+    gap: 16px;
+    /* 内容靠上，不撑开 */
+    min-height: unset;
+  }
 
-  .greeting h2 { font-size: 1.15rem; }
+  .brand-logo { width: 28px; height: 28px; }
+  .brand-name  { font-size: 0.88rem; }
+  .brand-sub   { display: none; }
+  .btn-logout  { padding: 5px 10px; font-size: 0.78rem; }
 
-  /* 手机端：2 列固定，卡片紧凑 */
+  .greeting h2 { font-size: 1.1rem; }
+  .greeting p  { font-size: 0.82rem; }
+
+  /* 3列：适合3~6人家庭，每个卡片宽度合理 */
   .member-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
   }
 
   .member-card {
-    padding: 18px 8px 14px;
+    padding: 14px 6px 10px;
     border-radius: 14px;
-    gap: 7px;
+    gap: 6px;
   }
 
-  .member-name { font-size: 0.88rem; }
+  .member-name { font-size: 0.82rem; }
+  .tag { font-size: 0.65rem; padding: 1px 5px; }
 }
 
-/* 极窄屏（< 320px）：单列 */
-@media (max-width: 319px) {
+/* 极窄屏（< 360px）：2列 */
+@media (max-width: 359px) {
+  .member-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+}
+
+/* 极窄屏（< 280px）：单列 */
+@media (max-width: 279px) {
   .member-grid { grid-template-columns: 1fr; }
 }
 </style>
