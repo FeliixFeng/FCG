@@ -94,7 +94,9 @@ function getPaths(type) {
         <!-- 领口 -->
         <ellipse cx="50" cy="55" rx="7" ry="3" fill="white" opacity="0.25"/>
       `
-    case 'child-male':
+    case 'child-male-elder':
+    case 'child-male-young':
+    case 'child-male':  // 兼容旧值
       return `
         <!-- 头部（大） -->
         <ellipse cx="50" cy="35" rx="18" ry="19" fill="currentColor" opacity="0.9"/>
@@ -103,7 +105,9 @@ function getPaths(type) {
         <!-- 身体（小） -->
         <path d="M32 78 Q34 58 50 56 Q66 58 68 78 Z" fill="currentColor" opacity="0.75"/>
       `
-    case 'child-female':
+    case 'child-female-elder':
+    case 'child-female-young':
+    case 'child-female':  // 兼容旧值
       return `
         <!-- 头部（大） -->
         <ellipse cx="50" cy="35" rx="17" ry="19" fill="currentColor" opacity="0.9"/>
