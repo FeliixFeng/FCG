@@ -78,7 +78,12 @@ function roleTag(member) {
   return null
 }
 
-onMounted(() => loadMembers())
+onMounted(async () => {
+  await Promise.all([
+    loadMembers(),
+    userStore.family ? Promise.resolve() : userStore.fetchFamilyInfo().catch(() => {})
+  ])
+})
 </script>
 
 <template>

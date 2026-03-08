@@ -59,6 +59,13 @@ export const useUserStore = defineStore('user', {
       return res.data
     },
 
+    /** 获取家庭信息（刷新后恢复 family 状态） */
+    async fetchFamilyInfo() {
+      const res = await http.get('/api/family/info')
+      this.family = res.data
+      return res.data
+    },
+
     /** 退出登录，清除所有状态 */
     logout() {
       this.familyToken = ''
