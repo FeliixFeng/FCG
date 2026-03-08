@@ -2,8 +2,8 @@
 
 > 家庭健康管理系统 - 毕业设计项目
 
-**Generated:** 2026-03-06  
-**Commit:** b7a794f  
+**Generated:** 2026-03-08  
+**Commit:** 5db3fe1  
 **Branch:** dev
 
 ## Project Overview
@@ -233,7 +233,7 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 
 ## Development Status
 
-### Completed (2026-03-06)
+### Completed (2026-03-08)
 - ✅ Database schema design (7 tables)
 - ✅ MyBatis-Plus Generator configuration
 - ✅ Entity classes (7 entities)
@@ -245,6 +245,12 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ AuthDialog（两栏登录/注册弹窗，支持注册）
 - ✅ 路由守卫（家庭级/成员级 token 双重校验）
 - ✅ 前端基础页面骨架（Home/SelectMember/FamilyHome/MedicineHome/AdminHome）
+- ✅ SelectMember 成员按关系词权重排序（老人 > 父母 > 子女）
+- ✅ SelectMember 移动端适配（3列/2列/单列响应式）
+- ✅ SelectMember + user.js 家庭名称并行加载修复
+- ✅ 页面切换 fade 过渡动画（App.vue Transition，纯 opacity，无位移）
+- ✅ 滚动条跳动修复（html scrollbar-gutter: stable，消除 overflow-x:hidden 干扰）
+- ✅ 测试数据：zhangfamily 8 名成员覆盖所有头像类型
 
 ### Next Steps
 - 🔄 药品页：药品列表、添加药品（含 OCR 识别）、用药计划
