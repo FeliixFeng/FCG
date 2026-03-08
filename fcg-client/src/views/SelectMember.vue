@@ -166,38 +166,33 @@ onMounted(() => loadMembers())
   padding: clamp(16px, 4vw, 48px) clamp(12px, 3vw, 24px);
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(124% 92% at 8% 4%,  rgba(255,255,255,0.84) 0%,  transparent 55%),
-    radial-gradient(98%  76% at 100% 8%, rgba(84,127,124,0.22)  0%,  transparent 60%),
-    radial-gradient(88%  74% at 0% 100%, rgba(246,228,201,0.68) 0%,  transparent 64%),
-    linear-gradient(134deg, #fbf8f1 0%, #f2e9d8 56%, #e6ede9 100%);
+  /* 暖米绿亮色底色 */
+  background: linear-gradient(145deg, #eef5f4 0%, #f0ebe0 45%, #e8f2f0 100%);
 }
 
-/* 格纹叠加 */
+/* ── 大模糊装饰圆（无纹理，靠形状撑空间） ── */
 .shell::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(135deg, rgba(69,99,97,0.16) 0 1px, transparent 1px 30px),
-    repeating-linear-gradient(45deg,  rgba(255,255,255,0.32) 0 1px, transparent 1px 30px);
-  opacity: 0.56;
-  -webkit-mask-image: radial-gradient(120% 94% at 50% 56%, #000 0%, rgba(0,0,0,0.58) 66%, transparent 100%);
-  mask-image:         radial-gradient(120% 94% at 50% 56%, #000 0%, rgba(0,0,0,0.58) 66%, transparent 100%);
+  width: min(70vw, 640px);
+  height: min(70vw, 640px);
+  top: -25%;
+  right: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(45,95,93,0.13) 0%, transparent 70%);
   pointer-events: none;
 }
 
-/* 光晕叠加 */
+/* ── 品牌色光晕叠加 ── */
 .shell::after {
   content: '';
   position: absolute;
-  inset: -8% -10% -12% -10%;
+  inset: 0;
   background:
-    linear-gradient(118deg, rgba(45,95,93,0.16) 0%, rgba(45,95,93,0) 34%),
-    linear-gradient(304deg, rgba(45,95,93,0.12) 0%, rgba(45,95,93,0) 32%),
-    linear-gradient(146deg, rgba(255,255,255,0.36) 0%, rgba(255,255,255,0) 32%),
-    linear-gradient(338deg, rgba(238,224,198,0.34) 0%, rgba(238,224,198,0) 30%);
-  opacity: 0.92;
+    radial-gradient(ellipse 55% 45% at 8%  10%,  rgba(45,95,93,0.12)   0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 92% 85%,  rgba(45,95,93,0.10)   0%, transparent 60%),
+    radial-gradient(ellipse 40% 35% at 88% 12%,  rgba(246,228,201,0.40) 0%, transparent 55%),
+    radial-gradient(ellipse 45% 40% at 5%  90%,  rgba(246,228,201,0.30) 0%, transparent 55%);
   pointer-events: none;
 }
 
@@ -208,30 +203,30 @@ onMounted(() => loadMembers())
   width: min(44vw, 560px); height: min(30vw, 360px);
   left: -12%; top: -8%;
   clip-path: polygon(0 18%, 76% 0, 100% 44%, 60% 100%, 0 80%);
-  background: linear-gradient(138deg, rgba(229,243,241,0.72) 0%, rgba(77,124,121,0.22) 100%);
-  border: 1px solid rgba(255,255,255,0.28);
-  opacity: 0.88;
+  background: linear-gradient(138deg, rgba(45,95,93,0.09) 0%, rgba(255,255,255,0.12) 100%);
+  border: 1px solid rgba(45,95,93,0.12);
+  opacity: 0.8;
 }
 .bg-b {
   width: min(48vw, 620px); height: min(36vw, 430px);
   right: -16%; bottom: -18%;
   clip-path: polygon(8% 0, 100% 24%, 92% 100%, 0 74%);
-  background: linear-gradient(142deg, rgba(45,95,93,0.44) 0%, rgba(45,95,93,0.14) 100%);
+  background: linear-gradient(142deg, rgba(45,95,93,0.10) 0%, rgba(246,228,201,0.20) 100%);
   opacity: 0.62;
 }
 .bg-c {
   width: min(24vw, 300px); height: min(20vw, 220px);
   right: 10%; top: 12%;
   clip-path: polygon(0 24%, 80% 0, 100% 66%, 18% 100%);
-  background: linear-gradient(130deg, rgba(250,244,234,0.9) 0%, rgba(45,95,93,0.24) 100%);
-  opacity: 0.68;
+  background: linear-gradient(130deg, rgba(246,228,201,0.50) 0%, rgba(45,95,93,0.08) 100%);
+  opacity: 0.7;
 }
 .bg-d {
   width: min(30vw, 380px); height: min(22vw, 260px);
   left: -8%; bottom: -12%;
   clip-path: polygon(0 32%, 88% 0, 100% 86%, 12% 100%);
-  background: linear-gradient(132deg, rgba(232,202,161,0.44) 0%, rgba(255,255,255,0.1) 100%);
-  opacity: 0.58;
+  background: linear-gradient(132deg, rgba(45,95,93,0.08) 0%, rgba(246,228,201,0.35) 100%);
+  opacity: 0.7;
 }
 
 /* ── 主面板 ── */
@@ -243,11 +238,11 @@ onMounted(() => loadMembers())
   gap: 24px;
   padding: clamp(20px, 4vw, 32px);
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.66);
-  background: linear-gradient(170deg, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.78) 100%);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 20px 60px rgba(26,38,37,0.12);
+  border: 1px solid rgba(255,255,255,0.80);
+  background: linear-gradient(170deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.90) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(45,95,93,0.14), 0 2px 8px rgba(45,95,93,0.08), 0 0 0 1px rgba(255,255,255,0.7);
 }
 
 /* ── 顶部品牌栏 ── */
