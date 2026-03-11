@@ -36,6 +36,7 @@ export const switchCareMode = (mode) => http.put(`/api/user/care-mode/${mode}`)
 
 // ========== 药品模块 ==========
 
+
 /** 药品列表（分页） */
 export const fetchMedicineList = (params) => http.get('/api/medicine/list', { params })
 
@@ -50,3 +51,29 @@ export const deleteMedicine = (id) => http.delete(`/api/medicine/${id}`)
 
 /** 药品详情 */
 export const fetchMedicine = (id) => http.get(`/api/medicine/${id}`)
+
+/** 今日计划记录联表（含 medicineName、planDosage 等）*/
+export const fetchTodayPlanRecords = (scheduledDate, userId) =>
+  http.get('/api/medicine/plan/records', { params: { scheduledDate, userId, page: 1, size: 50 } })
+
+/** 更新服药记录状态（打卡/跳过） */
+export const updateMedicineRecord = (id, data) => http.put(`/api/medicine/record/${id}`, data)
+
+// ========== 健康模块 ==========
+
+/** 近一周体征 */
+export const fetchWeeklyVitals = (userId, type) =>
+  http.get('/api/health/vital/weekly', { params: { userId, type } })
+
+/** 今日是否有体征记录（列表查，取第一页第一条） */
+export const fetchTodayVitals = (userId) => {
+  const today = new Date()
+  const start = `${today.toISOString().slice(0, 10)}T00:00:00`
+  const end   = `${today.toISOString().slice(0, 10)}T23:59:59`
+  return http.get('/api/health/vital/list', {
+    params: { userId, startTime: start, endTime: end, page: 1, size: 1 },
+  })
+}
+
+/** 健康周报列表 */
+export const fetchHealthReports = (params) => http.get('/api/health/report/list', { params })
