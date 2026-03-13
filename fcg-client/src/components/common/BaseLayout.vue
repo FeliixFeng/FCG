@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 
@@ -7,8 +7,20 @@ const userStore = useUserStore()
 const router = useRouter()
 const route = useRoute()
 
+const isPreviewMode = ref(false)
+
+onMounted(() => {
+  isPreviewMode.value = sessionStorage.getItem('fcg_preview_care') === '1'
+})
+
+const exitPreview = () => {
+  sessionStorage.removeItem('fcg_preview_care')
+  window.location.reload()
+}
+
 const memberName = computed(() => userStore.member?.nickname || '访客')
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
+const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
 const navItems = [
   { name: 'dashboard', label: '首页', icon: homeIcon() },
@@ -40,6 +52,18 @@ function familyIcon() { return 'family' }
 
 <template>
   <div class="app-shell">
+    <!-- ── 预览模式退出横幅 ── -->
+    <div v-if="isPreviewMode" class="preview-banner">
+      <div class="preview-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span class="preview-text">正在预览关怀模式</span>
+        <button @click="exitPreview" class="btn-exit-preview">退出预览</button>
+      </div>
+    </div>
+    
     <!-- ── 顶部导航（桌面） ── -->
     <header class="topbar">
       <div class="topbar-inner">
@@ -103,7 +127,7 @@ function familyIcon() { return 'family' }
                   <div class="dropdown-name">{{ memberName }}</div>
                   <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
                 </div>
-                <el-dropdown-item command="switch">
+                <el-dropdown-item v-if="!isCareMode" command="switch">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>
@@ -112,7 +136,7 @@ function familyIcon() { return 'family' }
                   </svg>
                   切换成员
                 </el-dropdown-item>
-                <el-dropdown-item command="logout" divided>
+                <el-dropdown-item command="logout" :divided="!isCareMode">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                     <polyline points="16 17 21 12 16 7"/>
@@ -133,7 +157,7 @@ function familyIcon() { return 'family' }
     </main>
 
     <!-- ── 底部 Tab Bar（移动端） ── -->
-    <nav class="bottom-bar">
+    <nav class="bottom-bar" :class="{ 'care-mode': isCareMode }">
       <button
         v-for="item in navItems"
         :key="item.name"
@@ -173,6 +197,51 @@ function familyIcon() { return 'family' }
   flex-direction: column;
   background: linear-gradient(145deg, #eef5f4 0%, #f0ebe0 45%, #e8f2f0 100%);
   position: relative;
+}
+
+/* ── 预览模式横幅 ── */
+.preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 51;
+  background: linear-gradient(135deg, #2d5f5d, #3a7573);
+  color: white;
+  padding: 10px 24px;
+  box-shadow: 0 2px 12px rgba(45, 95, 93, 0.3);
+}
+
+.preview-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.preview-text {
+  flex: 1;
+}
+
+.btn-exit-preview {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-exit-preview:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 /* ── 顶部导航 ── */
@@ -376,6 +445,20 @@ function familyIcon() { return 'family' }
   font-size: 0.68rem;
   font-weight: 500;
   letter-spacing: 0.02em;
+}
+
+.bottom-bar.care-mode .tab-item {
+  padding: 14px 0 12px;
+}
+
+.bottom-bar.care-mode .tab-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.bottom-bar.care-mode .tab-label {
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 /* ── 用户下拉菜单 ── */

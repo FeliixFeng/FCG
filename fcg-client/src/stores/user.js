@@ -23,8 +23,8 @@ export const useUserStore = defineStore('user', {
     token: (state) => state.memberToken || state.familyToken,
     // 是否为管理员
     isAdmin: (state) => state.member?.role === 0,
-    // 是否为关怀模式
-    isCareMode: (state) => state.member?.careMode === 1,
+    // 是否为关怀模式（受控成员 role=2 强制关怀模式）
+    isCareMode: (state) => state.member?.role === 2,
   },
 
   actions: {
