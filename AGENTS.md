@@ -260,6 +260,49 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - 🔄 关怀模式：大字体/简化 UI 适配
 - 🔄 健康周报：AI 生成摘要展示
 
+## CI/CD (GitHub Actions + Alibaba Cloud ACR)
+
+### 流程概述
+
+```
+推送 main 分支 → GitHub Actions 构建 → 推送到阿里云 ACR → 服务器拉取镜像 → 部署
+```
+
+### GitHub Secrets
+
+需要在仓库 Settings → Secrets and variables → Actions 中配置：
+
+| Secret | 说明 | 示例值 |
+|--------|------|--------|
+| `ACR_REGISTRY` | ACR 地址 | `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com` |
+| `ACR_USERNAME` | 阿里云账号 | 你的阿里云用户名 |
+| `ACR_PASSWORD` | 阿里云密码 | 你的阿里云密码 |
+| `SSH_HOST` | 服务器 IP | 你的服务器地址 |
+| `SSH_PORT` | SSH 端口 | 22 |
+| `SSH_USER` | SSH 用户名 | root |
+| `SSH_PRIVATE_KEY` | SSH 私钥 | 你的私钥内容 |
+
+### 触发条件
+
+- 推送到 `main` 分支触发部署
+- 推送到 `dev` 分支不触发（开发测试用）
+
+### ACR 镜像
+
+- **后端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-server`
+- **前端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-client`
+
+每个镜像保留 `latest` 和 `sha` 标签。
+
+### 回滚
+
+如果新版本有问题，在服务器上手动拉取旧版本：
+```bash
+docker pull <acr-registry>/feliixfeng/fcg-server:<旧sha>
+docker tag <acr-registry>/feliixfeng/fcg-server:<旧sha> fcg-server:latest
+docker compose up -d --force-recreate
+```
+
 ## Notes
 
 - This is a graduation project (毕业设计) from Wuhan Textile University
