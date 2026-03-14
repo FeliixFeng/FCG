@@ -2,7 +2,7 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
@@ -53,7 +53,6 @@ jobs:
           push: true
           tags: |
             ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:latest
-            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:${{ github.sha }}
 
       - name: Build and push frontend image to ACR
         uses: docker/build-push-action@v6
@@ -64,7 +63,6 @@ jobs:
           push: true
           tags: |
             ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest
-            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:${{ github.sha }}
 
       - name: Clean old frontend dist on server
         uses: appleboy/ssh-action@v1.2.5
@@ -97,6 +95,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/user/apps/fcg
-            docker build -t fcg-server:latest ./fcg-server
-            docker build -t fcg-web:latest ./fcg-client
+            docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} ${{ env.ACR_REGISTRY }}
+            docker pull ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:latest
+            docker pull ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest
+            docker tag ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:latest fcg-server:latest
+            docker tag ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest fcg-web:latest
             docker compose up -d --force-recreate

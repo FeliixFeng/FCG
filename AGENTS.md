@@ -260,6 +260,44 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - 🔄 关怀模式：大字体/简化 UI 适配
 - 🔄 健康周报：AI 生成摘要展示
 
+## CI/CD (GitHub Actions + Alibaba Cloud ACR)
+
+### 流程概述
+
+```
+推送 main 分支 → GitHub Actions 构建 → 推送到阿里云 ACR → 服务器拉取镜像 → 部署
+```
+
+### GitHub Secrets
+
+需要在仓库 Settings → Secrets and variables → Actions 中配置：
+
+| Secret | 说明 | 示例值 |
+|--------|------|--------|
+| `ACR_REGISTRY` | ACR 地址 | `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com` |
+| `ACR_USERNAME` | 阿里云账号 | 你的阿里云用户名 |
+| `ACR_PASSWORD` | 阿里云密码 | 你的阿里云密码 |
+| `SSH_HOST` | 服务器 IP | 你的服务器地址 |
+| `SSH_PORT` | SSH 端口 | 22 |
+| `SSH_USER` | SSH 用户名 | root |
+| `SSH_PRIVATE_KEY` | SSH 私钥 | 你的私钥内容 |
+
+### 触发条件
+
+- 推送到 `main` 分支触发部署
+- 推送到 `dev` 分支不触发（开发测试用）
+
+### ACR 镜像
+
+- **后端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-server:latest`
+- **前端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-client:latest`
+
+只保留 `latest` 标签，每次推送覆盖。
+
+### 回滚
+
+如果新版本有问题，需要重新推送旧代码到 main 分支触发重新部署。
+
 ## Notes
 
 - This is a graduation project (毕业设计) from Wuhan Textile University
