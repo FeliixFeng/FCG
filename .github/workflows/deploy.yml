@@ -97,6 +97,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/user/apps/fcg
-            docker build -t fcg-server:latest ./fcg-server
-            docker build -t fcg-web:latest ./fcg-client
+            docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} ${{ env.ACR_REGISTRY }}
+            docker pull ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:latest
+            docker pull ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest
+            docker tag ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:latest fcg-server:latest
+            docker tag ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest fcg-web:latest
             docker compose up -d --force-recreate
