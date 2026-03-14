@@ -9,6 +9,13 @@ import { ElMessage } from 'element-plus'
 const userStore = useUserStore()
 const router = useRouter()
 
+const isPreviewMode = ref(false)
+onMounted(() => {
+  isPreviewMode.value = sessionStorage.getItem('fcg_preview_care') === '1'
+})
+
+const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
+
 // ── 管理员验证弹窗 ──
 const showAdminModal = ref(false)
 const adminPassword = ref('')
@@ -198,7 +205,7 @@ function statusClass(status) {
     <div class="bg-layer bg-a" aria-hidden="true"></div>
     <div class="bg-layer bg-b" aria-hidden="true"></div>
 
-    <div class="dashboard">
+    <div class="dashboard" :class="{ 'care-mode': isCareMode }">
       <!-- ══════════════════════════════════════════
            左列
       ═══════════════════════════════════════════ -->
@@ -303,7 +310,7 @@ function statusClass(status) {
         </div>
 
         <!-- ③ 模块分区卡 -->
-        <div class="card">
+        <div v-if="!isCareMode" class="card">
           <div class="card-title">功能模块</div>
           <div class="module-grid">
             <div
@@ -344,7 +351,7 @@ function statusClass(status) {
       <!-- ══════════════════════════════════════════
            右列
       ═══════════════════════════════════════════ -->
-      <div class="col-side">
+      <div v-if="!isCareMode" class="col-side">
 
         <!-- ④ 今日概览卡 -->
         <div class="card">
@@ -450,6 +457,12 @@ function statusClass(status) {
   grid-template-columns: 2fr 1fr;
   gap: 20px;
   align-items: start;
+}
+
+.dashboard.care-mode {
+  grid-template-columns: 1fr;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 /* ── 卡片基础 ── */
@@ -984,6 +997,113 @@ function statusClass(status) {
   margin: 10px 0 0;
   color: #b42318;
   font-size: 0.85rem;
+}
+
+/* ── 关怀模式放大样式 ── */
+.dashboard.care-mode .card {
+  padding: 28px 26px 26px;
+  border-radius: 24px;
+}
+
+.dashboard.care-mode .card-title {
+  font-size: 0.95rem;
+  margin-bottom: 18px;
+}
+
+.dashboard.care-mode .task-greeting {
+  font-size: 1.6rem;
+}
+
+.dashboard.care-mode .task-date {
+  font-size: 1rem;
+}
+
+.dashboard.care-mode .task-badge {
+  font-size: 0.9rem;
+  padding: 6px 14px;
+}
+
+.dashboard.care-mode .task-body {
+  padding: 20px 22px;
+  gap: 18px;
+  border-radius: 18px;
+  margin-bottom: 20px;
+}
+
+.dashboard.care-mode .task-icon-wrap {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+}
+
+.dashboard.care-mode .task-icon-wrap svg {
+  width: 36px;
+  height: 36px;
+}
+
+.dashboard.care-mode .task-name {
+  font-size: 1.35rem;
+  margin-bottom: 6px;
+}
+
+.dashboard.care-mode .task-desc {
+  font-size: 1.05rem;
+}
+
+.dashboard.care-mode .task-actions {
+  gap: 14px;
+}
+
+.dashboard.care-mode .task-btn-primary,
+.dashboard.care-mode .task-btn-ghost {
+  font-size: 1.1rem !important;
+  padding: 14px 24px !important;
+  height: auto !important;
+  border-radius: 14px !important;
+}
+
+.dashboard.care-mode .task-all-done {
+  padding: 20px 22px;
+  font-size: 1.15rem;
+  gap: 16px;
+}
+
+.dashboard.care-mode .task-all-done svg {
+  width: 40px;
+  height: 40px;
+}
+
+.dashboard.care-mode .med-item {
+  padding: 16px 20px;
+  border-radius: 16px;
+  border-width: 2px;
+}
+
+.dashboard.care-mode .med-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.dashboard.care-mode .med-name {
+  font-size: 1.15rem;
+}
+
+.dashboard.care-mode .med-meta {
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+.dashboard.care-mode .med-status-badge {
+  font-size: 0.9rem;
+  min-width: 36px;
+}
+
+.dashboard.care-mode .med-checkin-btn,
+.dashboard.care-mode .med-skip-btn {
+  font-size: 1rem;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border-width: 2px;
 }
 
 /* ── 响应式 ── */

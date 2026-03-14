@@ -2,6 +2,9 @@
 import BaseLayout from '../components/common/BaseLayout.vue'
 import { onMounted, ref } from 'vue'
 import { fetchFamilyInfo, fetchFamilyMembers } from '../utils/api'
+import { useUserStore } from '../stores/user'
+
+const userStore = useUserStore()
 
 const loading = ref(false)
 const info = ref(null)
@@ -22,6 +25,10 @@ const loadFamily = async () => {
   }
 }
 
+const startPreview = () => {
+  sessionStorage.setItem('fcg_preview_care', '1')
+  window.location.reload()
+}
 
 onMounted(() => {
   loadFamily()
@@ -51,7 +58,16 @@ onMounted(() => {
       </div>
 
       <div class="card panel" v-if="info">
-        <h2>家庭成员</h2>
+        <div class="panel-header">
+          <h2>家庭成员</h2>
+          <button v-if="userStore.isAdmin" @click="startPreview" class="btn-preview">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            预览关怀模式
+          </button>
+        </div>
         <div v-if="members.length === 0" class="muted">暂无成员</div>
         <div v-else class="member-list">
           <div v-for="member in members" :key="member.userId" class="member">
@@ -60,8 +76,8 @@ onMounted(() => {
               <div class="muted">关系：{{ member.relation || '未设置' }}</div>
             </div>
             <div class="member-meta">
-              <span>角色：{{ member.role }}</span>
-              <span>关怀模式：{{ member.careMode === 1 ? '开启' : '关闭' }}</span>
+              <span>角色：{{ member.role === 0 ? '超级管理员' : member.role === 1 ? '普通成员' : '受控成员' }}</span>
+              <span>关怀模式：{{ member.role === 2 ? '强制启用' : '关闭' }}</span>
             </div>
           </div>
         </div>
@@ -80,6 +96,38 @@ onMounted(() => {
   padding: 24px;
   display: grid;
   gap: 16px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.panel-header h2 {
+  margin: 0;
+}
+
+.btn-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid rgba(45, 95, 93, 0.25);
+  border-radius: 10px;
+  background: rgba(45, 95, 93, 0.05);
+  color: #2d5f5d;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-preview:hover {
+  background: rgba(45, 95, 93, 0.1);
+  border-color: rgba(45, 95, 93, 0.4);
 }
 
 .info {

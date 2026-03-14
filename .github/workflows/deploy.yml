@@ -2,11 +2,14 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+      ACR_NAMESPACE: feliixfeng
 
     steps:
       - name: Checkout code
@@ -30,6 +33,38 @@ jobs:
       - name: Build frontend
         working-directory: fcg-client
         run: npm install && npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        uses: aliyun/acr-login@v1
+        with:
+          login-server: https://${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push backend image to ACR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./fcg-server
+          file: ./fcg-server/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:latest
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-server:${{ github.sha }}
+
+      - name: Build and push frontend image to ACR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./fcg-client
+          file: ./fcg-client/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:${{ github.sha }}
 
       - name: Clean old frontend dist on server
         uses: appleboy/ssh-action@v1.2.5
