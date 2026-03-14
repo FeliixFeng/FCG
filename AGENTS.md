@@ -289,19 +289,14 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 
 ### ACR 镜像
 
-- **后端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-server`
-- **前端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-client`
+- **后端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-server:latest`
+- **前端**: `crpi-xxxxx.cn-hangzhou.personal.cr.aliyuncs.com/feliixfeng/fcg-client:latest`
 
-每个镜像保留 `latest` 和 `sha` 标签。
+只保留 `latest` 标签，每次推送覆盖。
 
 ### 回滚
 
-如果新版本有问题，在服务器上手动拉取旧版本：
-```bash
-docker pull <acr-registry>/feliixfeng/fcg-server:<旧sha>
-docker tag <acr-registry>/feliixfeng/fcg-server:<旧sha> fcg-server:latest
-docker compose up -d --force-recreate
-```
+如果新版本有问题，需要重新推送旧代码到 main 分支触发重新部署。
 
 ## Notes
 
