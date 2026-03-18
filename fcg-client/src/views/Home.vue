@@ -86,11 +86,27 @@ async function loadTodayData() {
   }
 }
 
+const refreshData = async () => {
+  await loadTodayData()
+  ElMessage({ message: '刷新成功', type: 'success', duration: 1000 })
+}
+
 onMounted(loadTodayData)
 
 // ── 状态派生 ──
 const pendingRecords = computed(() => planRecords.value.filter(r => r.recordStatus === 0))
 const doneRecords    = computed(() => planRecords.value.filter(r => r.recordStatus === 1))
+
+// 检查是否超时（返回超时分钟数，0表示未超时）
+function getOverdueMinutes(scheduledTime) {
+  if (!scheduledTime) return 0
+  const now = new Date()
+  const [h, m] = scheduledTime.split(':').map(Number)
+  const scheduledMin = h * 60 + m
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const diff = nowMin - scheduledMin
+  return diff > 0 ? diff : 0
+}
 
 // 下一条待打卡（按计划时间最近）
 const nextPending = computed(() => {
@@ -105,14 +121,19 @@ const nextPending = computed(() => {
   return (passed[0] ?? pendingRecords.value[0]) ?? null
 })
 
+const nextPendingOverdueMin = computed(() => {
+  if (!nextPending.value?.scheduledTime) return 0
+  return getOverdueMinutes(nextPending.value.scheduledTime)
+})
+
 // ── 打卡 ──
 async function checkin(record) {
   try {
     const now = new Date()
     const actualTime = now.toISOString().replace('T', ' ').slice(0, 19)
     await updateMedicineRecord(record.recordId, { status: 1, actualTime })
-    record.recordStatus = 1  // 乐观更新
     ElMessage({ message: '打卡成功 ✓', type: 'success', duration: 1500 })
+    await loadTodayData()  // 刷新数据
   } catch (e) {
     ElMessage({ message: '打卡失败，请重试', type: 'error', duration: 2000 })
   }
@@ -122,7 +143,7 @@ async function checkin(record) {
 async function skipRecord(record) {
   try {
     await updateMedicineRecord(record.recordId, { status: 2 })
-    record.recordStatus = 2  // 乐观更新
+    await loadTodayData()  // 刷新数据
   } catch (e) {
     ElMessage({ message: '操作失败', type: 'error', duration: 2000 })
   }
@@ -135,7 +156,13 @@ const timeline = computed(() => {
     const tb = b.scheduledTime ?? '00:00'
     return ta.localeCompare(tb)
   })
-  return sorted.slice(0, 5).map(r => {
+  
+  // 关怀模式：只显示待服和已服，隐藏已跳过
+  const filtered = isCareMode.value 
+    ? sorted.filter(r => r.recordStatus !== 2)
+    : sorted
+  
+  return filtered.slice(0, 5).map(r => {
     let status = 'upcoming'
     let desc = r.scheduledTime ? `计划 ${r.scheduledTime.slice(0, 5)}` : '今日'
     if (r.recordStatus === 1) { status = 'done'; desc = '已打卡' }
@@ -218,8 +245,23 @@ function statusClass(status) {
               <div class="task-greeting">{{ greeting }}，{{ userStore.member?.nickname || '朋友' }} 👋</div>
               <div class="task-date">{{ todayStr }}</div>
             </div>
-            <div v-if="pendingRecords.length > 0" class="task-badge">待完成 {{ pendingRecords.length }}</div>
-            <div v-else class="task-badge task-badge-done">全部完成 ✓</div>
+            <div class="task-header-right">
+              <button 
+                class="refresh-btn" 
+                :class="{ 'refresh-loading': loadingRecords }" 
+                @click="refreshData"
+                :disabled="loadingRecords"
+                title="刷新数据"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+              <div v-if="pendingRecords.length > 0" class="task-badge">待完成 {{ pendingRecords.length }}</div>
+              <div v-else class="task-badge task-badge-done">全部完成 ✓</div>
+            </div>
           </div>
 
           <template v-if="nextPending">
@@ -233,6 +275,9 @@ function statusClass(status) {
                 <div class="task-name">{{ nextPending.medicineName ?? '用药提醒' }}</div>
                 <div class="task-desc">
                   {{ nextPending.scheduledTime ? nextPending.scheduledTime.slice(0, 5) + ' · ' : '' }}{{ nextPending.planDosage ?? '' }}
+                </div>
+                <div v-if="nextPendingOverdueMin > 0" class="task-overdue-tag">
+                  已超时 {{ nextPendingOverdueMin }} 分钟
                 </div>
               </div>
             </div>
@@ -266,12 +311,15 @@ function statusClass(status) {
 
           <div v-if="loadingRecords" class="med-loading">加载中…</div>
 
-          <div v-else-if="planRecords.length === 0" class="med-empty">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 12h8M12 8v8"/>
+          <div v-else-if="planRecords.length === 0" class="med-empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d0d0d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
             </svg>
-            <span>今日暂无用药计划</span>
+            <p class="empty-text">今日暂无用药计划</p>
+            <p class="empty-hint">休息一天，享受健康时光 😊</p>
+            <el-button class="empty-btn" @click="router.push({ name: 'medicine' })">
+              添加用药计划
+            </el-button>
           </div>
 
           <ul v-else class="med-list">
@@ -279,7 +327,10 @@ function statusClass(status) {
               v-for="r in planRecords"
               :key="r.recordId"
               class="med-item"
-              :class="statusClass(r.recordStatus)"
+              :class="[
+                statusClass(r.recordStatus),
+                { 'med-overdue': r.recordStatus === 0 && getOverdueMinutes(r.scheduledTime) > 0 }
+              ]"
             >
               <div class="med-left">
                 <!-- 状态圆点 -->
@@ -289,6 +340,12 @@ function statusClass(status) {
                   <div class="med-meta">
                     <span v-if="r.scheduledTime">{{ r.scheduledTime.slice(0, 5) }}</span>
                     <span v-if="r.planDosage"> · {{ r.planDosage }}</span>
+                    <span 
+                      v-if="r.recordStatus === 0 && getOverdueMinutes(r.scheduledTime) > 0" 
+                      class="overdue-label"
+                    >
+                      · 超时 {{ getOverdueMinutes(r.scheduledTime) }} 分钟
+                    </span>
                   </div>
                 </div>
               </div>
@@ -365,7 +422,11 @@ function statusClass(status) {
               <div class="overview-val">{{ doneRecords.length }}</div>
               <div class="overview-key">已打卡</div>
             </div>
-            <div class="overview-item overview-vital">
+            <div 
+              class="overview-item overview-vital overview-clickable" 
+              @click="router.push({ name: 'health' })"
+              title="点击跳转到健康页"
+            >
               <div class="overview-val" :class="vitalRecorded ? '' : 'overview-val-no'">
                 {{ vitalRecorded ? '✓' : '—' }}
               </div>
@@ -396,6 +457,33 @@ function statusClass(status) {
                 </div>
                 <div class="tl-desc">{{ item.desc }}</div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           关怀模式时间线（单列，置于底部）
+      ═══════════════════════════════════════════ -->
+      <div v-if="isCareMode && timeline.length > 0" class="card timeline-card">
+        <div class="card-title">今日任务</div>
+        <div class="timeline">
+          <div
+            v-for="(item, idx) in timeline"
+            :key="idx"
+            class="timeline-item"
+            :class="'tl-' + item.status"
+          >
+            <div class="tl-line">
+              <div class="tl-dot"></div>
+              <div v-if="idx < timeline.length - 1" class="tl-track"></div>
+            </div>
+            <div class="tl-content">
+              <div class="tl-top">
+                <span class="tl-label">{{ item.label }}</span>
+                <span class="tl-time">{{ item.time }}</span>
+              </div>
+              <div class="tl-desc">{{ item.desc }}</div>
             </div>
           </div>
         </div>
@@ -526,6 +614,48 @@ function statusClass(status) {
   margin-bottom: 18px;
 }
 
+.task-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.refresh-btn {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid rgba(45, 95, 93, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #2d5f5d;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: rgba(45, 95, 93, 0.08);
+  border-color: rgba(45, 95, 93, 0.3);
+  transform: translateY(-1px);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-btn.refresh-loading svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .task-greeting {
   font-size: 1.2rem;
   font-weight: 800;
@@ -586,6 +716,17 @@ function statusClass(status) {
   color: #888;
 }
 
+.task-overdue-tag {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
 .task-actions {
   display: flex;
   gap: 10px;
@@ -622,14 +763,48 @@ function statusClass(status) {
 }
 
 /* ── ② 今日用药 ── */
-.med-loading,
-.med-empty {
+.med-loading {
   display: flex;
   align-items: center;
   gap: 8px;
   color: #bbb;
   font-size: 0.85rem;
   padding: 8px 0 4px;
+}
+
+.med-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.med-empty-state svg {
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-text {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #999;
+}
+
+.empty-hint {
+  margin: 0 0 20px;
+  font-size: 0.8rem;
+  color: #bbb;
+}
+
+.empty-btn {
+  --el-button-bg-color: #2d5f5d !important;
+  --el-button-border-color: #2d5f5d !important;
+  --el-button-hover-bg-color: #3d7370 !important;
+  --el-button-hover-border-color: #3d7370 !important;
+  font-family: inherit !important;
 }
 
 .med-list {
@@ -661,6 +836,11 @@ function statusClass(status) {
   opacity: 0.55;
 }
 
+.med-item.med-overdue {
+  border-color: rgba(231, 76, 60, 0.4);
+  background: rgba(231, 76, 60, 0.04);
+}
+
 .med-left {
   display: flex;
   align-items: center;
@@ -677,6 +857,7 @@ function statusClass(status) {
 }
 .med-done .med-dot { background: #2d5f5d; }
 .med-skip .med-dot { background: #ccc; }
+.med-overdue .med-dot { background: #e74c3c; }
 
 .med-info {
   min-width: 0;
@@ -703,6 +884,11 @@ function statusClass(status) {
   font-size: 0.75rem;
   color: #aaa;
   margin-top: 1px;
+}
+
+.overdue-label {
+  color: #e74c3c;
+  font-weight: 600;
 }
 
 .med-right {
@@ -848,6 +1034,17 @@ function statusClass(status) {
 
 .overview-vital {
   background: rgba(90, 122, 158, 0.07);
+}
+
+.overview-clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.overview-clickable:hover {
+  background: rgba(90, 122, 158, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(90, 122, 158, 0.15);
 }
 
 .overview-val {

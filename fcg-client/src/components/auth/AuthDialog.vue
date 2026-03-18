@@ -175,12 +175,12 @@ const handleRegister = async () => {
             </div>
             <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" label-position="top" @submit.prevent="handleLogin">
               <el-form-item label="家庭账号" prop="username">
-                <el-input v-model.trim="loginForm.username" placeholder="请输入家庭账号" size="large" clearable>
+                <el-input v-model.trim="loginForm.username" placeholder="请输入家庭账号" size="large" clearable @keyup.enter="handleLogin">
                   <template #prefix><el-icon><User /></el-icon></template>
                 </el-input>
               </el-form-item>
               <el-form-item label="密码" prop="password">
-                <el-input v-model="loginForm.password" placeholder="请输入密码" size="large" show-password>
+                <el-input v-model="loginForm.password" placeholder="请输入密码" size="large" show-password @keyup.enter="handleLogin">
                   <template #prefix><el-icon><Lock /></el-icon></template>
                 </el-input>
               </el-form-item>
@@ -202,26 +202,26 @@ const handleRegister = async () => {
             <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-position="top" @submit.prevent="handleRegister">
               <div class="form-grid">
                 <el-form-item label="家庭账号" prop="username">
-                  <el-input v-model.trim="registerForm.username" placeholder="4-20 位" size="large" clearable>
+                  <el-input v-model.trim="registerForm.username" placeholder="4-20 位" size="large" clearable @keyup.enter="handleRegister">
                     <template #prefix><el-icon><User /></el-icon></template>
                   </el-input>
                 </el-form-item>
                 <el-form-item label="管理员昵称" prop="adminNickname">
-                  <el-input v-model.trim="registerForm.adminNickname" placeholder="例如：妈妈、张三" size="large" clearable />
+                  <el-input v-model.trim="registerForm.adminNickname" placeholder="例如：妈妈、张三" size="large" clearable @keyup.enter="handleRegister" />
                 </el-form-item>
                 <el-form-item label="密码" prop="password">
-                  <el-input v-model="registerForm.password" placeholder="6-20 位" size="large" show-password>
+                  <el-input v-model="registerForm.password" placeholder="6-20 位" size="large" show-password @keyup.enter="handleRegister">
                     <template #prefix><el-icon><Lock /></el-icon></template>
                   </el-input>
                 </el-form-item>
                 <el-form-item label="确认密码" prop="confirmPassword">
-                  <el-input v-model="registerForm.confirmPassword" placeholder="请再次输入密码" size="large" show-password>
+                  <el-input v-model="registerForm.confirmPassword" placeholder="请再次输入密码" size="large" show-password @keyup.enter="handleRegister">
                     <template #prefix><el-icon><Lock /></el-icon></template>
                   </el-input>
                 </el-form-item>
               </div>
               <el-form-item label="家庭名称（可选）" prop="familyName">
-                <el-input v-model.trim="registerForm.familyName" placeholder="不填则系统自动生成" size="large" clearable />
+                <el-input v-model.trim="registerForm.familyName" placeholder="不填则系统自动生成" size="large" clearable @keyup.enter="handleRegister" />
               </el-form-item>
               <div class="form-footer-tip">
                 已有账号？<button type="button" class="link-btn" @click="switchTab('login')">直接登录</button>
