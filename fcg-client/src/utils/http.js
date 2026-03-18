@@ -26,7 +26,19 @@ http.interceptors.response.use(
   },
   (error) => {
     if (error.response && error.response.status === 401) {
+      // 清除 localStorage 中的 token
       clearToken()
+      
+      // 同步清除 Pinia store 状态并跳转登录页
+      // 注意：在 interceptor 中不能直接 import useUserStore，会造成循环依赖
+      // 解决方案：通过事件通知或直接操作 window.location
+      if (typeof window !== 'undefined') {
+        // 清除 Pinia 持久化状态（如果有的话）
+        localStorage.removeItem('pinia-user')
+        
+        // 强制跳转到登录页，清空所有状态
+        window.location.href = '/'
+      }
     }
     return Promise.reject(error)
   }
