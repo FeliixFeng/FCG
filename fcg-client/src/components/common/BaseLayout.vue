@@ -100,8 +100,6 @@ const handleUserCommand = (cmd) => {
   } else if (cmd === 'logout') {
     userStore.logout()
     router.replace({ name: 'landing' })
-  } else if (cmd === 'admin') {
-    router.push({ name: 'admin-members' })
   }
 }
 
@@ -110,7 +108,6 @@ function homeIcon() { return 'home' }
 function medicineIcon() { return 'medicine' }
 function healthIcon() { return 'health' }
 function familyIcon() { return 'family' }
-function adminIcon() { return 'admin' }
 function profileIcon() { return 'profile' }
 </script>
 
@@ -169,11 +166,6 @@ function profileIcon() { return 'profile' }
                 <circle cx="9" cy="7" r="4"/>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              <!-- admin -->
-              <svg v-else-if="item.icon === 'admin'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
               </svg>
               <!-- profile -->
               <svg v-else-if="item.icon === 'profile'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -271,10 +263,6 @@ function profileIcon() { return 'profile' }
             <circle cx="9" cy="7" r="4"/>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          <svg v-else-if="item.icon === 'admin'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
           </svg>
           <svg v-else-if="item.icon === 'profile'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
