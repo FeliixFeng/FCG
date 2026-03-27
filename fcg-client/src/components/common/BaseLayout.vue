@@ -8,9 +8,25 @@ const router = useRouter()
 const route = useRoute()
 
 const isPreviewMode = ref(false)
+const loadingProfile = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   isPreviewMode.value = sessionStorage.getItem('fcg_preview_care') === '1'
+  
+  // 🔧 修复：页面刷新时，如果有 memberToken 但 member 为空，自动加载用户信息
+  if (userStore.hasMember && !userStore.member) {
+    try {
+      loadingProfile.value = true
+      await userStore.fetchProfile()
+    } catch (err) {
+      console.error('[BaseLayout] 加载用户信息失败', err)
+      // token 可能过期，清除状态并跳转登录页
+      userStore.logout()
+      router.replace({ name: 'landing' })
+    } finally {
+      loadingProfile.value = false
+    }
+  }
 })
 
 const exitPreview = () => {
@@ -18,16 +34,37 @@ const exitPreview = () => {
   window.location.reload()
 }
 
-const memberName = computed(() => userStore.member?.nickname || '访客')
+const memberName = computed(() => {
+  // 正在加载用户信息
+  if (loadingProfile.value) return '加载中...'
+  // 显示用户昵称
+  return userStore.member?.nickname || '访客'
+})
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
-const navItems = [
-  { name: 'dashboard', label: '首页', icon: homeIcon() },
-  { name: 'medicine', label: '药品', icon: medicineIcon() },
-  { name: 'health',   label: '健康', icon: healthIcon() },
-  { name: 'family',   label: '家庭', icon: familyIcon() },
-]
+// 动态导航菜单（根据角色显示）
+const navItems = computed(() => {
+  const role = userStore.member?.role
+  const baseItems = [
+    { name: 'dashboard', label: '首页', icon: homeIcon() },
+    { name: 'medicine', label: '药品', icon: medicineIcon() },
+    { name: 'health',   label: '健康', icon: healthIcon() },
+  ]
+  
+  // 受控成员（role=2）只有基础导航
+  if (role === 2) return baseItems
+  
+  // 普通成员和管理员都有家庭页
+  const withFamily = [...baseItems, { name: 'family', label: '家庭', icon: familyIcon() }]
+  
+  // 超级管理员（role=0）额外有管理页
+  if (role === 0) {
+    return [...withFamily, { name: 'admin', label: '管理', icon: adminIcon() }]
+  }
+  
+  return withFamily
+})
 
 const isActive = (name) => route.name === name
 
@@ -48,6 +85,7 @@ function homeIcon() { return 'home' }
 function medicineIcon() { return 'medicine' }
 function healthIcon() { return 'health' }
 function familyIcon() { return 'family' }
+function adminIcon() { return 'admin' }
 </script>
 
 <template>
@@ -105,6 +143,11 @@ function familyIcon() { return 'family' }
                 <circle cx="9" cy="7" r="4"/>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <!-- admin -->
+              <svg v-else-if="item.icon === 'admin'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
               </svg>
             </span>
             {{ item.label }}
@@ -181,6 +224,10 @@ function familyIcon() { return 'family' }
             <circle cx="9" cy="7" r="4"/>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <svg v-else-if="item.icon === 'admin'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
           </svg>
         </span>
         <span class="tab-label">{{ item.label }}</span>

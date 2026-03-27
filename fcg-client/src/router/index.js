@@ -34,19 +34,43 @@ const router = createRouter({
 router.beforeEach((to) => {
   const userStore = useUserStore()
 
+  // 调试信息：记录路由守卫状态
+  console.log('[Router Guard]', {
+    to: to.name,
+    isLoggedIn: userStore.isLoggedIn,
+    hasMember: userStore.hasMember,
+    member: userStore.member ? `${userStore.member.nickname}(${userStore.member.userId})` : null
+  })
+
   // 公开页面直接放行
   if (to.meta.public) return true
 
   // 需要家庭级 token（选人页）
   if (to.meta.requireFamily) {
-    if (!userStore.isLoggedIn) return { name: 'landing' }
+    if (!userStore.isLoggedIn) {
+      console.log('[Router Guard] 未登录，跳转登录页')
+      return { name: 'landing' }
+    }
     return true
   }
 
   // 需要成员级 token（业务页面）
   if (to.meta.requireMember) {
-    if (!userStore.isLoggedIn) return { name: 'landing' }
-    if (!userStore.hasMember) return { name: 'select-member' }
+    if (!userStore.isLoggedIn) {
+      console.log('[Router Guard] 未登录，跳转登录页')
+      return { name: 'landing' }
+    }
+    if (!userStore.hasMember) {
+      console.log('[Router Guard] 未选择成员，跳转选人页')
+      return { name: 'select-member' }
+    }
+    
+    // 管理员页面权限检查
+    if (to.meta.requireAdmin && !userStore.isAdmin) {
+      console.log('[Router Guard] 非管理员，跳转首页')
+      return { name: 'dashboard' }
+    }
+    
     return true
   }
 

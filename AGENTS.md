@@ -231,9 +231,121 @@ mvn test -Dtest=UserServiceTest
 mvn test -Dtest=UserServiceTest#shouldCreateUser
 ```
 
+## UI/UX Design Guidelines
+
+### Role-Based Permission System
+
+#### Role Definitions
+
+| 角色 | role 值 | 定位 | 典型用户 | 创建方式 |
+|------|---------|------|----------|----------|
+| **超级管理员** | 0 | 家庭管理者 | 子女、创建者 | 注册时第一个用户 |
+| **普通成员** | 1 | 自主使用者 | 中青年家庭成员 | 管理员添加 |
+| **受控成员** | 2 | 被照护对象 | 老人、需关怀人群 | 管理员添加，强制关怀模式 |
+
+#### Page Access Matrix
+
+| 页面 | 超级管理员 | 普通成员 | 受控成员 | 说明 |
+|------|-----------|---------|---------|------|
+| **首页** | ✅ 完整版 | ✅ 完整版 | ✅ 简化版 | 所有人都有 |
+| **药品页** | ✅ 增删改查 + 为所有人创建计划 | ✅ 增删改查 + 仅为自己创建计划 | ✅ 仅查看（关怀模式） | 药品库共享，计划个人化 |
+| **健康页** | ✅ 可切换查看所有人 | ✅ 仅查看自己 | ✅ 仅录入/查看自己（关怀模式） | 管理员可查看家庭所有人体征 |
+| **家庭页** | ✅ 成员列表 + 基础信息 + 编辑家庭名 | ✅ 成员列表 + 基础信息 | ❌ 不显示 | 添加/删除成员功能在管理员页 |
+| **管理员页** | ✅ 成员管理 + 权限分配 | ❌ 不显示 | ❌ 不显示 | 仅管理员可见 |
+
+**核心逻辑**：
+- **药品库是共享的**（家庭药箱概念）→ 管理员和普通成员都可以增删改查
+- **用药计划是个人的**（谁吃什么药）→ 管理员可为所有人创建，普通成员只能管理自己的
+- **受控成员只能打卡和查看**（老人只需要按提醒吃药）
+
+### Navigation Design
+
+#### Role Navigation Matrix
+
+| 导航项 | 超级管理员 | 普通成员 | 受控成员 |
+|--------|-----------|---------|---------|
+| 🏠 首页 | ✅ | ✅ | ✅ |
+| 💊 药品 | ✅ | ✅ | ✅ |
+| ❤️ 健康 | ✅ | ✅ | ✅ |
+| 👨‍👩‍👧‍👦 家庭 | ✅ | ✅ | ❌ |
+| ⚙️ 管理 | ✅ | ❌ | ❌ |
+
+#### Desktop Navigation (Topbar)
+
+- **超级管理员**：`[Logo] FCG | 张家庭  [首页] [药品] [健康] [家庭] [管理]  张爸爸▼`
+- **普通成员**：`[Logo] FCG | 张家庭  [首页] [药品] [健康] [家庭]  张妈妈▼`
+- **受控成员**：`[Logo] FCG | 张家庭  [首页] [药品] [健康]  张奶奶▼`
+
+#### Mobile Navigation (Bottom Tabbar)
+
+- **超级管理员**：`[首页] [药品] [健康] [更多▼]` → 更多菜单：家庭、管理
+- **普通成员**：`[首页] [药品] [健康] [家庭]`
+- **受控成员**：`[首页] [药品] [健康]`（居中显示，大图标 32px）
+
+**关怀模式特殊样式**（移动端）：
+- 底部导航栏高度：80px（常规 60px）
+- 图标尺寸：32px（常规 24px）
+- 文字尺寸：18px（常规 12px）
+- 居中布局
+
+### Layout Strategy
+
+#### Device Priorities
+- **主要适配**：桌面网页端（≥ 768px）— 优先开发
+- **兼容**：移动端响应式（< 768px）— 同步适配
+
+#### Navigation Placement
+- **桌面端**（≥ 768px）：顶部横向导航
+- **移动端**（< 768px）：底部固定导航栏
+
+### Component Selection
+
+#### Medicine Page
+- **Layout**：卡片布局（温馨，适合家庭）
+- **Plan Management**：右侧抽屉（Drawer）
+- **Forms**：弹窗（Dialog）
+
+#### Health Page
+- **Charts**：ECharts 5（折线图 + 参考线）
+- **Data Entry**：弹窗表单
+- **Member Switcher**（管理员）：顶部下拉选择
+
+#### Family Page
+- **Member List**：卡片布局
+- **Quick Actions**：切换成员、退出登录
+
+#### Admin Page
+- **Member Management**：表格（Table）
+- **Forms**：弹窗（Dialog）
+
+### Care Mode Enhancement
+
+**适配对象**：受控成员（role = 2）强制启用
+
+#### Visual Enhancements
+- **Font Size**：1.5rem+ （常规 0.9-1rem）
+- **Icon Size**：32px（常规 22-24px）
+- **Button Height**：52px（常规 40px）
+- **Color Contrast**：高对比度配色
+- **Line Height**：1.8（常规 1.4-1.5）
+
+#### Interaction Simplification
+- 隐藏次要功能（编辑/删除按钮）
+- 减少步骤（一键打卡，无确认弹窗）
+- 简化时间线（仅显示今日任务）
+
+### Color Palette
+
+| 用途 | 颜色 | 用法 |
+|------|------|------|
+| 主色调 | `#2d5f5d` | 导航栏、按钮、强调文字 |
+| 超时高亮 | `#e74c3c` | 未打卡提醒、过期药品 |
+| 背景渐变 | `linear-gradient(145deg, #eef5f4 0%, #f0ebe0 45%, #e8f2f0 100%)` | 页面背景 |
+| 卡片背景 | `rgba(255, 255, 255, 0.9)` | 卡片、弹窗 |
+
 ## Development Status
 
-### Completed (2026-03-08)
+### Completed (2026-03-27)
 - ✅ Database schema design (7 tables)
 - ✅ MyBatis-Plus Generator configuration
 - ✅ Entity classes (7 entities)
@@ -251,14 +363,20 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ 页面切换 fade 过渡动画（App.vue Transition，纯 opacity，无位移）
 - ✅ 滚动条跳动修复（html scrollbar-gutter: stable，消除 overflow-x:hidden 干扰）
 - ✅ 测试数据：zhangfamily 8 名成员覆盖所有头像类型
+- ✅ "访客"Bug 修复（BaseLayout onMounted 自动加载 member）
+- ✅ 权限体系与 UI/UX 设计规范确认
+
+### In Progress
+- 🔄 动态导航菜单（按角色显示导航项）
 
 ### Next Steps
-- 🔄 药品页：药品列表、添加药品（含 OCR 识别）、用药计划
+- 🔄 药品页：药品列表、添加药品（暂跳过 OCR）、用药计划
 - 🔄 健康页：体征录入、近一周趋势图表
-- 🔄 家庭页：成员列表、添加成员、关怀模式切换
+- 🔄 家庭页：成员列表、基础信息展示
 - 🔄 管理员页：成员管理完善
-- 🔄 关怀模式：大字体/简化 UI 适配
-- 🔄 健康周报：AI 生成摘要展示
+- 🔄 关怀模式：大字体/简化 UI 统一适配
+- ⏸️ OCR/AI 功能：方案待定（服务器不可用）
+- ⏸️ 健康周报：AI 生成摘要展示
 
 ## CI/CD (GitHub Actions + Alibaba Cloud ACR)
 
