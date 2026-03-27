@@ -1,11 +1,27 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 
 const userStore = useUserStore()
 const router = useRouter()
 const route = useRoute()
+
+const loadingProfile = ref(false)
+
+onMounted(async () => {
+  if (userStore.hasMember && !userStore.member) {
+    try {
+      loadingProfile.value = true
+      await userStore.fetchProfile()
+    } catch (err) {
+      userStore.logout()
+      router.replace({ name: 'landing' })
+    } finally {
+      loadingProfile.value = false
+    }
+  }
+})
 
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 
