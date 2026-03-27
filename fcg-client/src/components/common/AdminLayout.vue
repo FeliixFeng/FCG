@@ -21,6 +21,13 @@ onMounted(async () => {
       loadingProfile.value = false
     }
   }
+  if (userStore.isLoggedIn && !userStore.family) {
+    try {
+      await userStore.fetchFamilyInfo()
+    } catch (err) {
+      console.error('[AdminLayout] 加载家庭信息失败', err)
+    }
+  }
 })
 
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
@@ -39,7 +46,7 @@ const go = (name) => router.push({ name })
 
 // 退出管理界面
 const exitAdmin = () => {
-  router.push({ name: 'profile' })
+  router.push({ name: 'dashboard' })
 }
 </script>
 
@@ -82,7 +89,7 @@ const exitAdmin = () => {
 
     <!-- 主内容 -->
     <main class="admin-main">
-      <slot />
+      <router-view />
     </main>
 
     <!-- 底部 Tab Bar（移动端） -->

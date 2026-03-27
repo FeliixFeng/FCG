@@ -9,7 +9,6 @@ const FamilyHome = () => import('../views/FamilyHome.vue')
 const MedicineHome = () => import('../views/MedicineHome.vue')
 const HealthHome = () => import('../views/HealthHome.vue')
 const ProfileHome = () => import('../views/ProfileHome.vue')
-const AdminHome = () => import('../views/AdminHome.vue')
 const AdminLayout = () => import('../components/common/AdminLayout.vue')
 const AdminMembers = () => import('../views/admin/AdminMembers.vue')
 const AdminMedicines = () => import('../views/admin/AdminMedicines.vue')
@@ -32,9 +31,7 @@ const router = createRouter({
     { path: '/health', name: 'health', component: HealthHome, meta: { requireMember: true } },
     { path: '/profile', name: 'profile', component: ProfileHome, meta: { requireMember: true } },
 
-    // 管理员页面
-    { path: '/admin', name: 'admin', component: AdminHome, meta: { requireMember: true, requireAdmin: true } },
-
+    // 管理界面路由（/admin 子路由）
     {
       path: '/admin',
       component: AdminLayout,
@@ -52,10 +49,10 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const userStore = useUserStore()
 
-  // 调试信息：记录路由守卫状态
+  // 调试信息
   console.log('[Router Guard]', {
     to: to.name,
     isLoggedIn: userStore.isLoggedIn,
@@ -84,6 +81,18 @@ router.beforeEach((to) => {
     if (!userStore.hasMember) {
       console.log('[Router Guard] 未选择成员，跳转选人页')
       return { name: 'select-member' }
+    }
+    
+    // 如果有 token 但没有 member 信息，先加载
+    if (!userStore.member) {
+      console.log('[Router Guard] 正在加载成员信息...')
+      try {
+        await userStore.fetchProfile()
+      } catch (err) {
+        console.log('[Router Guard] 加载失败，清除状态')
+        userStore.logout()
+        return { name: 'landing' }
+      }
     }
     
     // 管理员页面权限检查
