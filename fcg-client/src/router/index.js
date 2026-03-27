@@ -10,6 +10,11 @@ const MedicineHome = () => import('../views/MedicineHome.vue')
 const HealthHome = () => import('../views/HealthHome.vue')
 const ProfileHome = () => import('../views/ProfileHome.vue')
 const AdminHome = () => import('../views/AdminHome.vue')
+const AdminLayout = () => import('../components/common/AdminLayout.vue')
+const AdminMembers = () => import('../views/admin/AdminMembers.vue')
+const AdminMedicines = () => import('../views/admin/AdminMedicines.vue')
+const AdminSystem = () => import('../views/admin/AdminSystem.vue')
+const AdminData = () => import('../views/admin/AdminData.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -27,8 +32,22 @@ const router = createRouter({
     { path: '/health', name: 'health', component: HealthHome, meta: { requireMember: true } },
     { path: '/profile', name: 'profile', component: ProfileHome, meta: { requireMember: true } },
 
-    // 管理员页面（需要成员级 token + 管理员角色）
+    // 管理员页面
     { path: '/admin', name: 'admin', component: AdminHome, meta: { requireMember: true, requireAdmin: true } },
+
+    {
+      path: '/admin',
+      component: AdminLayout,
+      meta: { requireMember: true, requireAdmin: true },
+      children: [
+        { path: '', redirect: '/admin/members' },
+        { path: 'members', name: 'admin-members', component: AdminMembers },
+        { path: 'medicines', name: 'admin-medicines', component: AdminMedicines },
+        { path: 'system', name: 'admin-system', component: AdminSystem },
+        { path: 'data', name: 'admin-data', component: AdminData },
+      ]
+    },
+
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

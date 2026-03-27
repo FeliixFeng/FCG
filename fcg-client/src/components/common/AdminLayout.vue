@@ -1,0 +1,288 @@
+<script setup>
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '../stores/user'
+
+const userStore = useUserStore()
+const router = useRouter()
+const route = useRoute()
+
+const familyName = computed(() => userStore.family?.familyName || '我的家庭')
+
+// 管理界面导航
+const adminNavItems = [
+  { name: 'admin-members', label: '成员管理', icon: 'members' },
+  { name: 'admin-medicines', label: '药品管理', icon: 'medicine' },
+  { name: 'admin-system', label: '系统设置', icon: 'settings' },
+  { name: 'admin-data', label: '数据统计', icon: 'chart' },
+]
+
+const isActive = (name) => route.name === name
+
+const go = (name) => router.push({ name })
+
+// 退出管理界面
+const exitAdmin = () => {
+  router.push({ name: 'profile' })
+}
+</script>
+
+<template>
+  <div class="admin-shell">
+    <!-- 顶部导航 -->
+    <header class="admin-topbar">
+      <div class="topbar-inner">
+        <div class="brand" @click="exitAdmin">
+          <img src="/fcg.png" alt="FCG" class="brand-logo" />
+          <div class="brand-text">
+            <div class="brand-title">管理中心</div>
+            <div class="brand-sub">{{ familyName }}</div>
+          </div>
+        </div>
+        
+        <button class="btn-exit" @click="exitAdmin">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          退出管理
+        </button>
+      </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="admin-main">
+      <slot />
+    </main>
+
+    <!-- 底部 Tab Bar（移动端） -->
+    <nav class="admin-bottom-bar">
+      <button
+        v-for="item in adminNavItems"
+        :key="item.name"
+        class="tab-item"
+        :class="{ active: isActive(item.name) }"
+        @click="go(item.name)"
+      >
+        <span class="tab-icon">
+          <!-- members -->
+          <svg v-if="item.icon === 'members'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <!-- medicine -->
+          <svg v-else-if="item.icon === 'medicine'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+          </svg>
+          <!-- settings -->
+          <svg v-else-if="item.icon === 'settings'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
+          </svg>
+          <!-- chart -->
+          <svg v-else-if="item.icon === 'chart'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </span>
+        <span class="tab-label">{{ item.label }}</span>
+      </button>
+      
+      <button class="tab-item tab-back" @click="exitAdmin">
+        <span class="tab-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5m7 7-7-7 7-7"/>
+          </svg>
+        </span>
+        <span class="tab-label">返回</span>
+      </button>
+    </nav>
+  </div>
+</template>
+
+<style scoped>
+.admin-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, #eef5f4 0%, #f0ebe0 45%, #e8f2f0 100%);
+}
+
+/* 顶部导航 */
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(45, 95, 93, 0.1);
+  box-shadow: 0 2px 12px rgba(45, 95, 93, 0.08);
+}
+
+.topbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  line-height: 1.2;
+}
+
+.brand-sub {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 2px;
+}
+
+.btn-exit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #2d5f5d;
+  border-radius: 6px;
+  color: #2d5f5d;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-exit:hover {
+  background: #2d5f5d;
+  color: white;
+}
+
+/* 主内容 */
+.admin-main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 24px 100px;
+}
+
+/* 底部 Tab Bar */
+.admin-bottom-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(45, 95, 93, 0.1);
+  box-shadow: 0 -2px 12px rgba(45, 95, 93, 0.08);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.tab-item.active {
+  color: #2d5f5d;
+}
+
+.tab-item.active .tab-icon {
+  transform: scale(1.1);
+}
+
+.tab-icon {
+  margin-bottom: 4px;
+  transition: transform 0.2s ease;
+}
+
+.tab-label {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tab-back {
+  flex: 0.8;
+}
+
+.tab-back .tab-label {
+  color: #2d5f5d;
+  font-weight: 500;
+}
+
+/* 桌面端 */
+@media (min-width: 768px) {
+  .admin-bottom-bar {
+    display: none !important;
+  }
+  
+  .admin-main {
+    padding-bottom: 28px;
+  }
+  
+  .btn-exit {
+    padding: 10px 20px;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 767px) {
+  .admin-bottom-bar {
+    display: flex;
+  }
+  
+  .topbar-inner {
+    padding: 12px 16px;
+  }
+  
+  .brand-title {
+    font-size: 0.9rem;
+  }
+  
+  .btn-exit span {
+    display: none;
+  }
+  
+  .btn-exit {
+    padding: 8px 12px;
+  }
+}
+</style>
