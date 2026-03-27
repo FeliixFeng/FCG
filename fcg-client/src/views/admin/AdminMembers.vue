@@ -93,9 +93,15 @@ onMounted(() => {
 }
 
 .page-header h2 {
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 1.25rem;
   color: #2d5f5d;
+}
+
+.page-desc {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
 }
 
 .loading, .error, .empty {

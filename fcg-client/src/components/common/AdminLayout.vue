@@ -104,15 +104,6 @@ const exitAdmin = () => {
         </span>
         <span class="tab-label">{{ item.label }}</span>
       </button>
-      
-      <button class="tab-item tab-back" @click="exitAdmin">
-        <span class="tab-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5m7 7-7-7 7-7"/>
-          </svg>
-        </span>
-        <span class="tab-label">返回</span>
-      </button>
     </nav>
   </div>
 </template>
