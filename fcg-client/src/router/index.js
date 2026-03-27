@@ -8,6 +8,7 @@ const Home = () => import('../views/Home.vue')
 const FamilyHome = () => import('../views/FamilyHome.vue')
 const MedicineHome = () => import('../views/MedicineHome.vue')
 const HealthHome = () => import('../views/HealthHome.vue')
+const ProfileHome = () => import('../views/ProfileHome.vue')
 const AdminHome = () => import('../views/AdminHome.vue')
 
 const router = createRouter({
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/family', name: 'family', component: FamilyHome, meta: { requireMember: true } },
     { path: '/medicine', name: 'medicine', component: MedicineHome, meta: { requireMember: true } },
     { path: '/health', name: 'health', component: HealthHome, meta: { requireMember: true } },
+    { path: '/profile', name: 'profile', component: ProfileHome, meta: { requireMember: true } },
 
     // 管理员页面（需要成员级 token + 管理员角色）
     { path: '/admin', name: 'admin', component: AdminHome, meta: { requireMember: true, requireAdmin: true } },

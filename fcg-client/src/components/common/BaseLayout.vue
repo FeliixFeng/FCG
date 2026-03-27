@@ -43,7 +43,7 @@ const memberName = computed(() => {
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
-// 动态导航菜单（根据角色显示）
+// 桌面端导航菜单（根据角色显示）
 const navItems = computed(() => {
   const role = userStore.member?.role
   const baseItems = [
@@ -66,6 +66,28 @@ const navItems = computed(() => {
   return withFamily
 })
 
+// 移动端导航菜单（所有角色都有"我的"Tab）
+const mobileNavItems = computed(() => {
+  const role = userStore.member?.role
+  const baseItems = [
+    { name: 'dashboard', label: '首页', icon: homeIcon() },
+    { name: 'medicine', label: '药品', icon: medicineIcon() },
+    { name: 'health',   label: '健康', icon: healthIcon() },
+  ]
+  
+  // 受控成员（role=2）：4个Tab（无"家庭"）
+  if (role === 2) {
+    return [...baseItems, { name: 'profile', label: '我的', icon: profileIcon() }]
+  }
+  
+  // 管理员/普通成员：5个Tab
+  return [
+    ...baseItems,
+    { name: 'family', label: '家庭', icon: familyIcon() },
+    { name: 'profile', label: '我的', icon: profileIcon() }
+  ]
+})
+
 const isActive = (name) => route.name === name
 
 const go = (name) => router.push({ name })
@@ -86,6 +108,7 @@ function medicineIcon() { return 'medicine' }
 function healthIcon() { return 'health' }
 function familyIcon() { return 'family' }
 function adminIcon() { return 'admin' }
+function profileIcon() { return 'profile' }
 </script>
 
 <template>
@@ -149,6 +172,11 @@ function adminIcon() { return 'admin' }
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
               </svg>
+              <!-- profile -->
+              <svg v-else-if="item.icon === 'profile'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
             </span>
             {{ item.label }}
           </button>
@@ -202,7 +230,7 @@ function adminIcon() { return 'admin' }
     <!-- ── 底部 Tab Bar（移动端） ── -->
     <nav class="bottom-bar" :class="{ 'care-mode': isCareMode }">
       <button
-        v-for="item in navItems"
+        v-for="item in mobileNavItems"
         :key="item.name"
         class="tab-item"
         :class="{ active: isActive(item.name) }"
@@ -228,6 +256,10 @@ function adminIcon() { return 'admin' }
           <svg v-else-if="item.icon === 'admin'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
+          </svg>
+          <svg v-else-if="item.icon === 'profile'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
           </svg>
         </span>
         <span class="tab-label">{{ item.label }}</span>
