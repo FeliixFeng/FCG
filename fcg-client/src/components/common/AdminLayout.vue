@@ -39,6 +39,19 @@ const exitAdmin = () => {
             <div class="brand-sub">{{ familyName }}</div>
           </div>
         </div>
+
+        <!-- 桌面端导航 -->
+        <nav class="admin-top-nav">
+          <button
+            v-for="item in adminNavItems"
+            :key="item.name"
+            class="nav-link"
+            :class="{ active: isActive(item.name) }"
+            @click="go(item.name)"
+          >
+            {{ item.label }}
+          </button>
+        </nav>
         
         <button class="btn-exit" @click="exitAdmin">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -164,6 +177,33 @@ const exitAdmin = () => {
   margin-top: 2px;
 }
 
+/* 桌面端导航 */
+.admin-top-nav {
+  display: none;
+  gap: 8px;
+}
+
+.nav-link {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #666;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  background: rgba(45, 95, 93, 0.1);
+  color: #2d5f5d;
+}
+
+.nav-link.active {
+  background: #2d5f5d;
+  color: white;
+}
+
 .btn-exit {
   display: flex;
   align-items: center;
@@ -250,6 +290,10 @@ const exitAdmin = () => {
 
 /* 桌面端 */
 @media (min-width: 768px) {
+  .admin-top-nav {
+    display: flex;
+  }
+  
   .admin-bottom-bar {
     display: none !important;
   }

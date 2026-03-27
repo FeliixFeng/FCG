@@ -42,6 +42,7 @@ onMounted(() => {
   <div class="admin-members">
     <div class="page-header">
       <h2>成员管理</h2>
+      <p class="page-desc">管理家庭成员信息，包括添加、查看、修改角色等操作。</p>
     </div>
 
     <div v-if="loading" class="loading">加载中...</div>
