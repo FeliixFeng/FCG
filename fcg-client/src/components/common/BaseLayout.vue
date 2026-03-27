@@ -58,14 +58,7 @@ const navItems = computed(() => {
   if (role === 2) return baseItems
   
   // 普通成员和管理员都有家庭页
-  const withFamily = [...baseItems, { name: 'family', label: '家庭', icon: familyIcon() }]
-  
-  // 超级管理员（role=0）额外有管理页
-  if (role === 0) {
-    return [...withFamily, { name: 'admin', label: '管理', icon: adminIcon() }]
-  }
-  
-  return withFamily
+  return [...baseItems, { name: 'family', label: '家庭', icon: familyIcon() }]
 })
 
 // 移动端导航菜单（所有角色都有"我的"Tab）
@@ -101,6 +94,8 @@ const handleUserCommand = (cmd) => {
   } else if (cmd === 'logout') {
     userStore.logout()
     router.replace({ name: 'landing' })
+  } else if (cmd === 'admin') {
+    router.push({ name: 'admin-members' })
   }
 }
 
@@ -216,7 +211,14 @@ function profileIcon() { return 'profile' }
                     <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
                   </div>
                 </div>
-                <el-dropdown-item command="switch" divided>
+                <el-dropdown-item v-if="userStore.isAdmin" command="admin" divided>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
+                  </svg>
+                  进入管理界面
+                </el-dropdown-item>
+                <el-dropdown-item command="switch">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>

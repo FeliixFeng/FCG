@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import BaseLayout from '../components/common/BaseLayout.vue'
+import AvatarIcon from '../components/common/AvatarIcon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
@@ -20,11 +21,6 @@ const roleLabel = computed(() => {
 // 关怀模式状态
 const careModeStatus = computed(() => {
   return userStore.isCareMode ? '已启用（强制）' : '未启用'
-})
-
-// 头像生成（取昵称首字）
-const avatarText = computed(() => {
-  return userStore.member?.nickname?.[0] || '?'
 })
 
 // 切换成员
@@ -76,9 +72,15 @@ const handleEnterAdmin = () => {
     <section class="profile-container">
       <!-- 成员信息卡片 -->
       <div class="card profile-card">
-        <div class="avatar" :class="{ 'care-mode': userStore.isCareMode }">
-          {{ avatarText }}
-        </div>
+        <AvatarIcon
+          class="avatar"
+          :class="{ 'care-mode': userStore.isCareMode }"
+          :avatar="userStore.member?.avatar"
+          :relation="userStore.member?.relation"
+          :role="userStore.member?.role"
+          :nickname="userStore.member?.nickname"
+          :size="80"
+        />
         <h2 class="nickname">{{ userStore.member?.nickname || '未命名' }}</h2>
         <div class="meta">
           <span class="role-badge" :class="`role-${userStore.member?.role}`">
@@ -165,23 +167,11 @@ const handleEnterAdmin = () => {
 }
 
 .avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2d5f5d 0%, #3a7775 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: bold;
-  box-shadow: 0 4px 12px rgba(45, 95, 93, 0.2);
+  flex-shrink: 0;
 }
 
 .avatar.care-mode {
-  width: 100px;
-  height: 100px;
-  font-size: 40px;
+  transform: scale(1.25);
 }
 
 .nickname {
