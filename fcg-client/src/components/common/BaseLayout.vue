@@ -45,7 +45,7 @@ const memberName = computed(() => {
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
-// 桌面端导航菜单（根据角色显示）
+// 桌面端导航菜单（所有角色都有"我的"Tab）
 const navItems = computed(() => {
   const role = userStore.member?.role
   const baseItems = [
@@ -54,11 +54,17 @@ const navItems = computed(() => {
     { name: 'health',   label: '健康', icon: healthIcon() },
   ]
   
-  // 受控成员（role=2）只有基础导航
-  if (role === 2) return baseItems
+  // 受控成员（role=2）无"家庭"但有"我的"
+  if (role === 2) {
+    return [...baseItems, { name: 'profile', label: '我的', icon: profileIcon() }]
+  }
   
-  // 普通成员和管理员都有家庭页
-  return [...baseItems, { name: 'family', label: '家庭', icon: familyIcon() }]
+  // 普通成员和管理员都有"家庭"和"我的"
+  return [
+    ...baseItems,
+    { name: 'family', label: '家庭', icon: familyIcon() },
+    { name: 'profile', label: '我的', icon: profileIcon() }
+  ]
 })
 
 // 移动端导航菜单（所有角色都有"我的"Tab）
@@ -211,14 +217,7 @@ function profileIcon() { return 'profile' }
                     <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
                   </div>
                 </div>
-                <el-dropdown-item v-if="userStore.isAdmin" command="admin" divided>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
-                  </svg>
-                  进入管理界面
-                </el-dropdown-item>
-                <el-dropdown-item command="switch">
+                <el-dropdown-item command="switch" divided>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>
@@ -636,7 +635,20 @@ function profileIcon() { return 'profile' }
   }
 
   .brand-text {
+    display: flex;
+    flex-direction: column;
+    margin-left: 8px;
+  }
+
+  .brand-title {
     display: none;
+  }
+
+  .brand-sub {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #2d5f5d;
   }
 
   .topbar-inner {
