@@ -40,6 +40,12 @@ const memberName = computed(() => {
   // 显示用户昵称
   return userStore.member?.nickname || '访客'
 })
+
+// 头像文字（昵称首字）
+const avatarText = computed(() => {
+  return userStore.member?.nickname?.[0] || '?'
+})
+
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
@@ -186,7 +192,7 @@ function profileIcon() { return 'profile' }
         <div class="user-area">
           <el-dropdown trigger="click" @command="handleUserCommand" placement="bottom-end">
             <div class="member-chip">
-              <div class="member-avatar-dot"></div>
+              <div class="member-avatar">{{ avatarText }}</div>
               <span class="member-name">{{ memberName }}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                 <polyline points="6 9 12 15 18 9"/>
@@ -195,8 +201,11 @@ function profileIcon() { return 'profile' }
             <template #dropdown>
               <el-dropdown-menu class="user-dropdown">
                 <div class="dropdown-header">
-                  <div class="dropdown-name">{{ memberName }}</div>
-                  <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
+                  <div class="dropdown-avatar">{{ avatarText }}</div>
+                  <div class="dropdown-info">
+                    <div class="dropdown-name">{{ memberName }}</div>
+                    <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
+                  </div>
                 </div>
                 <el-dropdown-item command="switch" divided>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
@@ -462,6 +471,20 @@ function profileIcon() { return 'profile' }
   flex-shrink: 0;
 }
 
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2d5f5d 0%, #3a7775 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 .member-name {
   max-width: 80px;
   overflow: hidden;
@@ -551,23 +574,48 @@ function profileIcon() { return 'profile' }
 }
 
 .dropdown-header {
-  padding: 12px 16px 10px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid rgba(45, 95, 93, 0.09);
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dropdown-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2d5f5d 0%, #3a7775 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dropdown-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .dropdown-name {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #1a1a1a;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dropdown-role {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #2d5f5d;
-  margin-top: 2px;
-  opacity: 0.8;
+  margin-top: 3px;
+  opacity: 0.85;
 }
 
 :deep(.user-dropdown .el-dropdown-menu__item) {
