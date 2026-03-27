@@ -2,6 +2,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
+import AvatarIcon from './AvatarIcon.vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -39,11 +40,6 @@ const memberName = computed(() => {
   if (loadingProfile.value) return '加载中...'
   // 显示用户昵称
   return userStore.member?.nickname || '访客'
-})
-
-// 头像文字（昵称首字）
-const avatarText = computed(() => {
-  return userStore.member?.nickname?.[0] || '?'
 })
 
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
@@ -192,7 +188,13 @@ function profileIcon() { return 'profile' }
         <div class="user-area">
           <el-dropdown trigger="click" @command="handleUserCommand" placement="bottom-end">
             <div class="member-chip">
-              <div class="member-avatar">{{ avatarText }}</div>
+              <AvatarIcon
+                :avatar="userStore.member?.avatar"
+                :relation="userStore.member?.relation"
+                :role="userStore.member?.role"
+                :nickname="userStore.member?.nickname"
+                :size="32"
+              />
               <span class="member-name">{{ memberName }}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                 <polyline points="6 9 12 15 18 9"/>
@@ -201,7 +203,14 @@ function profileIcon() { return 'profile' }
             <template #dropdown>
               <el-dropdown-menu class="user-dropdown">
                 <div class="dropdown-header">
-                  <div class="dropdown-avatar">{{ avatarText }}</div>
+                  <AvatarIcon
+                    class="dropdown-avatar-icon"
+                    :avatar="userStore.member?.avatar"
+                    :relation="userStore.member?.relation"
+                    :role="userStore.member?.role"
+                    :nickname="userStore.member?.nickname"
+                    :size="40"
+                  />
                   <div class="dropdown-info">
                     <div class="dropdown-name">{{ memberName }}</div>
                     <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
@@ -471,20 +480,6 @@ function profileIcon() { return 'profile' }
   flex-shrink: 0;
 }
 
-.member-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2d5f5d 0%, #3a7775 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
 .member-name {
   max-width: 80px;
   overflow: hidden;
@@ -582,17 +577,7 @@ function profileIcon() { return 'profile' }
   gap: 12px;
 }
 
-.dropdown-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2d5f5d 0%, #3a7775 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
+.dropdown-avatar-icon {
   flex-shrink: 0;
 }
 
