@@ -117,4 +117,5 @@ Spring Boot 支持用环境变量覆盖配置，常用项如下：
 
 ## 开发备注
 最近一次本地测试：2026-02-23
+SSH key smoke test trigger: 2026-04-02
 # test
