@@ -2,15 +2,32 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
+import AvatarIcon from './AvatarIcon.vue'
 
 const userStore = useUserStore()
 const router = useRouter()
 const route = useRoute()
 
 const isPreviewMode = ref(false)
+const loadingProfile = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   isPreviewMode.value = sessionStorage.getItem('fcg_preview_care') === '1'
+  
+  // 🔧 修复：页面刷新时，如果有 memberToken 但 member 为空，自动加载用户信息
+  if (userStore.hasMember && !userStore.member) {
+    try {
+      loadingProfile.value = true
+      await userStore.fetchProfile()
+    } catch (err) {
+      console.error('[BaseLayout] 加载用户信息失败', err)
+      // token 可能过期，清除状态并跳转登录页
+      userStore.logout()
+      router.replace({ name: 'landing' })
+    } finally {
+      loadingProfile.value = false
+    }
+  }
 })
 
 const exitPreview = () => {
@@ -18,16 +35,59 @@ const exitPreview = () => {
   window.location.reload()
 }
 
-const memberName = computed(() => userStore.member?.nickname || '访客')
+const memberName = computed(() => {
+  // 正在加载用户信息
+  if (loadingProfile.value) return '加载中...'
+  // 显示用户昵称
+  return userStore.member?.nickname || '访客'
+})
+
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
-const navItems = [
-  { name: 'dashboard', label: '首页', icon: homeIcon() },
-  { name: 'medicine', label: '药品', icon: medicineIcon() },
-  { name: 'health',   label: '健康', icon: healthIcon() },
-  { name: 'family',   label: '家庭', icon: familyIcon() },
-]
+// 桌面端导航菜单（所有角色都有"我的"Tab）
+const navItems = computed(() => {
+  const role = userStore.member?.role
+  const baseItems = [
+    { name: 'dashboard', label: '首页', icon: homeIcon() },
+    { name: 'medicine', label: '药品', icon: medicineIcon() },
+    { name: 'health',   label: '健康', icon: healthIcon() },
+  ]
+  
+  // 受控成员（role=2）无"家庭"但有"我的"
+  if (role === 2) {
+    return [...baseItems, { name: 'profile', label: '我的', icon: profileIcon() }]
+  }
+  
+  // 普通成员和管理员都有"家庭"和"我的"
+  return [
+    ...baseItems,
+    { name: 'family', label: '家庭', icon: familyIcon() },
+    { name: 'profile', label: '我的', icon: profileIcon() }
+  ]
+})
+
+// 移动端导航菜单（所有角色都有"我的"Tab）
+const mobileNavItems = computed(() => {
+  const role = userStore.member?.role
+  const baseItems = [
+    { name: 'dashboard', label: '首页', icon: homeIcon() },
+    { name: 'medicine', label: '药品', icon: medicineIcon() },
+    { name: 'health',   label: '健康', icon: healthIcon() },
+  ]
+  
+  // 受控成员（role=2）：4个Tab（无"家庭"）
+  if (role === 2) {
+    return [...baseItems, { name: 'profile', label: '我的', icon: profileIcon() }]
+  }
+  
+  // 管理员/普通成员：5个Tab
+  return [
+    ...baseItems,
+    { name: 'family', label: '家庭', icon: familyIcon() },
+    { name: 'profile', label: '我的', icon: profileIcon() }
+  ]
+})
 
 const isActive = (name) => route.name === name
 
@@ -48,6 +108,7 @@ function homeIcon() { return 'home' }
 function medicineIcon() { return 'medicine' }
 function healthIcon() { return 'health' }
 function familyIcon() { return 'family' }
+function profileIcon() { return 'profile' }
 </script>
 
 <template>
@@ -106,6 +167,11 @@ function familyIcon() { return 'family' }
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
+              <!-- profile -->
+              <svg v-else-if="item.icon === 'profile'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
             </span>
             {{ item.label }}
           </button>
@@ -115,7 +181,13 @@ function familyIcon() { return 'family' }
         <div class="user-area">
           <el-dropdown trigger="click" @command="handleUserCommand" placement="bottom-end">
             <div class="member-chip">
-              <div class="member-avatar-dot"></div>
+              <AvatarIcon
+                :avatar="userStore.member?.avatar"
+                :relation="userStore.member?.relation"
+                :role="userStore.member?.role"
+                :nickname="userStore.member?.nickname"
+                :size="32"
+              />
               <span class="member-name">{{ memberName }}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                 <polyline points="6 9 12 15 18 9"/>
@@ -124,10 +196,20 @@ function familyIcon() { return 'family' }
             <template #dropdown>
               <el-dropdown-menu class="user-dropdown">
                 <div class="dropdown-header">
-                  <div class="dropdown-name">{{ memberName }}</div>
-                  <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
+                  <AvatarIcon
+                    class="dropdown-avatar-icon"
+                    :avatar="userStore.member?.avatar"
+                    :relation="userStore.member?.relation"
+                    :role="userStore.member?.role"
+                    :nickname="userStore.member?.nickname"
+                    :size="40"
+                  />
+                  <div class="dropdown-info">
+                    <div class="dropdown-name">{{ memberName }}</div>
+                    <div class="dropdown-role">{{ userStore.isAdmin ? '管理员' : userStore.isCareMode ? '关怀成员' : '普通成员' }}</div>
+                  </div>
                 </div>
-                <el-dropdown-item v-if="!isCareMode" command="switch">
+                <el-dropdown-item command="switch" divided>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>
@@ -136,7 +218,7 @@ function familyIcon() { return 'family' }
                   </svg>
                   切换成员
                 </el-dropdown-item>
-                <el-dropdown-item command="logout" :divided="!isCareMode">
+                <el-dropdown-item command="logout">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:7px;flex-shrink:0">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                     <polyline points="16 17 21 12 16 7"/>
@@ -159,7 +241,7 @@ function familyIcon() { return 'family' }
     <!-- ── 底部 Tab Bar（移动端） ── -->
     <nav class="bottom-bar" :class="{ 'care-mode': isCareMode }">
       <button
-        v-for="item in navItems"
+        v-for="item in mobileNavItems"
         :key="item.name"
         class="tab-item"
         :class="{ active: isActive(item.name) }"
@@ -181,6 +263,10 @@ function familyIcon() { return 'family' }
             <circle cx="9" cy="7" r="4"/>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <svg v-else-if="item.icon === 'profile'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
           </svg>
         </span>
         <span class="tab-label">{{ item.label }}</span>
@@ -472,23 +558,38 @@ function familyIcon() { return 'family' }
 }
 
 .dropdown-header {
-  padding: 12px 16px 10px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid rgba(45, 95, 93, 0.09);
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dropdown-avatar-icon {
+  flex-shrink: 0;
+}
+
+.dropdown-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .dropdown-name {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #1a1a1a;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dropdown-role {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #2d5f5d;
-  margin-top: 2px;
-  opacity: 0.8;
+  margin-top: 3px;
+  opacity: 0.85;
 }
 
 :deep(.user-dropdown .el-dropdown-menu__item) {
@@ -522,7 +623,20 @@ function familyIcon() { return 'family' }
   }
 
   .brand-text {
+    display: flex;
+    flex-direction: column;
+    margin-left: 8px;
+  }
+
+  .brand-title {
     display: none;
+  }
+
+  .brand-sub {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #2d5f5d;
   }
 
   .topbar-inner {
