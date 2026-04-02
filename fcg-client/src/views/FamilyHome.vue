@@ -47,10 +47,6 @@ onMounted(() => {
             <div class="value">{{ info.familyName }}</div>
           </div>
           <div>
-            <div class="label">邀请码</div>
-            <div class="value">{{ info.inviteCode }}</div>
-          </div>
-          <div>
             <div class="label">创建时间</div>
             <div class="value">{{ info.createTime }}</div>
           </div>

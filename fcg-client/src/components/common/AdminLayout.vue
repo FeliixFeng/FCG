@@ -194,28 +194,36 @@ const exitAdmin = () => {
 /* 桌面端导航 */
 .admin-top-nav {
   display: none;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
 }
 
 .nav-link {
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   color: #666;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
 }
 
 .nav-link:hover {
-  background: rgba(45, 95, 93, 0.1);
+  background: rgba(45, 95, 93, 0.07);
   color: #2d5f5d;
 }
 
 .nav-link.active {
-  background: #2d5f5d;
-  color: white;
+  background: rgba(45, 95, 93, 0.1);
+  color: #2d5f5d;
+  font-weight: 600;
 }
 
 .btn-exit {
@@ -267,16 +275,19 @@ const exitAdmin = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 4px 8px;
+  gap: 3px;
+  padding: 10px 0 8px;
   background: transparent;
   border: none;
   cursor: pointer;
-  color: #666;
-  transition: all 0.2s ease;
+  color: #aaa;
+  transition: color 0.15s;
+  font-family: inherit;
 }
 
 .tab-item.active {
   color: #2d5f5d;
+  font-weight: 600;
 }
 
 .tab-item.active .tab-icon {
@@ -284,13 +295,17 @@ const exitAdmin = () => {
 }
 
 .tab-icon {
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
   transition: transform 0.2s ease;
 }
 
 .tab-label {
-  font-size: 11px;
-  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .tab-back {

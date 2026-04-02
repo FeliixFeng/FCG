@@ -57,7 +57,7 @@ const greeting = computed(() => {
 // ── 今日日期 ──
 const todayStr = computed(() => {
   const d = new Date()
-  return `${d.getMonth() + 1}月${d.getDate()}日 · ${['日','一','二','三','四','五','六'][d.getDay()]}曜日`
+  return `${d.getMonth() + 1}月${d.getDate()}日 · 星期${['日','一','二','三','四','五','六'][d.getDay()]}`
 })
 
 const todayISO = computed(() => new Date().toISOString().slice(0, 10))

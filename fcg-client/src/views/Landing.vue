@@ -206,7 +206,7 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   background: #ffffff;
   color: #0f0f0f;
   position: relative;
-  /* overflow-x 由 html 统一控制，此处不设避免抢走滚动条归属 */
+  overflow-x: hidden; /* 明确禁止横向滚动，防止手机端溢出 */
 }
 
 /* ─── 顶部光晕 ─── */
@@ -215,7 +215,7 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   top: -200px;
   left: 50%;
   transform: translateX(-50%);
-  width: 900px;
+  width: min(900px, 200vw);
   height: 600px;
   background: radial-gradient(ellipse at center, rgba(45, 95, 93, 0.1) 0%, transparent 70%);
   pointer-events: none;

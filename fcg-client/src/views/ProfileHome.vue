@@ -137,10 +137,6 @@ const handleEnterAdmin = () => {
           <span class="label">家庭名称</span>
           <span class="value">{{ userStore.family.familyName || '未命名家庭' }}</span>
         </div>
-        <div class="info-row" v-if="userStore.isAdmin">
-          <span class="label">邀请码</span>
-          <span class="value">{{ userStore.family.inviteCode || '-' }}</span>
-        </div>
       </div>
     </section>
   </BaseLayout>
