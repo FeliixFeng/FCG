@@ -35,6 +35,7 @@ public class AiService {
      */
     public String chat(String systemPrompt, String userPrompt) {
         Map<String, Object> requestBody = new HashMap<>();
+        // 使用纯文本模型
         requestBody.put("model", aiProperties.getModel());
 
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -75,6 +76,108 @@ public class AiService {
         } catch (Exception e) {
             log.error("AI chat failed: {}", e.getMessage(), e);
             throw new RuntimeException("AI服务调用失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 多模态识别：直接识别药品图片并结构化
+     * @param imageBase64 图片base64编码（不含data:image前缀）
+     * @return 结构化的药品信息JSON字符串
+     */
+    public String recognizeMedicineImage(String imageBase64) {
+        String systemPrompt = """
+            你是一个专业的药品信息识别助手。
+            请识别图片中的药品说明书或药盒信息，提取准确的药品信息，并以JSON格式返回。
+            只返回JSON，不要其他内容。
+            """;
+
+        String userPrompt = """
+            请识别图片中的药品信息，提取以下字段并返回JSON格式：
+            {
+                "name": "药品名称",
+                "specification": "规格（如500mg）",
+                "manufacturer": "生产厂家",
+                "dosageForm": "剂型（如片剂、胶囊）",
+                "expireDate": "过期日期(YYYY-MM-DD格式，如果看不到则返回null)",
+                "usage": "主要用途/适应症",
+                "contraindications": "禁忌人群/药物",
+                "sideEffects": "常见副作用",
+                "dosage": "用法用量"
+            }
+            
+            如果某项无法识别，请返回null。只返回JSON，不要任何额外说明。
+            """;
+
+        return chatWithImage(systemPrompt, userPrompt, imageBase64);
+    }
+
+    /**
+     * 多模态对话（带图片）
+     */
+    private String chatWithImage(String systemPrompt, String userPrompt, String imageBase64) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", aiProperties.getModel());
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            Map<String, Object> systemMsg = new HashMap<>();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", systemPrompt);
+            messages.add(systemMsg);
+        }
+
+        // 用户消息：包含文本和图片
+        Map<String, Object> userMsg = new HashMap<>();
+        userMsg.put("role", "user");
+        
+        List<Map<String, Object>> contentList = new ArrayList<>();
+        
+        // 文本内容
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", userPrompt);
+        contentList.add(textContent);
+        
+        // 图片内容
+        Map<String, Object> imageContent = new HashMap<>();
+        imageContent.put("type", "image_url");
+        Map<String, String> imageUrl = new HashMap<>();
+        imageUrl.put("url", "data:image/jpeg;base64," + imageBase64);
+        imageContent.put("image_url", imageUrl);
+        contentList.add(imageContent);
+        
+        userMsg.put("content", contentList);
+        messages.add(userMsg);
+
+        requestBody.put("messages", messages);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + aiProperties.getApiKey());
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+
+        try {
+            String url = aiProperties.getBaseUrl() + "/chat/completions";
+            log.info("Calling AI Vision API: {}, model: {}", url, aiProperties.getModel());
+            
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+                    String content = (String) message.get("content");
+                    log.info("AI Vision response received, length: {}", content != null ? content.length() : 0);
+                    return content;
+                }
+            }
+            log.warn("AI Vision response is empty: {}", response.getBody());
+            return null;
+        } catch (Exception e) {
+            log.error("AI Vision call failed: {}", e.getMessage(), e);
+            throw new RuntimeException("AI视觉识别服务调用失败: " + e.getMessage());
         }
     }
 

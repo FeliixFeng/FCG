@@ -15,9 +15,9 @@ public class AiProperties {
     private String apiKey;
 
     /**
-     * 模型名称，默认 glm-4.7-flash
+     * 模型名称，默认 glm-4.6v-flashx（视觉+文本多模态模型）
      */
-    private String model = "glm-4.7-flash";
+    private String model = "glm-4.6v-flashx";
 
     /**
      * 请求基础URL

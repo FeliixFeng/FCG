@@ -15,7 +15,6 @@ import com.ghf.fcg.modules.medicine.entity.Medicine;
 import com.ghf.fcg.modules.medicine.service.IMedicineService;
 import com.ghf.fcg.modules.medicine.vo.MedicineOcrEnhancedVO;
 import com.ghf.fcg.modules.medicine.vo.MedicineOcrParsedVO;
-import com.ghf.fcg.modules.medicine.vo.MedicineOcrVO;
 import com.ghf.fcg.modules.medicine.vo.MedicineVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
@@ -24,20 +23,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Base64;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @RestController
@@ -49,10 +39,6 @@ public class MedicineController {
     private final IMedicineService medicineService;
     private final IUserService userService;
     private final AiService aiService;
-    private final RestTemplate restTemplate;
-
-    @Value("${ocr.base-url}")
-    private String ocrBaseUrl;
 
     @PostMapping
     @Operation(summary = "新增药品")
@@ -127,32 +113,33 @@ public class MedicineController {
     }
 
     @PostMapping("/ocr")
-    @Operation(summary = "药品图片OCR识别并AI结构化")
-    public Result<MedicineOcrEnhancedVO> ocr(@RequestPart("files") MultipartFile[] files) {
-        if (files == null || files.length == 0) {
+    @Operation(summary = "药品图片智能识别（多模态AI一步完成）")
+    public Result<MedicineOcrEnhancedVO> ocr(@RequestPart("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
             throw new BusinessException(MessageConstant.PARAM_ERROR);
         }
 
-        MedicineOcrVO ocrResponse = requestOcr(files);
-        String ocrText = resolveOcrText(ocrResponse);
-        if (ocrText == null) {
-            throw new BusinessException(MessageConstant.OCR_FAILED);
+        // 1. 转换为Base64
+        String imageBase64;
+        try {
+            imageBase64 = Base64.getEncoder().encodeToString(file.getBytes());
+        } catch (Exception e) {
+            throw new BusinessException("图片读取失败");
         }
 
+        // 2. 调用多模态AI识别（OCR + 结构化一步完成）
         String aiRaw = null;
         MedicineOcrParsedVO parsed = null;
         boolean fallback = false;
         try {
-            aiRaw = aiService.optimizeMedicineInfo(ocrText);
+            aiRaw = aiService.recognizeMedicineImage(imageBase64);
             parsed = aiService.parseMedicineInfo(aiRaw);
         } catch (RuntimeException e) {
             fallback = true;
         }
 
+        // 3. 返回结果（不再包含rawText、rawLines、ocrError）
         MedicineOcrEnhancedVO result = MedicineOcrEnhancedVO.builder()
-                .rawText(ocrResponse.getText())
-                .rawLines(ocrResponse.getLines())
-                .ocrError(ocrResponse.getError())
                 .parsed(parsed)
                 .model(aiService.currentModel())
                 .fallback(fallback)
@@ -160,60 +147,6 @@ public class MedicineController {
                 .build();
 
         return Result.success(result);
-    }
-
-    private MedicineOcrVO requestOcr(MultipartFile[] files) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        for (MultipartFile file : files) {
-            try {
-                ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
-                    @Override
-                    public String getFilename() {
-                        return file.getOriginalFilename();
-                    }
-                };
-                body.add("files", resource);
-            } catch (Exception e) {
-                throw new BusinessException(MessageConstant.OCR_FAILED);
-            }
-        }
-
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-        try {
-            MedicineOcrVO response = restTemplate.postForObject(ocrBaseUrl + "/smart-ocr", requestEntity, MedicineOcrVO.class);
-            if (response == null) {
-                throw new BusinessException(MessageConstant.OCR_FAILED);
-            }
-            return response;
-        } catch (RestClientException e) {
-            throw new BusinessException(MessageConstant.OCR_FAILED);
-        }
-    }
-
-    private String resolveOcrText(MedicineOcrVO ocrResponse) {
-        if (ocrResponse.getText() != null && !ocrResponse.getText().trim().isEmpty()) {
-            return ocrResponse.getText().trim();
-        }
-
-        if (ocrResponse.getLines() == null || ocrResponse.getLines().isEmpty()) {
-            return null;
-        }
-
-        String mergedLines = ocrResponse.getLines()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(line -> !line.isEmpty())
-                .collect(Collectors.joining("\n"));
-
-        if (mergedLines.isEmpty()) {
-            return null;
-        }
-
-        return mergedLines;
     }
 
     private Long requireFamilyId(Long userId) {

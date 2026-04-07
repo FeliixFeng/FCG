@@ -38,7 +38,7 @@ POST /api/family/switch-member/{memberId} → 成员级 token
 - ✅ 健康模块：Vital/HealthReport 增删改查、近一周体征查询
 - ✅ JWT 双 token 认证拦截器
 - ✅ 全局异常处理
-- ✅ OCR + AI 一体化识别接口（药品图片识别并结构化提取）
+- ✅ 药品图片智能识别接口（智谱AI GLM-4.6V-FlashX 多模态模型一步完成）
 - ✅ OSS 上传接口（图片上传）
 
 ### 前端页面

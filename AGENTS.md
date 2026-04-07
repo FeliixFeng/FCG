@@ -447,12 +447,11 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ 路由守卫优化（刷新时加载member信息后再检查权限）
 
 ### Next Steps
-- 🔄 药品页：药品列表、添加药品（暂跳过 OCR）、用药计划
+- ✅ OCR + AI 智能识别（智谱AI GLM-4.6V-FlashX 多模态模型一步完成）
 - 🔄 健康页：体征录入、近一周趋势图表
 - 🔄 家庭页：成员列表、基础信息展示
 - 🔄 管理员页：成员管理完善
 - 🔄 关怀模式：大字体/简化 UI 统一适配
-- ⏸️ OCR/AI 功能：方案待定（服务器不可用）
 - ⏸️ 健康周报：AI 生成摘要展示
 
 ## CI/CD (GitHub Actions + Alibaba Cloud ACR)
