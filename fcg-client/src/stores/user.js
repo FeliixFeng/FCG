@@ -73,6 +73,8 @@ export const useUserStore = defineStore('user', {
       this.family = null
       this.member = null
       clearToken()
+      // 清除可能残留的关怀模式预览状态
+      sessionStorage.removeItem('fcg_preview_care')
     },
 
     /** 退出当前成员（回到选人页） */
@@ -80,6 +82,25 @@ export const useUserStore = defineStore('user', {
       this.memberToken = ''
       this.member = null
       localStorage.removeItem('fcg_member_token')
+      // 同时清除关怀模式预览状态
+      sessionStorage.removeItem('fcg_preview_care')
+    },
+
+    /** 初始化/清理状态（App启动时调用） */
+    initCleanup() {
+      const hasFamily = !!this.familyToken
+      const hasMember = !!this.memberToken
+      
+      // 如果只有familyToken没有memberToken，清理掉
+      // 防止"游客"状态
+      if (hasFamily && !hasMember) {
+        this.familyToken = ''
+        this.family = null
+        localStorage.removeItem('fcg_family_token')
+      }
+      
+      // 清除关怀模式预览状态
+      sessionStorage.removeItem('fcg_preview_care')
     }
   }
 })

@@ -34,6 +34,18 @@ export const updateUserInfo = (data) => http.put('/api/user/update', data)
 /** 切换关怀模式 */
 export const switchCareMode = (mode) => http.put(`/api/user/care-mode/${mode}`)
 
+/** 获取成员详情（管理员） */
+export const fetchMemberDetail = (userId) => http.get(`/api/user/${userId}`)
+
+/** 更新成员信息（管理员） */
+export const updateMember = (userId, data) => http.put(`/api/user/${userId}`, data)
+
+/** 删除成员（管理员） */
+export const deleteMember = (userId) => http.delete(`/api/user/${userId}`)
+
+/** 修改成员角色（管理员） */
+export const updateMemberRole = (userId, role) => http.put(`/api/user/${userId}/role?role=${role}`)
+
 // ========== 药品模块 ==========
 
 
