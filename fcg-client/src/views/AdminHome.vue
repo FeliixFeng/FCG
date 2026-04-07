@@ -1,154 +1,264 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import BaseLayout from '../components/common/BaseLayout.vue'
-import { fetchFamilyMembers, addMember } from '../utils/api'
+import { fetchFamilyMembers, fetchMedicineList, fetchTodayPlanRecords } from '../utils/api'
 
 const router = useRouter()
 const userStore = useUserStore()
+
 const members = ref([])
-const error = ref('')
-const showAddForm = ref(false)
+const medicines = ref([])
+const todayRecords = ref([])
 const loading = ref(false)
 
-const form = ref({
-  nickname: '',
-  relation: '',
-  role: 1,
-  phone: ''
+const memberCount = computed(() => members.value.length)
+const medicineCount = computed(() => medicines.value.length)
+
+const pendingCount = computed(() => {
+  return todayRecords.value.filter(r => r.status === 0 || r.status === 'pending').length
 })
 
-const roleOptions = [
-  { value: 0, label: '管理员' },
-  { value: 1, label: '普通成员' },
-  { value: 2, label: '关怀成员（老人）' }
-]
+const completedCount = computed(() => {
+  return todayRecords.value.filter(r => r.status === 1 || r.status === 'done').length
+})
 
-const loadMembers = async () => {
+const loadData = async () => {
+  loading.value = true
   try {
-    const res = await fetchFamilyMembers()
-    members.value = res.data
+    const [membersRes, medicinesRes] = await Promise.all([
+      fetchFamilyMembers(),
+      fetchMedicineList({ page: 1, size: 100 })
+    ])
+    members.value = membersRes.data
+    medicines.value = medicinesRes.data.records || []
   } catch (err) {
-    error.value = err?.message || '获取成员失败'
-  }
-}
-
-const handleAddMember = async () => {
-  if (!form.value.nickname) {
-    error.value = '昵称不能为空'
-    return
-  }
-  try {
-    loading.value = true
-    error.value = ''
-    await addMember({ ...form.value })
-    showAddForm.value = false
-    form.value = { nickname: '', relation: '', role: 1, phone: '' }
-    await loadMembers()
-  } catch (err) {
-    error.value = err?.message || '添加失败'
+    console.error('加载数据失败', err)
   } finally {
     loading.value = false
   }
 }
 
-// 退出管理员界面，回到普通界面
-const exitAdmin = () => {
-    router.replace({ name: 'dashboard' })
-}
+const goToMembers = () => router.push({ name: 'admin-members' })
+const goToMedicines = () => router.push({ name: 'admin-medicines' })
+const goToSystem = () => router.push({ name: 'admin-system' })
+const goToData = () => router.push({ name: 'admin-data' })
 
 onMounted(() => {
-  loadMembers()
+  loadData()
 })
 </script>
 
 <template>
-  <BaseLayout>
-    <section class="grid">
-      <!-- 顶部 -->
-      <div class="card panel">
-        <div class="row">
-          <h2>管理员界面</h2>
-          <button class="btn ghost" @click="exitAdmin">退出管理</button>
+  <div class="admin-dashboard">
+    <div class="page-header">
+      <h2>管理中心</h2>
+      <p class="page-desc">家庭：{{ userStore.family?.familyName }}</p>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card" @click="goToMembers">
+        <div class="stat-icon members-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
         </div>
-        <p class="muted">家庭：{{ userStore.family?.familyName }}</p>
-      </div>
-
-      <!-- 成员管理 -->
-      <div class="card panel">
-        <div class="row">
-          <h2>家庭成员</h2>
-          <button class="btn" @click="showAddForm = !showAddForm">
-            {{ showAddForm ? '取消' : '+ 添加成员' }}
-          </button>
-        </div>
-
-        <!-- 添加成员表单 -->
-        <div v-if="showAddForm" class="add-form">
-          <label class="field">
-            <span>昵称 *</span>
-            <input v-model="form.nickname" class="input" placeholder="例如：爷爷、妈妈" />
-          </label>
-          <label class="field">
-            <span>家庭关系</span>
-            <input v-model="form.relation" class="input" placeholder="例如：父亲、母亲" />
-          </label>
-          <label class="field">
-            <span>手机号</span>
-            <input v-model="form.phone" class="input" placeholder="选填" />
-          </label>
-          <label class="field">
-            <span>角色</span>
-            <select v-model="form.role" class="input">
-              <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </label>
-          <button class="btn" :disabled="loading" @click="handleAddMember">
-            {{ loading ? '添加中...' : '确认添加' }}
-          </button>
-        </div>
-
-        <p v-if="error" class="error">{{ error }}</p>
-
-        <!-- 成员列表 -->
-        <div v-if="members.length === 0" class="muted">暂无成员</div>
-        <div v-else class="member-list">
-          <div v-for="m in members" :key="m.userId" class="member-item">
-            <div class="avatar-sm">{{ m.nickname?.charAt(0) }}</div>
-            <div>
-              <div class="member-name">{{ m.nickname }}</div>
-              <div class="muted">{{ m.relation || '未设置关系' }} · {{ ['管理员','普通成员','关怀成员'][m.role] }}</div>
-            </div>
-          </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ memberCount }}</div>
+          <div class="stat-label">家庭成员</div>
         </div>
       </div>
 
-      <!-- 更多管理功能（后续扩展） -->
-      <div class="card panel">
-        <h2>更多功能</h2>
-        <p class="muted">药品管理、健康数据查看等功能后续开发中...</p>
+      <div class="stat-card" @click="goToMedicines">
+        <div class="stat-icon medicine-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+            <path d="m8.5 8.5 7 7"/>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ medicineCount }}</div>
+          <div class="stat-label">药品库存</div>
+        </div>
       </div>
-    </section>
-  </BaseLayout>
+
+      <div class="stat-card" @click="goToMembers">
+        <div class="stat-icon today-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ completedCount }}/{{ pendingCount + completedCount }}</div>
+          <div class="stat-label">今日打卡</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷操作 -->
+    <div class="quick-actions">
+      <h3>快捷操作</h3>
+      <div class="action-grid">
+        <div class="action-item" @click="goToMembers">
+          <div class="action-icon">+</div>
+          <div class="action-text">添加成员</div>
+        </div>
+        <div class="action-item" @click="goToMedicines">
+          <div class="action-icon">+</div>
+          <div class="action-text">添加药品</div>
+        </div>
+        <div class="action-item" @click="goToSystem">
+          <div class="action-icon">⚙</div>
+          <div class="action-text">系统设置</div>
+        </div>
+        <div class="action-item" @click="goToData">
+          <div class="action-icon">📊</div>
+          <div class="action-text">数据统计</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.grid { display: grid; gap: 20px; }
-.panel { padding: 24px; display: grid; gap: 16px; }
-.row { display: flex; justify-content: space-between; align-items: center; }
-.add-form { display: grid; gap: 12px; padding: 16px; background: #f9f9f9; border-radius: 12px; }
-.field { display: grid; gap: 6px; font-size: 0.9rem; }
-.member-list { display: grid; gap: 12px; }
-.member-item { display: flex; align-items: center; gap: 12px; }
-.avatar-sm {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--primary, #4f7cff); color: #fff;
-  display: grid; place-items: center; font-weight: 700; flex-shrink: 0;
+.admin-dashboard {
+  max-width: 900px;
 }
-.member-name { font-weight: 600; }
-.btn.ghost { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
-.error { color: #b42318; margin: 0; }
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  color: #2d5f5d;
+}
+
+.page-desc {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 12px rgba(45, 95, 93, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(45, 95, 93, 0.12);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.members-icon {
+  background: #fef3e7;
+  color: #d68910;
+}
+
+.medicine-icon {
+  background: #e8f4f8;
+  color: #2874a6;
+}
+
+.today-icon {
+  background: #e4f0ef;
+  color: #2d5f5d;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 4px;
+}
+
+.quick-actions h3 {
+  font-size: 1rem;
+  color: #333;
+  margin: 0 0 16px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.action-item {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(45, 95, 93, 0.06);
+}
+
+.action-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(45, 95, 93, 0.1);
+}
+
+.action-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 8px;
+  background: #2d5f5d;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.action-text {
+  font-size: 0.85rem;
+  color: #333;
+}
+
+@media (max-width: 767px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 </style>

@@ -34,17 +34,23 @@ const familyName = computed(() => userStore.family?.familyName || '我的家庭'
 
 // 管理界面导航
 const adminNavItems = [
-  { name: 'admin-members', label: '成员管理', icon: 'members' },
-  { name: 'admin-medicines', label: '药品管理', icon: 'medicine' },
-  { name: 'admin-system', label: '系统设置', icon: 'settings' },
-  { name: 'admin-data', label: '数据统计', icon: 'chart' },
+  { name: 'admin', label: '首页', icon: 'home' },
+  { name: 'admin-members', label: '成员', icon: 'members' },
+  { name: 'admin-medicines', label: '药品', icon: 'medicine' },
+  { name: 'admin-data', label: '统计', icon: 'chart' },
+  { name: 'admin-system', label: '设置', icon: 'settings' },
 ]
 
 const isActive = (name) => route.name === name
 
 const go = (name) => router.push({ name })
 
-// 退出管理界面
+// 回到管理首页
+const goHome = () => {
+  router.push({ name: 'admin' })
+}
+
+// 退出管理界面，回到用户首页
 const exitAdmin = () => {
   router.push({ name: 'dashboard' })
 }
@@ -55,7 +61,7 @@ const exitAdmin = () => {
     <!-- 顶部导航 -->
     <header class="admin-topbar">
       <div class="topbar-inner">
-        <div class="brand" @click="exitAdmin">
+        <div class="brand" @click="goHome">
           <img src="/fcg.png" alt="FCG" class="brand-logo" />
           <div class="brand-text">
             <div class="brand-title">管理中心</div>
@@ -102,6 +108,11 @@ const exitAdmin = () => {
         @click="go(item.name)"
       >
         <span class="tab-icon">
+          <!-- home -->
+          <svg v-if="item.icon === 'home'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
           <!-- members -->
           <svg v-if="item.icon === 'members'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
