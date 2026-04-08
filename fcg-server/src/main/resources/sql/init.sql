@@ -31,7 +31,7 @@ CREATE TABLE `sys_user` (
     `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '成员ID',
     `nickname`    VARCHAR(50)  NOT NULL COMMENT '昵称（必填，选人页展示用）',
     `phone`       VARCHAR(20)  DEFAULT NULL COMMENT '手机号',
-    `avatar`      VARCHAR(255) DEFAULT NULL COMMENT '头像URL（存OSS地址）',
+    `avatar`      MEDIUMTEXT   DEFAULT NULL COMMENT '头像URL（存OSS地址/Base64）',
     `role`        TINYINT      NOT NULL DEFAULT 1 COMMENT '角色 0-管理员 1-普通成员 2-关怀成员（老人）',
     `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
     `relation`    VARCHAR(20)  DEFAULT NULL COMMENT '家庭关系（父亲/母亲/爷爷等）',
