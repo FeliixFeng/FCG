@@ -34,11 +34,11 @@ const familyName = computed(() => userStore.family?.familyName || '我的家庭'
 
 // 管理界面导航
 const adminNavItems = [
-  { name: 'admin', label: '首页', icon: 'home' },
-  { name: 'admin-members', label: '成员', icon: 'members' },
-  { name: 'admin-medicines', label: '药品', icon: 'medicine' },
-  { name: 'admin-data', label: '统计', icon: 'chart' },
-  { name: 'admin-system', label: '设置', icon: 'settings' },
+  { name: 'admin', label: '首页', icon: 'HomeFilled' },
+  { name: 'admin-members', label: '成员', icon: 'User' },
+  { name: 'admin-medicines', label: '药品', icon: 'FirstAidKit' },
+  { name: 'admin-data', label: '统计', icon: 'DataLine' },
+  { name: 'admin-system', label: '设置', icon: 'Setting' },
 ]
 
 const isActive = (name) => route.name === name
@@ -69,7 +69,7 @@ const exitAdmin = () => {
           </div>
         </div>
 
-        <!-- 桌面端导航 -->
+<!-- 桌面端导航 -->
         <nav class="admin-top-nav">
           <button
             v-for="item in adminNavItems"
@@ -78,6 +78,7 @@ const exitAdmin = () => {
             :class="{ active: isActive(item.name) }"
             @click="go(item.name)"
           >
+            <component :is="item.icon" class="nav-icon" />
             {{ item.label }}
           </button>
         </nav>
@@ -108,33 +109,7 @@ const exitAdmin = () => {
         @click="go(item.name)"
       >
         <span class="tab-icon">
-          <!-- home -->
-          <svg v-if="item.icon === 'home'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <!-- members -->
-          <svg v-if="item.icon === 'members'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          <!-- medicine -->
-          <svg v-else-if="item.icon === 'medicine'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-          </svg>
-          <!-- settings -->
-          <svg v-else-if="item.icon === 'settings'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m-2 2l-4.2 4.2m13.2-5.2l-6 0m-6 0l-6 0m13.2 5.2l-4.2-4.2m-2-2l-4.2-4.2"/>
-          </svg>
-          <!-- chart -->
-          <svg v-else-if="item.icon === 'chart'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
+          <component :is="item.icon" />
         </span>
         <span class="tab-label">{{ item.label }}</span>
       </button>
@@ -213,6 +188,7 @@ const exitAdmin = () => {
 .nav-link {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 7px 14px;
   background: transparent;
   border: none;
@@ -224,6 +200,11 @@ const exitAdmin = () => {
   transition: background 0.15s, color 0.15s;
   font-family: inherit;
   white-space: nowrap;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .nav-link:hover {
