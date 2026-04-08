@@ -1,5 +1,16 @@
 import http from './http'
 
+// ========== 文件模块 ==========
+
+/** 上传文件到 OSS */
+export const uploadFile = (file, dir = 'avatar') => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return http.post(`/api/oss/upload?dir=${dir}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 // ========== 家庭模块 ==========
 
 /** 家庭注册 */
