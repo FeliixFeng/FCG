@@ -3,6 +3,7 @@ package com.ghf.fcg.modules.system.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -15,7 +16,6 @@ public class FamilyVO {
     private Long id;
     private String familyName;
     private String username;
-    /** 家庭级 token（登录后返回，用于获取成员列表） */
     private String token;
     private LocalDateTime createTime;
 
@@ -28,9 +28,15 @@ public class FamilyVO {
         private Long userId;
         private String nickname;
         private String avatar;
-        private Integer role;       // 0-管理员 1-普通成员 2-关怀成员
+        private Integer role;
         private String relation;
+        private String phone;
         private Integer careMode;
         private LocalDateTime joinTime;
+        private LocalDate birthday;
+        private java.math.BigDecimal height;
+        private java.math.BigDecimal weight;
+        private String disease;
+        private String allergy;
     }
 }

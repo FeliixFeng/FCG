@@ -4,6 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @Data
 @Schema(description = "管理员更新成员请求")
 public class MemberUpdateDTO {
@@ -23,4 +26,11 @@ public class MemberUpdateDTO {
 
     @Schema(description = "角色：0-管理员 1-普通成员 2-受控成员")
     private Integer role;
+
+    private LocalDate birthday;
+    private BigDecimal height;
+    private BigDecimal weight;
+    private String disease;
+    private String allergy;
+    private String remark;
 }

@@ -6,13 +6,22 @@ import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.modules.system.dto.MemberUpdateDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.entity.User;
+import com.ghf.fcg.modules.system.entity.UserProfile;
 import com.ghf.fcg.modules.system.mapper.UserMapper;
+import com.ghf.fcg.modules.system.service.IUserProfileService;
 import com.ghf.fcg.modules.system.service.IUserService;
 import com.ghf.fcg.modules.system.vo.UserVO;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
+
+    private final IUserProfileService userProfileService;
+
+    public UserServiceImpl(IUserProfileService userProfileService) {
+        this.userProfileService = userProfileService;
+    }
 
     /**
      * 获取成员信息
@@ -73,6 +82,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (user == null) {
             throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
+        var profile = userProfileService.getByUserId(memberId);
         return UserVO.builder()
                 .id(user.getId())
                 .nickname(user.getNickname())
@@ -83,10 +93,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 .relation(user.getRelation())
                 .careMode(user.getCareMode())
                 .createTime(user.getCreateTime())
+                .birthday(profile != null ? profile.getBirthday() : null)
+                .height(profile != null ? profile.getHeight() : null)
+                .weight(profile != null ? profile.getWeight() : null)
+                .disease(profile != null ? profile.getDisease() : null)
+                .allergy(profile != null ? profile.getAllergy() : null)
+                .remark(profile != null ? profile.getRemark() : null)
                 .build();
     }
 
     @Override
+    @Transactional
     public void updateMember(Long memberId, MemberUpdateDTO updateDTO) {
         User user = this.getById(memberId);
         if (user == null) {
@@ -109,6 +126,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             user.setRole(updateDTO.getRole());
         }
         this.updateById(user);
+        
+        // 保存扩展信息
+        UserProfile profile = userProfileService.getByUserId(memberId);
+        if (profile == null) {
+            profile = new UserProfile();
+            profile.setUserId(memberId);
+        }
+        if (updateDTO.getBirthday() != null) {
+            profile.setBirthday(updateDTO.getBirthday());
+        }
+        if (updateDTO.getHeight() != null) {
+            profile.setHeight(updateDTO.getHeight());
+        }
+        if (updateDTO.getWeight() != null) {
+            profile.setWeight(updateDTO.getWeight());
+        }
+        if (updateDTO.getDisease() != null) {
+            profile.setDisease(updateDTO.getDisease());
+        }
+        if (updateDTO.getAllergy() != null) {
+            profile.setAllergy(updateDTO.getAllergy());
+        }
+        if (updateDTO.getRemark() != null) {
+            profile.setRemark(updateDTO.getRemark());
+        }
+        userProfileService.saveOrUpdate(memberId, profile);
     }
 
     @Override

@@ -43,6 +43,23 @@ CREATE TABLE `sys_user` (
     KEY `idx_family_id` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家庭成员表';
 
+-- 2.1 成员扩展信息表（1:1 关联 sys_user）
+DROP TABLE IF EXISTS `sys_user_profile`;
+CREATE TABLE `sys_user_profile` (
+    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `user_id`     BIGINT       NOT NULL COMMENT '成员ID（关联 sys_user）',
+    `birthday`    DATE         DEFAULT NULL COMMENT '出生日期',
+    `height`     DECIMAL(5,1) DEFAULT NULL COMMENT '身高（cm）',
+    `weight`     DECIMAL(5,1) DEFAULT NULL COMMENT '体重（kg）',
+    `disease`    VARCHAR(255) DEFAULT NULL COMMENT '病史（高血压/糖尿病等，逗号分隔）',
+    `allergy`    VARCHAR(255) DEFAULT NULL COMMENT '过敏史',
+    `remark`     VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成员扩展信息表';
+
 -- ============================================
 -- 药品模块
 -- ============================================

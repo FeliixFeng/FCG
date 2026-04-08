@@ -13,6 +13,7 @@ import com.ghf.fcg.modules.system.entity.Family;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.mapper.FamilyMapper;
 import com.ghf.fcg.modules.system.service.IFamilyService;
+import com.ghf.fcg.modules.system.service.IUserProfileService;
 import com.ghf.fcg.modules.system.service.IUserService;
 import com.ghf.fcg.modules.system.vo.FamilyVO;
 import com.ghf.fcg.modules.system.vo.UserVO;
@@ -26,9 +27,11 @@ import java.util.stream.Collectors;
 public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> implements IFamilyService {
 
     private final IUserService userService;
+    private final IUserProfileService userProfileService;
 
-    public FamilyServiceImpl(IUserService userService) {
+    public FamilyServiceImpl(IUserService userService, IUserProfileService userProfileService) {
         this.userService = userService;
+        this.userProfileService = userProfileService;
     }
 
     /**
@@ -114,16 +117,24 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
         List<User> members = userService.list(new LambdaQueryWrapper<User>()
                 .eq(User::getFamilyId, familyId));
 
-        return members.stream().map(m -> FamilyVO.MemberInfo.builder()
-                .userId(m.getId())
-                .nickname(m.getNickname())
-                .avatar(m.getAvatar())
-                .role(m.getRole())
-                .relation(m.getRelation())
-                .careMode(m.getCareMode())
-                .joinTime(m.getCreateTime())
-                .build()
-        ).collect(Collectors.toList());
+        return members.stream().map(m -> {
+            var profile = userProfileService.getByUserId(m.getId());
+            return FamilyVO.MemberInfo.builder()
+                    .userId(m.getId())
+                    .nickname(m.getNickname())
+                    .avatar(m.getAvatar())
+                    .role(m.getRole())
+                    .relation(m.getRelation())
+                    .phone(m.getPhone())
+                    .careMode(m.getCareMode())
+                    .joinTime(m.getCreateTime())
+                    .birthday(profile != null ? profile.getBirthday() : null)
+                    .height(profile != null ? profile.getHeight() : null)
+                    .weight(profile != null ? profile.getWeight() : null)
+                    .disease(profile != null ? profile.getDisease() : null)
+                    .allergy(profile != null ? profile.getAllergy() : null)
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     /**

@@ -29,7 +29,13 @@ const editForm = ref({
   nickname: '',
   relation: '',
   role: 1,
-  phone: ''
+  phone: '',
+  birthday: '',
+  height: '',
+  weight: '',
+  disease: '',
+  allergy: '',
+  remark: ''
 })
 
 const roleOptions = [
@@ -50,6 +56,26 @@ const relationOptions = [
 
 const roleLabel = (role) => {
   return roleOptions.find(o => o.value === role)?.label || '未知'
+}
+
+// 从生日计算年龄
+const getAge = (birthday) => {
+  if (!birthday) return null
+  const birth = new Date(birthday)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--
+  }
+  return age >= 0 ? age : null
+}
+
+// 病史简写（取第一个）
+const getDiseaseShort = (disease) => {
+  if (!disease) return null
+  const list = disease.split(',').map(d => d.trim()).filter(d => d)
+  return list.length > 0 ? list[0] : null
 }
 
 async function loadMembers() {
@@ -105,7 +131,13 @@ const handleEdit = async (member) => {
       nickname: data.nickname,
       relation: data.relation || '',
       role: data.role,
-      phone: data.phone || ''
+      phone: data.phone || '',
+      birthday: data.birthday || '',
+      height: data.height || '',
+      weight: data.weight || '',
+      disease: data.disease || '',
+      allergy: data.allergy || '',
+      remark: data.remark || ''
     }
     showEditModal.value = true
   } catch (err) {
@@ -129,7 +161,13 @@ const handleUpdate = async () => {
       nickname: editForm.value.nickname,
       relation: editForm.value.relation,
       role: editForm.value.role,
-      phone: editForm.value.phone
+      phone: editForm.value.phone,
+      birthday: editForm.value.birthday || null,
+      height: editForm.value.height || null,
+      weight: editForm.value.weight || null,
+      disease: editForm.value.disease || '',
+      allergy: editForm.value.allergy || '',
+      remark: editForm.value.remark || ''
     })
     ElMessage.success('更新成功')
     showEditModal.value = false
@@ -248,6 +286,8 @@ onMounted(() => {
         <span class="col-avatar">头像</span>
         <span class="col-name">昵称</span>
         <span class="col-relation">关系</span>
+        <span class="col-phone">手机号</span>
+        <span class="col-profile">扩展</span>
         <span class="col-role">角色</span>
         <span class="col-actions">操作</span>
       </div>
@@ -267,6 +307,12 @@ onMounted(() => {
           <span v-if="member.userId === userStore.member?.userId" class="self-tag">我</span>
         </div>
         <div class="col-relation">{{ member.relation || '-' }}</div>
+        <div class="col-phone">{{ member.phone || '-' }}</div>
+        <div class="col-profile">
+          <span v-if="member.birthday" class="profile-age">{{ getAge(member.birthday) }}岁</span>
+          <span v-if="member.disease" class="profile-disease">{{ getDiseaseShort(member.disease) }}</span>
+          <span v-if="!member.birthday && !member.disease" class="profile-empty">-</span>
+        </div>
         <div class="col-role">
           <select 
             class="role-select" 
@@ -324,6 +370,34 @@ onMounted(() => {
                 {{ opt.label }}
               </option>
             </select>
+          </div>
+          
+          <div class="form-section-title">扩展信息（选填）</div>
+          <div class="form-field">
+            <label>出生日期</label>
+            <input type="date" v-model="editForm.birthday" />
+          </div>
+          <div class="form-field-row">
+            <div class="form-field">
+              <label>身高(cm)</label>
+              <input type="number" v-model="editForm.height" placeholder="如：170" />
+            </div>
+            <div class="form-field">
+              <label>体重(kg)</label>
+              <input type="number" v-model="editForm.weight" placeholder="如：65" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label>病史</label>
+            <input v-model="editForm.disease" placeholder="高血压,糖尿病" />
+          </div>
+          <div class="form-field">
+            <label>过敏史</label>
+            <input v-model="editForm.allergy" placeholder="如：青霉素" />
+          </div>
+          <div class="form-field">
+            <label>备注</label>
+            <textarea v-model="editForm.remark" placeholder="其他说明..." />
           </div>
         </div>
         <div class="modal-footer">
@@ -508,7 +582,8 @@ onMounted(() => {
 
 .col-name {
   flex: 1;
-  padding-left: 12px;
+  min-width: 100px;
+  padding-left: 14px;
   font-weight: 500;
 }
 
@@ -527,12 +602,42 @@ onMounted(() => {
   color: #666;
 }
 
-.col-role {
+.col-phone {
+  width: 110px;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.col-profile {
   width: 100px;
+  display: flex;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.profile-age {
+  color: #2d5f5d;
+  font-weight: 500;
+}
+
+.profile-disease {
+  background: #fef3e7;
+  color: #d68910;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+.profile-empty {
+  color: #bbb;
+}
+
+.col-role {
+  width: 110px;
 }
 
 .col-actions {
-  width: 120px;
+  width: 130px;
   display: flex;
   gap: 8px;
 }
@@ -632,6 +737,24 @@ onMounted(() => {
   gap: 16px;
 }
 
+.form-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  padding: 8px 0;
+  border-top: 1px dashed #eee;
+  margin-top: 8px;
+}
+
+.form-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-field-row .form-field {
+  flex: 1;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -658,30 +781,95 @@ onMounted(() => {
     display: none;
   }
   
-  .table-row {
-    flex-wrap: wrap;
+  .member-table {
+    display: flex;
+    flex-direction: column;
     gap: 12px;
-    padding: 16px;
+    background: transparent;
+    box-shadow: none;
+  }
+  
+  .table-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px;
+    background: white;
+    border-radius: 12px;
+    align-items: flex-start;
   }
   
   .col-avatar {
-    width: auto;
+    width: 44px;
+    flex-shrink: 0;
   }
   
   .col-name {
-    flex: 1 1 calc(100% - 60px);
-    padding-left: 12px;
+    flex: 1;
+    padding-left: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   
-  .col-relation,
+  .col-relation {
+    width: 100%;
+    padding-left: 54px;
+    font-size: 0.85rem;
+    color: #666;
+  }
+  
+  .col-phone {
+    width: 100%;
+    padding-left: 54px;
+    font-size: 0.8rem;
+    color: #888;
+  }
+  
+  .col-profile {
+    width: 100%;
+    padding-left: 54px;
+    display: flex;
+    gap: 8px;
+    font-size: 0.8rem;
+  }
+  
+  .col-profile .profile-age {
+    color: #2d5f5d;
+    font-weight: 600;
+  }
+  
+  .col-profile .profile-disease {
+    background: #fef3e7;
+    color: #d68910;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  
+  .col-profile .profile-empty {
+    color: #bbb;
+  }
+  
   .col-role {
     width: auto;
-    padding-left: 52px;
+    padding-left: 54px;
   }
   
   .col-actions {
     width: 100%;
-    padding-left: 52px;
+    display: flex;
+    gap: 8px;
+    padding-left: 54px;
+    margin-top: 4px;
+  }
+  
+  .btn-action {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    text-align: center;
   }
 }
 </style>
