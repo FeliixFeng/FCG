@@ -102,13 +102,24 @@ public class VitalController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
             @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
+        
+        Vital sampleVital = vitalService.getOne(new LambdaQueryWrapper<Vital>()
+                .eq(Vital::getUserId, currentUserId)
+                .last("LIMIT 1"));
+        
+        Long familyId = sampleVital != null ? sampleVital.getFamilyId() : null;
+        if (familyId == null) {
+            familyId = requireFamilyId(currentUserId);
+        }
+
+        Long targetUserId = userId;
+        if (targetUserId == null) {
+            targetUserId = currentUserId;
+        }
 
         LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Vital::getFamilyId, familyId);
-        if (userId != null) {
-            wrapper.eq(Vital::getUserId, userId);
-        }
+        wrapper.eq(Vital::getFamilyId, familyId)
+                .eq(Vital::getUserId, targetUserId);
         if (type != null) {
             wrapper.eq(Vital::getType, type);
         }
@@ -118,7 +129,7 @@ public class VitalController {
         if (endTime != null) {
             wrapper.le(Vital::getMeasureTime, endTime);
         }
-        wrapper.orderByDesc(Vital::getMeasureTime);
+        wrapper.orderByAsc(Vital::getMeasureTime);
 
         Page<Vital> pageResult = vitalService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
         return Result.success(PageResult.of(pageResult,
@@ -130,28 +141,82 @@ public class VitalController {
     public Result<List<VitalVO>> weekly(@RequestParam(required = false) Long userId,
                                         @RequestParam(required = false) Integer type) {
         Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
+        
+        Vital sampleVital = vitalService.getOne(new LambdaQueryWrapper<Vital>()
+                .eq(Vital::getUserId, currentUserId)
+                .last("LIMIT 1"));
+        
+        Long familyId = sampleVital != null ? sampleVital.getFamilyId() : null;
+        if (familyId == null) {
+            familyId = requireFamilyId(currentUserId);
+        }
+
+        Long targetUserId = userId;
+        if (targetUserId == null) {
+            targetUserId = currentUserId;
+        }
 
         LocalDateTime endTime = LocalDateTime.now();
         LocalDateTime startTime = endTime.minusDays(7);
 
         LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Vital::getFamilyId, familyId)
+                .eq(Vital::getUserId, targetUserId)
                 .ge(Vital::getMeasureTime, startTime)
                 .le(Vital::getMeasureTime, endTime);
-        if (userId != null) {
-            wrapper.eq(Vital::getUserId, userId);
-        }
         if (type != null) {
             wrapper.eq(Vital::getType, type);
         }
-        wrapper.orderByDesc(Vital::getMeasureTime);
+        wrapper.orderByAsc(Vital::getMeasureTime);
 
         List<VitalVO> list = vitalService.list(wrapper)
                 .stream()
                 .map(this::toVitalVO)
                 .collect(Collectors.toList());
         return Result.success(list);
+    }
+
+    @GetMapping("/today")
+    @Operation(summary = "今日最新体征", description = "返回每种类型的最新一条记录")
+    public Result<List<VitalVO>> today(@RequestParam(required = false) Long userId) {
+        Long currentUserId = UserContext.get().getUserId();
+        
+        Vital sampleVital = vitalService.getOne(new LambdaQueryWrapper<Vital>()
+                .eq(Vital::getUserId, currentUserId)
+                .last("LIMIT 1"));
+        
+        Long familyId = sampleVital != null ? sampleVital.getFamilyId() : null;
+        if (familyId == null) {
+            familyId = requireFamilyId(currentUserId);
+        }
+
+        Long targetUserId = userId;
+        if (targetUserId == null) {
+            targetUserId = currentUserId;
+        }
+
+        LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+        LocalDateTime todayEnd = LocalDateTime.now();
+
+        List<VitalVO> result = new java.util.ArrayList<>();
+
+        for (int type = 1; type <= 5; type++) {
+            LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Vital::getFamilyId, familyId)
+                    .eq(Vital::getUserId, targetUserId)
+                    .eq(Vital::getType, type)
+                    .ge(Vital::getMeasureTime, todayStart)
+                    .le(Vital::getMeasureTime, todayEnd)
+                    .orderByDesc(Vital::getMeasureTime)
+                    .last("LIMIT 1");
+
+            Vital vital = vitalService.getOne(wrapper);
+            if (vital != null) {
+                result.add(toVitalVO(vital));
+            }
+        }
+
+        return Result.success(result);
     }
 
     private Long requireFamilyId(Long userId) {

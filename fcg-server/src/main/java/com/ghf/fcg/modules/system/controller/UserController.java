@@ -6,6 +6,8 @@ import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.system.dto.MemberUpdateDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
+import com.ghf.fcg.modules.system.entity.UserProfile;
+import com.ghf.fcg.modules.system.service.IUserProfileService;
 import com.ghf.fcg.modules.system.service.IUserService;
 import com.ghf.fcg.modules.system.vo.UserVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final IUserService userService;
+    private final IUserProfileService userProfileService;
 
     /** 获取当前成员信息（需要成员级 token） */
     @GetMapping("/info")
@@ -86,5 +89,20 @@ public class UserController {
     public Result<Void> updateMemberRole(@PathVariable Long userId, @RequestParam Integer role) {
         userService.updateMemberRole(userId, role);
         return Result.success();
+    }
+
+    /** 获取成员健康档案（身高） */
+    @GetMapping("/profile")
+    @Operation(summary = "获取成员健康档案")
+    public Result<UserProfile> getUserProfile(@RequestParam(required = false) Long userId) {
+        Long targetUserId = userId;
+        if (targetUserId == null) {
+            targetUserId = UserContext.get().getUserId();
+        }
+        if (targetUserId == null) {
+            return Result.success(null);
+        }
+        UserProfile profile = userProfileService.getByUserId(targetUserId);
+        return Result.success(profile);
     }
 }
