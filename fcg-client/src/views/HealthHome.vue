@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from '../stores/user'
-import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile } from '../utils/api'
+import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport } from '../utils/api'
 import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
 import BaseLayout from '../components/common/BaseLayout.vue'
 import * as echarts from 'echarts'
 import { Delete, Plus } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
 
 const userStore = useUserStore()
 
@@ -25,9 +27,7 @@ let chartInstance = null
 const typeOptions = [
   { value: 1, label: '血压', unit: 'mmHg', icon: '❤️' },
   { value: 2, label: '血糖', unit: 'mmol/L', icon: '🩸' },
-  { value: 3, label: '心率', unit: 'bpm', icon: '💓' },
-  { value: 4, label: '体温', unit: '℃', icon: '🌡️' },
-  { value: 5, label: '体重', unit: 'kg', icon: '⚖️' }
+  { value: 3, label: '体重', unit: 'kg', icon: '⚖️' }
 ]
 
 const currentMemberId = computed(() => userStore.member?.id)
@@ -36,6 +36,16 @@ const isAdmin = computed(() => userStore.member?.role === 0)
 
 const familyMembers = ref([])
 const userProfile = ref(null)
+
+const isViewingOther = computed(() => {
+  return isAdmin.value && selectedMemberId.value && selectedMemberId.value !== userStore.member?.id
+})
+
+const currentViewerName = computed(() => {
+  if (!isViewingOther.value) return ''
+  const member = familyMembers.value.find(m => m.userId === selectedMemberId.value)
+  return member?.nickname || ''
+})
 
 onMounted(async () => {
   try {
@@ -46,6 +56,7 @@ onMounted(async () => {
     loadUserProfile()
     loadTodayVitals()
     loadWeeklyData()
+    loadLatestReport()
     setTimeout(initChart, 100)
   } catch (e) {
     console.error('页面初始化失败', e)
@@ -88,6 +99,7 @@ watch(selectedMember, (newVal, oldVal) => {
     loadUserProfile()
     loadTodayVitals()
     loadWeeklyData()
+    loadLatestReport()
   }
 })
 
@@ -111,6 +123,132 @@ const loadWeeklyData = async () => {
     console.error('加载周数据失败', e)
   }
 }
+
+const latestReport = ref(null)
+const reportLoading = ref(false)
+const vitalList = ref([])
+const listLoading = ref(false)
+
+const loadLatestReport = async () => {
+  if (!selectedMember.value) return
+  try {
+    const res = await fetchLatestReport(selectedMember.value)
+    latestReport.value = res.data
+  } catch (e) {
+    console.error('加载周报失败', e)
+  }
+}
+
+const handleGenerateReport = async () => {
+  reportLoading.value = true
+  try {
+    await generateHealthReport(selectedMember.value)
+    await loadLatestReport()
+    ElMessage.success('周报生成成功')
+  } catch (e) {
+    console.error('生成周报失败', e)
+    ElMessage.error('生成失败，请重试')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+const getRiskLevelInfo = (level) => {
+  const map = {
+    0: { label: '低风险', color: '#27ae60' },
+    1: { label: '中风险', color: '#f39c12' },
+    2: { label: '高风险', color: '#e74c3c' }
+  }
+  return map[level] || map[0]
+}
+
+const renderedAiSummary = computed(() => {
+  if (!latestReport.value?.aiSummary) return ''
+  return marked(latestReport.value.aiSummary)
+})
+
+const trendAnalysis = computed(() => {
+  const data = weeklyData.value
+  if (!data || data.length < 3) return null
+
+  const now = new Date()
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  const recentData = data.filter(d => new Date(d.measureTime) >= threeDaysAgo)
+  const earlierData = data.filter(d => {
+    const time = new Date(d.measureTime)
+    return time >= sevenDaysAgo && time < threeDaysAgo
+  })
+
+  if (recentData.length === 0 || earlierData.length === 0) return null
+
+  if (currentType.value === 1) {
+    const recentAvg = recentData.reduce((sum, d) => sum + (d.valueSystolic || 0), 0) / recentData.length
+    const earlierAvg = earlierData.reduce((sum, d) => sum + (d.valueSystolic || 0), 0) / earlierData.length
+    const diff = recentAvg - earlierAvg
+    
+    if (diff > 5) {
+      return { text: '📈 血压呈上升趋势', color: '#e74c3c' }
+    } else if (diff < -5) {
+      return { text: '📉 血压有所下降', color: '#27ae60' }
+    } else {
+      return { text: '✅ 血压整体稳定', color: '#27ae60' }
+    }
+  }
+
+  if (currentType.value === 2) {
+    const recentFasting = recentData.filter(d => d.measurePoint === 1)
+    const earlierFasting = earlierData.filter(d => d.measurePoint === 1)
+    const recentPost = recentData.filter(d => d.measurePoint === 2)
+    const earlierPost = earlierData.filter(d => d.measurePoint === 2)
+
+    let result = []
+    
+    if (recentFasting.length > 0 && earlierFasting.length > 0) {
+      const recentAvg = recentFasting.reduce((sum, d) => sum + (d.value || 0), 0) / recentFasting.length
+      const earlierAvg = earlierFasting.reduce((sum, d) => sum + (d.value || 0), 0) / earlierFasting.length
+      const diff = recentAvg - earlierAvg
+      if (Math.abs(diff) > 0.5) {
+        result.push({
+          text: diff > 0 ? '📈 空腹血糖上升' : '📉 空腹血糖下降',
+          color: diff > 0 ? '#f39c12' : '#27ae60'
+        })
+      }
+    }
+
+    if (recentPost.length > 0 && earlierPost.length > 0) {
+      const recentAvg = recentPost.reduce((sum, d) => sum + (d.value || 0), 0) / recentPost.length
+      const earlierAvg = earlierPost.reduce((sum, d) => sum + (d.value || 0), 0) / earlierPost.length
+      const diff = recentAvg - earlierAvg
+      if (Math.abs(diff) > 0.5) {
+        result.push({
+          text: diff > 0 ? '📈 餐后血糖上升' : '📉 餐后血糖下降',
+          color: diff > 0 ? '#f39c12' : '#27ae60'
+        })
+      }
+    }
+
+    if (result.length === 0) {
+      return { text: '✅ 血糖整体稳定', color: '#27ae60' }
+    }
+    return result.length === 2 ? { text: result[0].text + '，' + result[1].text, color: '#f39c12' } : result[0]
+  }
+
+  if (currentType.value === 3) {
+    const recentAvg = recentData.reduce((sum, d) => sum + (d.value || 0), 0) / recentData.length
+    const earlierAvg = earlierData.reduce((sum, d) => sum + (d.value || 0), 0) / earlierData.length
+    const diff = recentAvg - earlierAvg
+    
+    if (Math.abs(diff) > 0.5) {
+      return { text: diff > 0 ? '📈 体重上升' : '📉 体重下降', color: diff > 0 ? '#f39c12' : '#27ae60' }
+    } else {
+      return { text: '✅ 体重稳定', color: '#27ae60' }
+    }
+  }
+
+  return null
+})
 
 watch(() => currentType.value, (newType) => {
   if (selectedMember.value) {
@@ -217,15 +355,45 @@ const getBloodPressureOption = (data) => {
 
 const getSingleValueOption = (data, type) => {
   const typeOpt = getTypeOption(type)
+
+  // 血糖特殊处理：区分空腹和餐后
+  if (type === 2) {
+    const fastingData = data.filter(d => d.measurePoint === 1)
+    const postMealData = data.filter(d => d.measurePoint === 2)
+    
+    // 获取所有日期（合并两个集合并去重）
+    const allDates = [...new Set([
+      ...fastingData.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })),
+      ...postMealData.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
+    ])].sort()
+    
+    // 构建空值数组对齐日期
+    const fastingValues = allDates.map(date => {
+      const item = fastingData.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
+      return item ? item.value : null
+    })
+    
+    const postMealValues = allDates.map(date => {
+      const item = postMealData.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
+      return item ? item.value : null
+    })
+
+    return {
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['空腹', '餐后'], bottom: 0 },
+      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: allDates, boundaryGap: false },
+      yAxis: { type: 'value', name: typeOpt?.unit },
+      series: [
+        { name: '空腹', type: 'line', data: fastingValues, smooth: true, lineStyle: { color: '#27ae60' }, itemStyle: { color: '#27ae60' }, connectNulls: false },
+        { name: '餐后', type: 'line', data: postMealValues, smooth: true, lineStyle: { color: '#f39c12' }, itemStyle: { color: '#f39c12' }, connectNulls: false }
+      ]
+    }
+  }
+
+  // 其他类型（体重）正常显示
   const dates = data.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
   const values = data.map(d => d.value)
-
-  const colorMap = {
-    2: '#27ae60',
-    3: '#f39c12',
-    4: '#9b59b6',
-    5: '#1abc9c'
-  }
 
   return {
     tooltip: { trigger: 'axis' },
@@ -238,9 +406,9 @@ const getSingleValueOption = (data, type) => {
       type: 'line',
       data: values,
       smooth: true,
-      lineStyle: { color: colorMap[type] || '#2d5f5d' },
-      itemStyle: { color: colorMap[type] || '#2d5f5d' },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: (colorMap[type] || '#2d5f5d') + '40' }, { offset: 1, color: 'transparent' }]) }
+      lineStyle: { color: '#1abc9c' },
+      itemStyle: { color: '#1abc9c' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#1abc9c40' }, { offset: 1, color: 'transparent' }]) }
     }]
   }
 }
@@ -252,6 +420,14 @@ const initChart = () => {
   }
   chartInstance = echarts.init(chartRef.value)
   updateChart()
+  
+  window.addEventListener('resize', handleResize)
+}
+
+const handleResize = () => {
+  if (chartInstance) {
+    chartInstance.resize()
+  }
 }
 
 const formatTime = (time) => {
@@ -265,6 +441,7 @@ onUnmounted(() => {
     chartInstance.dispose()
     chartInstance = null
   }
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
@@ -272,7 +449,10 @@ onUnmounted(() => {
   <div class="health-page">
     <BaseLayout>
       <div class="page-header">
-        <h1 class="page-title">健康数据</h1>
+        <h1 class="page-title">
+          健康数据
+          <span v-if="isViewingOther" class="viewer-tag">查看：{{ currentViewerName }}</span>
+        </h1>
         <div v-if="isAdmin && familyMembers.length > 0" class="member-switch">
           <span class="switch-label">查看成员：</span>
           <el-select 
@@ -306,7 +486,12 @@ onUnmounted(() => {
       </section>
 
       <section class="trend-chart">
-        <h2 class="section-title">近7天趋势</h2>
+        <div class="trend-header">
+          <h2 class="section-title">近7天趋势</h2>
+          <div v-if="trendAnalysis" class="trend-analysis" :style="{ color: trendAnalysis.color }">
+            {{ trendAnalysis.text }}
+          </div>
+        </div>
         <div class="chart-tabs">
           <button
             v-for="t in typeOptions"
@@ -319,6 +504,37 @@ onUnmounted(() => {
           </button>
         </div>
         <div ref="chartRef" class="chart-container"></div>
+      </section>
+
+      <section class="health-report">
+        <h2 class="section-title">本周健康周报</h2>
+        <div v-if="latestReport" class="report-card">
+          <div class="report-header">
+            <span class="report-period">{{ latestReport.weekStart?.slice(5) }} ~ {{ latestReport.weekEnd?.slice(5) }}</span>
+            <span class="report-risk" :style="{ color: getRiskLevelInfo(latestReport.riskLevel).color }">
+              {{ getRiskLevelInfo(latestReport.riskLevel).label }}
+            </span>
+          </div>
+          <div class="report-compliance">
+            <span class="label">用药依从率：</span>
+            <span class="value">{{ latestReport.complianceRate }}%</span>
+          </div>
+          <div class="report-ai">
+            <div class="ai-title">AI 健康建议</div>
+            <div class="ai-content" v-html="renderedAiSummary"></div>
+          </div>
+        </div>
+        <div v-else class="report-empty">
+          <p>暂无本周周报</p>
+          <el-button type="primary" @click="handleGenerateReport" :loading="reportLoading">
+            生成周报
+          </el-button>
+        </div>
+        <div v-if="latestReport" class="report-actions">
+          <el-button @click="handleGenerateReport" :loading="reportLoading">
+            重新生成
+          </el-button>
+        </div>
       </section>
 
       <VitalRecordDialog
@@ -348,6 +564,18 @@ onUnmounted(() => {
   font-weight: 600;
   color: #1a1a1a;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.viewer-tag {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #fff;
+  background: #2d5f5d;
+  padding: 4px 10px;
+  border-radius: 12px;
 }
 
 .member-switch {
@@ -376,8 +604,8 @@ onUnmounted(() => {
 
 .vital-cards {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
 .vital-card {
@@ -390,6 +618,7 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   position: relative;
   overflow: hidden;
+  min-height: 100px;
 }
 
 .vital-card:hover {
@@ -443,6 +672,27 @@ onUnmounted(() => {
 
 .trend-chart {
   margin-bottom: 32px;
+}
+
+.trend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.trend-header .section-title {
+  margin: 0;
+}
+
+.trend-analysis {
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .chart-tabs {
@@ -529,6 +779,137 @@ onUnmounted(() => {
   padding: 40px;
   text-align: center;
   color: #999;
+}
+
+.health-report {
+  margin-bottom: 32px;
+}
+
+.report-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.report-period {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.report-risk {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.report-compliance {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.report-compliance .label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.report-compliance .value {
+  color: #2d5f5d;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.report-ai {
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+}
+
+.ai-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  margin-bottom: 8px;
+}
+
+.ai-content {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+.ai-content h1, .ai-content h2, .ai-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  margin: 12px 0 8px 0;
+}
+
+.ai-content h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+  margin: 10px 0 6px 0;
+}
+
+.ai-content p {
+  margin: 8px 0;
+}
+
+.ai-content ul, .ai-content ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.ai-content li {
+  margin: 4px 0;
+}
+
+.ai-content strong {
+  color: #2d5f5d;
+}
+
+.ai-content em {
+  color: #666;
+}
+
+.ai-content code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.ai-content p:first-child {
+  margin-top: 0;
+}
+
+.report-empty {
+  text-align: center;
+  padding: 40px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.report-empty p {
+  color: #999;
+  margin-bottom: 16px;
+}
+
+.report-actions {
+  text-align: center;
+  margin-top: 16px;
 }
 
 @media (max-width: 767px) {
