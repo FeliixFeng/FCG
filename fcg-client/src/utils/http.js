@@ -3,7 +3,7 @@ import { getToken, clearToken } from './storage'
 
 const http = axios.create({
   baseURL: '',
-  timeout: 10000
+  timeout: 60000
 })
 
 http.interceptors.request.use((config) => {
