@@ -449,14 +449,21 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ 成员管理：查看/编辑弹窗（扩展信息字段）
 - ✅ 头像选择器 AvatarPicker（内置8个头像 + OSS上传）
 - ✅ sys_user.avatar 字段改为 MEDIUMTEXT 支持 OSS URL
+- ✅ 健康页：体征录入、近一周趋势图表（血压/血糖/体重）
+- ✅ 健康页：血糖区分空腹/餐后
+- ✅ 健康页：趋势分析提示（上升/下降/稳定）
+- ✅ 健康页：管理员切换成员显示"查看：XXX"
+- ✅ 健康周报：手动生成 + AI 总结（glm-4.6v-flashx）
+- ✅ 健康周报：覆盖模式（同本周只保留一条）
+- ✅ 健康周报：Markdown 渲染展示
+- ✅ 用药依从率计算 API
+- ✅ 前端超时时间调整为 60s
 
 ### Next Steps
-- ✅ OCR + AI 智能识别（智谱AI GLM-4.6V-FlashX 多模态模型一步完成）
-- 🔄 健康页：体征录入、近一周趋势图表
+- 🔄 历史周报列表查看
 - 🔄 家庭页：成员列表、基础信息展示
 - 🔄 管理员页：成员管理完善
 - 🔄 关怀模式：大字体/简化 UI 统一适配
-- ⏸️ 健康周报：AI 生成摘要展示
 
 ## CI/CD (GitHub Actions + Alibaba Cloud ACR)
 
