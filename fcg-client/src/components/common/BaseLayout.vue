@@ -46,47 +46,25 @@ const memberName = computed(() => {
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
-// 桌面端导航菜单（所有角色都有"我的"Tab）
+// 桌面端导航菜单（所有人都是5个Tab）
 const navItems = computed(() => {
-  const role = userStore.member?.role
-  const baseItems = [
+  return [
     { name: 'dashboard', label: '首页', icon: 'HomeFilled' },
     { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
     { name: 'health',   label: '健康', icon: 'Monitor' },
-  ]
-  
-  // 受控成员（role=2）无"家庭"但有"我的"
-  if (role === 2) {
-    return [...baseItems, { name: 'profile', label: '我的', icon: 'User' }]
-  }
-  
-  // 普通成员和管理员都有"家庭"和"我的"
-  return [
-    ...baseItems,
-    { name: 'family', label: '家庭', icon: 'House' },
-    { name: 'profile', label: '我的', icon: 'User' }
+    { name: 'ai',       label: 'AI',   icon: 'ChatDotRound' },
+    { name: 'profile',  label: '我的', icon: 'User' }
   ]
 })
 
-// 移动端导航菜单（所有角色都有"我的"Tab）
+// 移动端导航菜单（所有人都是5个Tab）
 const mobileNavItems = computed(() => {
-  const role = userStore.member?.role
-  const baseItems = [
+  return [
     { name: 'dashboard', label: '首页', icon: 'HomeFilled' },
     { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
     { name: 'health',   label: '健康', icon: 'Monitor' },
-  ]
-  
-  // 受控成员（role=2）：4个Tab（无"家庭"）
-  if (role === 2) {
-    return [...baseItems, { name: 'profile', label: '我的', icon: 'User' }]
-  }
-  
-  // 管理员/普通成员：5个Tab
-  return [
-    ...baseItems,
-    { name: 'family', label: '家庭', icon: 'House' },
-    { name: 'profile', label: '我的', icon: 'User' }
+    { name: 'ai',       label: 'AI',   icon: 'ChatDotRound' },
+    { name: 'profile',  label: '我的', icon: 'User' }
   ]
 })
 
