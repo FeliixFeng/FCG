@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from '../stores/user'
-import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport } from '../utils/api'
+import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../utils/api'
 import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
 import BaseLayout from '../components/common/BaseLayout.vue'
 import * as echarts from 'echarts'
-import { Delete, Plus } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { Delete, Plus, Refresh } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 
 const userStore = useUserStore()
@@ -57,6 +57,7 @@ onMounted(async () => {
     loadTodayVitals()
     loadWeeklyData()
     loadLatestReport()
+    loadReportList()
     setTimeout(initChart, 100)
   } catch (e) {
     console.error('页面初始化失败', e)
@@ -100,6 +101,7 @@ watch(selectedMember, (newVal, oldVal) => {
     loadTodayVitals()
     loadWeeklyData()
     loadLatestReport()
+    loadReportList()
   }
 })
 
@@ -126,6 +128,7 @@ const loadWeeklyData = async () => {
 
 const latestReport = ref(null)
 const reportLoading = ref(false)
+const reportList = ref([])
 const vitalList = ref([])
 const listLoading = ref(false)
 
@@ -139,6 +142,32 @@ const loadLatestReport = async () => {
   }
 }
 
+const loadReportList = async () => {
+  if (!selectedMember.value) return
+  try {
+    const res = await fetchHealthReports({
+      userId: selectedMember.value,
+      page: 1,
+      size: 20
+    })
+    const allReports = res.data?.records || []
+    
+    // 过滤掉本周的周报，只保留历史周报
+    const today = new Date()
+    const weekStart = new Date(today)
+    weekStart.setDate(today.getDate() - today.getDay())
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    
+    reportList.value = allReports.filter(report => {
+      const reportStart = new Date(report.weekStart)
+      return reportStart < weekStart || reportStart.getTime() === weekStart.getTime()
+    }).slice(0, 6)
+  } catch (e) {
+    console.error('加载历史周报失败', e)
+  }
+}
+
 const handleGenerateReport = async () => {
   reportLoading.value = true
   try {
@@ -147,7 +176,15 @@ const handleGenerateReport = async () => {
     ElMessage.success('周报生成成功')
   } catch (e) {
     console.error('生成周报失败', e)
-    ElMessage.error('生成失败，请重试')
+    const msg = e?.message || ''
+    if (msg.includes('暂无体征数据')) {
+      ElMessageBox.alert('本周暂无体征数据，请先记录健康数据后再生成周报', '提示', {
+        confirmButtonText: '知道了',
+        type: 'warning'
+      })
+    } else {
+      ElMessage.error('生成失败，请重试')
+    }
   } finally {
     reportLoading.value = false
   }
@@ -161,6 +198,20 @@ const getRiskLevelInfo = (level) => {
   }
   return map[level] || map[0]
 }
+
+// 周报详情弹窗
+const reportDetailVisible = ref(false)
+const currentReportDetail = ref(null)
+
+const openReportDetail = (report) => {
+  currentReportDetail.value = report
+  reportDetailVisible.value = true
+}
+
+const renderedCurrentAiSummary = computed(() => {
+  if (!currentReportDetail.value?.aiSummary) return ''
+  return marked(currentReportDetail.value.aiSummary)
+})
 
 const renderedAiSummary = computed(() => {
   if (!latestReport.value?.aiSummary) return ''
@@ -586,35 +637,75 @@ onUnmounted(() => {
       </section>
 
       <section class="health-report">
-        <h2 class="section-title">本周健康周报</h2>
-        <div v-if="latestReport" class="report-card">
-          <div class="report-header">
-            <span class="report-period">{{ latestReport.weekStart?.slice(5) }} ~ {{ latestReport.weekEnd?.slice(5) }}</span>
-            <span class="report-risk" :style="{ color: getRiskLevelInfo(latestReport.riskLevel).color }">
-              {{ getRiskLevelInfo(latestReport.riskLevel).label }}
-            </span>
+        <h2 class="section-title">健康周报</h2>
+        
+        <!-- 本周周报卡片 -->
+        <div class="current-report-section">
+          <h3 class="section-subtitle">本周周报</h3>
+          <div v-if="latestReport" class="current-report-card" @click="openReportDetail(latestReport)">
+            <div class="card-main">
+              <div class="card-period">{{ latestReport.weekStart?.slice(5) }} ~ {{ latestReport.weekEnd?.slice(5) }}</div>
+              <div class="card-risk" :style="{ color: getRiskLevelInfo(latestReport.riskLevel).color }">
+                {{ getRiskLevelInfo(latestReport.riskLevel).label }}
+              </div>
+            </div>
+            <div class="card-info">
+              <span class="info-item">用药依从率: {{ latestReport.complianceRate }}%</span>
+              <span class="info-arrow">查看详情 ></span>
+            </div>
           </div>
-          <div class="report-compliance">
-            <span class="label">用药依从率：</span>
-            <span class="value">{{ latestReport.complianceRate }}%</span>
+          <div v-else class="report-empty">
+            <p>暂无本周周报</p>
+            <el-button type="primary" @click="handleGenerateReport" :loading="reportLoading">
+              生成周报
+            </el-button>
           </div>
-          <div class="report-ai">
-            <div class="ai-title">AI 健康建议</div>
-            <div class="ai-content" v-html="renderedAiSummary"></div>
+          <div v-if="latestReport" class="report-actions">
+            <el-button size="small" @click="handleGenerateReport" :loading="reportLoading" class="regen-btn">
+              <Refresh class="btn-icon" /> 重新生成
+            </el-button>
           </div>
         </div>
-        <div v-else class="report-empty">
-          <p>暂无本周周报</p>
-          <el-button type="primary" @click="handleGenerateReport" :loading="reportLoading">
-            生成周报
-          </el-button>
-        </div>
-        <div v-if="latestReport" class="report-actions">
-          <el-button @click="handleGenerateReport" :loading="reportLoading">
-            重新生成
-          </el-button>
+
+        <!-- 历史周报 -->
+        <div v-if="reportList.length > 0" class="history-reports">
+          <h3 class="section-subtitle">历史周报</h3>
+          <div class="report-grid">
+            <div 
+              v-for="report in reportList.slice(0, 6)" 
+              :key="report.id" 
+              class="report-mini-card"
+              @click="openReportDetail(report)"
+            >
+              <div class="mini-period">{{ report.weekStart?.slice(5) }} ~ {{ report.weekEnd?.slice(5) }}</div>
+              <div class="mini-risk" :style="{ color: getRiskLevelInfo(report.riskLevel).color }">
+                {{ getRiskLevelInfo(report.riskLevel).label }}
+              </div>
+              <div class="mini-compliance">{{ report.complianceRate }}% 依从率</div>
+            </div>
+          </div>
         </div>
       </section>
+
+      <!-- 周报详情弹窗 -->
+      <el-dialog v-model="reportDetailVisible" title="周报详情" width="90%" :close-on-click-modal="true">
+        <div v-if="currentReportDetail" class="detail-content">
+          <div class="detail-header">
+            <span class="detail-period">{{ currentReportDetail.weekStart }} ~ {{ currentReportDetail.weekEnd }}</span>
+            <span class="detail-risk" :style="{ color: getRiskLevelInfo(currentReportDetail.riskLevel).color }">
+              {{ getRiskLevelInfo(currentReportDetail.riskLevel).label }}
+            </span>
+          </div>
+          <div class="detail-compliance">
+            <span class="label">用药依从率：</span>
+            <span class="value">{{ currentReportDetail.complianceRate }}%</span>
+          </div>
+          <div class="detail-ai">
+            <div class="ai-title">AI 健康建议</div>
+            <div class="ai-content" v-html="renderedCurrentAiSummary"></div>
+          </div>
+        </div>
+      </el-dialog>
 
       <VitalRecordDialog
         v-model:visible="dialogVisible"
@@ -864,6 +955,74 @@ onUnmounted(() => {
   margin-bottom: 32px;
 }
 
+/* 本周周报卡片 */
+.current-report-section {
+  margin-bottom: 20px;
+}
+
+.current-report-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  color: #2d5f5d;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.current-report-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(180deg, #7fcfb8 0%, #a8e6cf 100%);
+}
+
+.current-report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.12);
+}
+
+.card-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.card-period {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.card-risk {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.card-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.info-arrow {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
 .report-card {
   background: #fff;
   border-radius: 16px;
@@ -988,7 +1147,131 @@ onUnmounted(() => {
 
 .report-actions {
   text-align: center;
-  margin-top: 16px;
+  margin-top: 12px;
+}
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+
+.regen-btn {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #2d5f5d;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.06);
+}
+
+.regen-btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 6px 20px rgba(31, 38, 135, 0.1);
+}
+
+/* 历史周报 */
+.history-reports {
+  margin-top: 24px;
+}
+
+.section-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #666;
+  margin: 0 0 12px 0;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.report-mini-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.report-mini-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(31, 38, 135, 0.1);
+}
+
+.mini-period {
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.mini-risk {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.mini-compliance {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+/* 周报详情弹窗 */
+.detail-content {
+  padding: 8px 0;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-period {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.detail-risk {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.detail-compliance {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.detail-compliance .label {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.detail-compliance .value {
+  color: #2d5f5d;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.detail-ai {
+  border-top: 1px solid #eee;
+  padding-top: 16px;
 }
 
 @media (max-width: 767px) {
@@ -1014,6 +1297,27 @@ onUnmounted(() => {
     width: 100%;
     height: 240px;
     box-sizing: border-box;
+  }
+
+  .report-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .report-mini-card {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.75);
+  }
+
+  .mini-period {
+    font-size: 0.7rem;
+  }
+
+  .mini-risk {
+    font-size: 0.75rem;
+  }
+
+  .mini-compliance {
+    font-size: 0.65rem;
   }
 }
 </style>

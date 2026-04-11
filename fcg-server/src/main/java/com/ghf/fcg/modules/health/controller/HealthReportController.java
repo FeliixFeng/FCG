@@ -66,6 +66,11 @@ public class HealthReportController {
         LocalDateTime endTime = weekEnd.atTime(LocalTime.MAX);
 
         List<Vital> vitals = vitalService.listByUserIdAndDateRange(targetUserId, startTime, endTime);
+        
+        if (vitals == null || vitals.isEmpty()) {
+            return Result.error("本周暂无体征数据，请先记录健康数据后再生成周报");
+        }
+        
         String vitalData = formatVitalData(vitals);
 
         BigDecimal complianceRate = medicineRecordService.calculateComplianceRate(targetUserId, weekStart, weekEnd);
