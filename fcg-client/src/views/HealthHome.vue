@@ -168,8 +168,12 @@ const renderedAiSummary = computed(() => {
 })
 
 const trendAnalysis = computed(() => {
-  const data = weeklyData.value
-  if (!data || data.length < 3) return null
+  const allData = weeklyData.value
+  if (!allData || allData.length < 3) return null
+
+  // 只使用当前类型的数据
+  const data = allData.filter(d => d.type === currentType.value)
+  if (data.length < 3) return null
 
   const now = new Date()
   const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
@@ -274,14 +278,30 @@ const loadVitalList = async () => {
   }
 }
 
-const getVitalValue = (type, item) => {
-  if (!item) return '--'
+const getVitalValue = (type, todayData) => {
+  if (!todayData || todayData.length === 0) return '--'
   if (type === 1) {
-    return item.valueSystolic && item.valueDiastolic 
-      ? `${item.valueSystolic}/${item.valueDiastolic}` 
+    const bp = todayData.find(v => v.type === 1)
+    return bp && bp.valueSystolic && bp.valueDiastolic 
+      ? `${bp.valueSystolic}/${bp.valueDiastolic}` 
       : '--'
   }
-  return item.value != null ? item.value : '--'
+  if (type === 2) {
+    const fasting = todayData.find(v => v.type === 2 && v.measurePoint === 1)
+    const postMeal = todayData.find(v => v.type === 2 && v.measurePoint === 2)
+    const fastingVal = fasting?.value != null ? fasting.value : null
+    const postMealVal = postMeal?.value != null ? postMeal.value : null
+    if (!fastingVal && !postMealVal) return '--'
+    if (fastingVal && postMealVal) {
+      return `空腹${fastingVal} / 餐后${postMealVal}`
+    }
+    return fastingVal != null ? `空腹${fastingVal}` : `餐后${postMealVal}`
+  }
+  if (type === 3) {
+    const wt = todayData.find(v => v.type === 3)
+    return wt?.value != null ? wt.value : '--'
+  }
+  return '--'
 }
 
 const getTypeOption = (type) => typeOptions.find(t => t.value === type)
@@ -336,19 +356,43 @@ const updateChart = () => {
 }
 
 const getBloodPressureOption = (data) => {
-  const dates = data.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
-  const systolic = data.map(d => d.valueSystolic)
-  const diastolic = data.map(d => d.valueDiastolic)
+  const today = new Date()
+  const sevenDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
+  const allDates = []
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sevenDaysAgo.getTime() + i * 24 * 60 * 60 * 1000)
+    allDates.push(d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
+  }
+
+  const systolic = allDates.map(date => {
+    const item = data.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
+    return item ? item.valueSystolic : null
+  })
+  
+  const diastolic = allDates.map(date => {
+    const item = data.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
+    return item ? item.valueDiastolic : null
+  })
+
+  // 动态计算Y轴范围
+  const allBpValues = [...systolic, ...diastolic].filter(v => v != null)
+  let yMin = 40, yMax = 200
+  if (allBpValues.length > 0) {
+    const min = Math.min(...allBpValues)
+    const max = Math.max(...allBpValues)
+    yMin = Math.max(40, Math.floor(min - 15))
+    yMax = Math.min(200, Math.ceil(max + 15))
+  }
 
   return {
     tooltip: { trigger: 'axis' },
     legend: { data: ['收缩压', '舒张压'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-    xAxis: { type: 'category', data: dates, boundaryGap: false },
-    yAxis: { type: 'value', min: 40, max: 200 },
+    xAxis: { type: 'category', data: allDates, boundaryGap: false },
+    yAxis: { type: 'value', min: yMin, max: yMax },
     series: [
-      { name: '收缩压', type: 'line', data: systolic, smooth: true, lineStyle: { color: '#e74c3c' }, itemStyle: { color: '#e74c3c' } },
-      { name: '舒张压', type: 'line', data: diastolic, smooth: true, lineStyle: { color: '#3498db' }, itemStyle: { color: '#3498db' } }
+      { name: '收缩压', type: 'line', data: systolic, smooth: true, lineStyle: { color: '#e74c3c' }, itemStyle: { color: '#e74c3c' }, connectNulls: true },
+      { name: '舒张压', type: 'line', data: diastolic, smooth: true, lineStyle: { color: '#3498db' }, itemStyle: { color: '#3498db' }, connectNulls: true }
     ]
   }
 }
@@ -361,46 +405,79 @@ const getSingleValueOption = (data, type) => {
     const fastingData = data.filter(d => d.measurePoint === 1)
     const postMealData = data.filter(d => d.measurePoint === 2)
     
-    // 获取所有日期（合并两个集合并去重）
-    const allDates = [...new Set([
-      ...fastingData.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })),
-      ...postMealData.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
-    ])].sort()
+    // 生成完整7天日期
+    const allDates = []
+    const today = new Date()
+    const sevenDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sevenDaysAgo.getTime() + i * 24 * 60 * 60 * 1000)
+      allDates.push(d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
+    }
     
     // 构建空值数组对齐日期
     const fastingValues = allDates.map(date => {
       const item = fastingData.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
       return item ? item.value : null
     })
-    
+     
     const postMealValues = allDates.map(date => {
       const item = postMealData.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
       return item ? item.value : null
     })
+
+    // 动态计算Y轴范围
+    const allBsValues = [...fastingValues, ...postMealValues].filter(v => v != null)
+    let yMin = 0, yMax = 20
+    if (allBsValues.length > 0) {
+      const min = Math.min(...allBsValues)
+      const max = Math.max(...allBsValues)
+      yMin = Math.max(0, Math.floor(min - 2))
+      yMax = Math.ceil(max + 2)
+    }
 
     return {
       tooltip: { trigger: 'axis' },
       legend: { data: ['空腹', '餐后'], bottom: 0 },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
       xAxis: { type: 'category', data: allDates, boundaryGap: false },
-      yAxis: { type: 'value', name: typeOpt?.unit },
+      yAxis: { type: 'value', name: typeOpt?.unit, min: yMin, max: yMax },
       series: [
-        { name: '空腹', type: 'line', data: fastingValues, smooth: true, lineStyle: { color: '#27ae60' }, itemStyle: { color: '#27ae60' }, connectNulls: false },
-        { name: '餐后', type: 'line', data: postMealValues, smooth: true, lineStyle: { color: '#f39c12' }, itemStyle: { color: '#f39c12' }, connectNulls: false }
+        { name: '空腹', type: 'line', data: fastingValues, smooth: true, lineStyle: { color: '#27ae60' }, itemStyle: { color: '#27ae60' }, connectNulls: true },
+        { name: '餐后', type: 'line', data: postMealValues, smooth: true, lineStyle: { color: '#f39c12' }, itemStyle: { color: '#f39c12' }, connectNulls: true }
       ]
     }
   }
 
-  // 其他类型（体重）正常显示
-  const dates = data.map(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
-  const values = data.map(d => d.value)
+  // 体重：生成完整7天日期
+  const allDates = []
+  const today = new Date()
+  const sevenDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sevenDaysAgo.getTime() + i * 24 * 60 * 60 * 1000)
+    allDates.push(d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
+  }
+  
+  const values = allDates.map(date => {
+    const item = data.find(d => new Date(d.measureTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) === date)
+    return item ? item.value : null
+  })
+
+  // 动态计算Y轴范围
+  const validValues = values.filter(v => v != null)
+  let yMin = 0, yMax = 150
+  if (validValues.length > 0) {
+    const min = Math.min(...validValues)
+    const max = Math.max(...validValues)
+    yMin = Math.max(0, Math.floor(min - 3))
+    yMax = Math.ceil(max + 3)
+  }
 
   return {
     tooltip: { trigger: 'axis' },
     legend: { data: [typeOpt?.label], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-    xAxis: { type: 'category', data: dates, boundaryGap: false },
-    yAxis: { type: 'value', name: typeOpt?.unit },
+    xAxis: { type: 'category', data: allDates, boundaryGap: false },
+    yAxis: { type: 'value', name: typeOpt?.unit, min: yMin, max: yMax },
     series: [{
       name: typeOpt?.label,
       type: 'line',
@@ -408,7 +485,7 @@ const getSingleValueOption = (data, type) => {
       smooth: true,
       lineStyle: { color: '#1abc9c' },
       itemStyle: { color: '#1abc9c' },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#1abc9c40' }, { offset: 1, color: 'transparent' }]) }
+      connectNulls: true
     }]
   }
 }
@@ -474,10 +551,12 @@ onUnmounted(() => {
           <div v-for="t in typeOptions" :key="t.value" class="vital-card" @click="openAddDialog(t.value)">
             <div class="card-icon">{{ t.icon }}</div>
             <div class="card-value">
-              {{ getVitalValue(t.value, todayVitals.find(v => v.type === t.value)) }}
+              {{ getVitalValue(t.value, todayVitals) }}
             </div>
             <div class="card-label">{{ t.label }}</div>
-            <div class="card-unit">{{ todayVitals.find(v => v.type === t.value) ? t.unit : '点击记录' }}</div>
+            <div class="card-unit">
+              {{ t.value === 2 ? (todayVitals.some(v => v.type === 2) ? 'mmol/L' : '点击记录') : (todayVitals.some(v => v.type === t.value) ? t.unit : '点击记录') }}
+            </div>
             <div class="card-add">
               <Plus />
             </div>
