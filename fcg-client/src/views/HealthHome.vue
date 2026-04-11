@@ -344,7 +344,7 @@ const getVitalValue = (type, todayData) => {
     const postMealVal = postMeal?.value != null ? postMeal.value : null
     if (!fastingVal && !postMealVal) return '--'
     if (fastingVal && postMealVal) {
-      return `空腹${fastingVal} / 餐后${postMealVal}`
+      return { fasting: fastingVal, postMeal: postMealVal }
     }
     return fastingVal != null ? `空腹${fastingVal}` : `餐后${postMealVal}`
   }
@@ -602,7 +602,14 @@ onUnmounted(() => {
           <div v-for="t in typeOptions" :key="t.value" class="vital-card" @click="openAddDialog(t.value)">
             <div class="card-icon">{{ t.icon }}</div>
             <div class="card-value">
-              {{ getVitalValue(t.value, todayVitals) }}
+              <template v-if="t.value === 2 && typeof getVitalValue(t.value, todayVitals) === 'object'">
+                <span>空腹{{ getVitalValue(t.value, todayVitals).fasting }}</span>
+                <br>
+                <span>餐后{{ getVitalValue(t.value, todayVitals).postMeal }}</span>
+              </template>
+              <template v-else>
+                {{ getVitalValue(t.value, todayVitals) }}
+              </template>
             </div>
             <div class="card-label">{{ t.label }}</div>
             <div class="card-unit">
