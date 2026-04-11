@@ -213,19 +213,14 @@ public class VitalController {
     public Result<List<VitalVO>> today(@RequestParam(required = false) Long userId) {
         Long currentUserId = UserContext.get().getUserId();
         
-        Vital sampleVital = vitalService.getOne(new LambdaQueryWrapper<Vital>()
-                .eq(Vital::getUserId, currentUserId)
-                .last("LIMIT 1"));
-        
-        Long familyId = sampleVital != null ? sampleVital.getFamilyId() : null;
-        if (familyId == null) {
-            familyId = requireFamilyId(currentUserId);
-        }
-
         Long targetUserId = userId;
         if (targetUserId == null) {
             targetUserId = currentUserId;
         }
+        
+        // 先获取目标用户的 familyId
+        User user = userService.getById(targetUserId);
+        Long familyId = user != null && user.getFamilyId() != null ? user.getFamilyId() : requireFamilyId(currentUserId);
 
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         LocalDateTime todayEnd = LocalDateTime.now();
