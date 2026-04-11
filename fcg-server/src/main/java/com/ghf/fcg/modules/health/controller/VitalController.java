@@ -200,7 +200,7 @@ public class VitalController {
 
         List<VitalVO> result = new java.util.ArrayList<>();
 
-        for (int type = 1; type <= 5; type++) {
+        for (int type = 1; type <= 3; type++) {
             LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(Vital::getFamilyId, familyId)
                     .eq(Vital::getUserId, targetUserId)
