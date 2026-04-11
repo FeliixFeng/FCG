@@ -90,6 +90,10 @@ export const fetchTodayPlanRecords = (scheduledDate, userId) =>
 /** 更新服药记录状态（打卡/跳过） */
 export const updateMedicineRecord = (id, data) => http.put(`/api/medicine/record/${id}`, data)
 
+export const createPlan = (data) => http.post('/api/medicine/plan', data)
+
+export const fetchPlanList = (params) => http.get('/api/medicine/plan/list', { params })
+
 // ========== 健康模块 ==========
 
 /** 近一周体征 */
