@@ -115,37 +115,31 @@ const handleSubmit = async () => {
     :close-on-click-modal="false"
   >
     <el-form label-position="top">
-      <el-form-item :label="currentType?.label">
-        <div v-if="isBloodPressure" class="blood-pressure-input">
-          <el-input-number
-            v-model="form.valueSystolic"
-            :min="60"
-            :max="250"
-            :precision="0"
-            placeholder="收缩压"
-            controls-position="right"
-          />
+      <el-form-item label="血压 (mmHg)">
+        <div class="blood-pressure-input">
+          <div class="bp-field">
+            <span class="bp-label">收缩压(高压)</span>
+            <el-input-number
+              v-model="form.valueSystolic"
+              :min="60"
+              :max="250"
+              :precision="0"
+              placeholder="120"
+              controls-position="right"
+            />
+          </div>
           <span class="separator">/</span>
-          <el-input-number
-            v-model="form.valueDiastolic"
-            :min="40"
-            :max="150"
-            :precision="0"
-            placeholder="舒张压"
-            controls-position="right"
-          />
-          <span class="unit">{{ currentType?.unit }}</span>
-        </div>
-        <div v-else class="single-input">
-          <el-input-number
-            v-model="form.value"
-            :min="0"
-            :max="props.type === 3 ? 300 : 100"
-            :precision="1"
-            :step="props.type === 3 ? 1 : 0.1"
-            controls-position="right"
-          />
-          <span class="unit">{{ currentType?.unit }}</span>
+          <div class="bp-field">
+            <span class="bp-label">舒张压(低压)</span>
+            <el-input-number
+              v-model="form.valueDiastolic"
+              :min="40"
+              :max="150"
+              :precision="0"
+              placeholder="80"
+              controls-position="right"
+            />
+          </div>
         </div>
       </el-form-item>
 
@@ -178,15 +172,25 @@ const handleSubmit = async () => {
 <style scoped>
 .blood-pressure-input {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 12px;
+}
+.bp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bp-label {
+  font-size: 12px;
+  color: #999;
 }
 .blood-pressure-input :deep(.el-input-number) {
-  width: 120px;
+  width: 110px;
 }
 .separator {
-  font-size: 18px;
+  font-size: 20px;
   color: #999;
+  padding-bottom: 8px;
 }
 .unit {
   color: #666;
