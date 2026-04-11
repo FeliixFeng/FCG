@@ -1,33 +1,38 @@
 <script setup>
 import BaseLayout from '../components/common/BaseLayout.vue'
 import { onMounted, ref, reactive, computed } from 'vue'
-import { fetchMedicineList, createMedicine, deleteMedicine, fetchPlanList, createPlan } from '../utils/api'
+import { fetchMedicineList, createMedicine, deleteMedicine, fetchPlanList, createPlan, fetchFamilyMembers } from '../utils/api'
 import { useUserStore } from '../stores/user'
 import { compressImage, fileToBase64 } from '../utils/image'
 
 const userStore = useUserStore()
-const currentMember = computed(() => userStore.currentMember)
 
-// 药品列表
 const medicineList = ref([])
 const planList = ref([])
+const memberList = ref([])
 const loading = ref(false)
 const error = ref('')
 
-// 弹窗
 const showCreatePlan = ref(false)
 const submitting = ref(false)
 const formError = ref('')
 
-// 添加药品弹窗（OCR用）
 const showAddMedicine = ref(false)
 const ocrLoading = ref(false)
 const previewUrl = ref('')
 const previewFile = ref(null)
 
+const loadMembers = async () => {
+  try {
+    const res = await fetchFamilyMembers()
+    memberList.value = res.data?.records || []
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 const memberOptions = computed(() => {
-  if (!userStore.members) return []
-  return userStore.members.map(m => ({
+  return memberList.value.map(m => ({
     value: m.id,
     label: m.nickname || m.username
   }))
@@ -209,7 +214,10 @@ const isToday = (dayStr) => {
   return dayStr?.includes(String(today))
 }
 
-onMounted(() => load())
+onMounted(async () => {
+  await loadMembers()
+  load()
+})
 </script>
 
 <template>
