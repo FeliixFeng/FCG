@@ -13,8 +13,6 @@ public class AiProperties {
 
     private String model = "glm-4.6v-flashx";
 
-    private String textModel = "glm-4-flash";
-
     private String baseUrl = "https://open.bigmodel.cn/api/paas/v4";
 
     private Integer timeout = 30000;
