@@ -225,11 +225,7 @@ public class AiService {
             Map<String, Object> map = objectMapper.readValue(jsonPayload, Map.class);
             String usage = normalizeString(map.get("usage"));
             String dosage = normalizeString(map.get("dosage"));
-            String instructions = normalizeString(map.get("instructions"));
-
-            if (instructions == null) {
-                instructions = buildInstructions(usage, dosage);
-            }
+            String usageNotes = buildUsageNotes(usage, dosage);
 
             String expireDateRaw = normalizeString(map.get("expireDate"));
             if (expireDateRaw == null) {
@@ -239,18 +235,24 @@ public class AiService {
             return MedicineOcrParsedVO.builder()
                     .name(normalizeString(map.get("name")))
                     .specification(normalizeString(map.get("specification")))
-                    .manufacturer(normalizeString(map.get("manufacturer")))
-                    .dosageForm(normalizeString(map.get("dosageForm")))
-                    .instructions(instructions)
-                    .contraindications(normalizeString(map.get("contraindications")))
-                    .sideEffects(normalizeString(map.get("sideEffects")))
-                    .usage(usage)
+                    .usageNotes(usageNotes)
                     .dosage(dosage)
                     .expireDate(parseDate(expireDateRaw))
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("AI结构化结果解析失败: " + e.getMessage(), e);
         }
+    }
+
+    private String buildUsageNotes(String usage, String dosage) {
+        StringBuilder sb = new StringBuilder();
+        if (dosage != null && !dosage.isEmpty()) {
+            sb.append("用法：").append(dosage).append("。");
+        }
+        if (usage != null && !usage.isEmpty()) {
+            sb.append(usage);
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     public String currentModel() {

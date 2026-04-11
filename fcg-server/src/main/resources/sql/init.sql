@@ -70,17 +70,12 @@ CREATE TABLE `med_medicine` (
     `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '药品ID',
     `family_id`       BIGINT       NOT NULL COMMENT '所属家庭ID',
     `name`            VARCHAR(100) NOT NULL COMMENT '药品名称',
-    `specification`   VARCHAR(100) DEFAULT NULL COMMENT '规格（如 10mg*20片）',
-    `manufacturer`    VARCHAR(100) DEFAULT NULL COMMENT '生产厂家',
-    `dosage_form`     VARCHAR(50)  DEFAULT NULL COMMENT '剂型（片剂/胶囊/液体等）',
-    `image_url`       VARCHAR(255) DEFAULT NULL COMMENT '药品图片URL',
-    `instructions`    TEXT         DEFAULT NULL COMMENT '药品说明书',
-    `contraindications` TEXT       DEFAULT NULL COMMENT '禁忌事项',
-    `side_effects`    TEXT         DEFAULT NULL COMMENT '副作用',
+    `specification`   VARCHAR(100) DEFAULT NULL COMMENT '规格（如 0.3g*20粒）',
+    `image_url`       VARCHAR(500) DEFAULT NULL COMMENT '封面图片URL',
     `stock`           INT          DEFAULT 0 COMMENT '库存数量',
-    `stock_unit`      VARCHAR(20)  DEFAULT NULL COMMENT '库存单位（片/粒/瓶）',
-    `expire_date`     DATE         DEFAULT NULL COMMENT '过期日期',
-    `storage_location` VARCHAR(100) DEFAULT NULL COMMENT '存放位置',
+    `stock_unit`      VARCHAR(20)  DEFAULT NULL COMMENT '库存单位（片/粒/ml）',
+    `expire_date`     DATE         DEFAULT NULL COMMENT '有效期',
+    `usage_notes`    TEXT         DEFAULT NULL COMMENT '用药注意',
     `deleted`         TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
     `create_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -92,49 +87,43 @@ CREATE TABLE `med_medicine` (
 DROP TABLE IF EXISTS `med_plan`;
 CREATE TABLE `med_plan` (
     `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '计划ID',
-    `user_id`       BIGINT       NOT NULL COMMENT '使用者ID（受控成员）',
-    `family_id`     BIGINT       NOT NULL COMMENT '所属家庭ID',
+    `user_id`       BIGINT       NOT NULL COMMENT '使用者ID',
     `medicine_id`   BIGINT       NOT NULL COMMENT '药品ID',
-    `dosage`        VARCHAR(50)  NOT NULL COMMENT '单次剂量（如 1片）',
-    `frequency`     VARCHAR(50)  NOT NULL COMMENT '服药频率（如 每天3次）',
-    `remind_times`  VARCHAR(100) NOT NULL COMMENT '提醒时间点（08:00,12:00,18:00）',
-    `start_date`    DATE         NOT NULL COMMENT '开始日期',
-    `end_date`      DATE         DEFAULT NULL COMMENT '结束日期（NULL表示长期）',
-    `take_days`     VARCHAR(20)  DEFAULT '1,2,3,4,5,6,7' COMMENT '服药星期（1-7，逗号分隔）',
-    `notes`         VARCHAR(255) DEFAULT NULL COMMENT '备注（饭后服用等）',
-    `status`        TINYINT      NOT NULL DEFAULT 1 COMMENT '状态 0-停用 1-启用',
-    `deleted`       TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
-    `create_time`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `dosage`        DECIMAL(5,2) NOT NULL COMMENT '单次剂量（如 1 或 0.5）',
+    `remind_slots`  VARCHAR(50)  NOT NULL COMMENT '提醒时段（早,中,晚）',
+    `take_days`    VARCHAR(20)  DEFAULT '1,2,3,4,5,6,7' COMMENT '服药星期（1-7，逗号分隔）',
+    `start_date`   DATE         NOT NULL COMMENT '开始日期',
+    `end_date`     DATE         DEFAULT NULL COMMENT '结束日期（可空=长期）',
+    `plan_remark` VARCHAR(255) DEFAULT NULL COMMENT '用药注意',
+    `status`       TINYINT      NOT NULL DEFAULT 1 COMMENT '状态 0-停用 1-启用',
+    `deleted`      TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
+    `create_time`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
-    KEY `idx_family_id` (`family_id`),
-    KEY `idx_status` (`status`),
-    KEY `idx_family_user` (`family_id`, `user_id`),
-    KEY `idx_family_status` (`family_id`, `status`)
+    KEY `idx_medicine_id` (`medicine_id`),
+    KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用药计划表';
 
 -- 5. 服药记录表
 DROP TABLE IF EXISTS `med_record`;
 CREATE TABLE `med_record` (
-    `id`             BIGINT   NOT NULL AUTO_INCREMENT COMMENT '记录ID',
-    `plan_id`        BIGINT   NOT NULL COMMENT '计划ID',
-    `user_id`        BIGINT   NOT NULL COMMENT '用户ID',
-    `family_id`      BIGINT   NOT NULL COMMENT '所属家庭ID',
-    `medicine_id`    BIGINT   NOT NULL COMMENT '药品ID',
-    `scheduled_date` DATE     NOT NULL COMMENT '应服药日期',
-    `scheduled_time` TIME     NOT NULL COMMENT '应服药时间',
-    `actual_time`    DATETIME DEFAULT NULL COMMENT '实际服药时间',
-    `status`         TINYINT  NOT NULL DEFAULT 0 COMMENT '状态 0-未服 1-已服 2-跳过',
-    `notes`          VARCHAR(255) DEFAULT NULL COMMENT '备注',
-    `deleted`        TINYINT  NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
+    `id`              BIGINT   NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    `plan_id`         BIGINT   NOT NULL COMMENT '计划ID',
+    `user_id`         BIGINT   NOT NULL COMMENT '用户ID',
+    `medicine_id`     BIGINT   NOT NULL COMMENT '药品ID',
+    `scheduled_date`  DATE     NOT NULL COMMENT '应服日期',
+    `slot_name`       VARCHAR(20) NOT NULL COMMENT '应服时段（早/中/晚/睡前）',
+    `actual_time`     DATETIME DEFAULT NULL COMMENT '实际打卡时间',
+    `status`          TINYINT  NOT NULL DEFAULT 0 COMMENT '状态 0-未服 1-已服 2-跳过',
+    `record_remark`   VARCHAR(255) DEFAULT NULL COMMENT '记录备注',
+    `deleted`         TINYINT  NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删 1-已删',
     `create_time`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
-    KEY `idx_family_id` (`family_id`),
-    KEY `idx_scheduled_date` (`scheduled_date`),
-    KEY `idx_family_user_date` (`family_id`, `user_id`, `scheduled_date`)
+    KEY `idx_plan_id` (`plan_id`),
+    KEY `idx_scheduled_date` (`scheduled_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服药记录表';
 
 -- ============================================
@@ -216,17 +205,12 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 张家药品（family_id=1）
 -- 张爷爷（user id=3）是关怀成员，主要服药对象
 -- 张爸爸（user id=1）偶尔服药
-INSERT INTO `med_medicine` (`family_id`, `name`, `specification`, `manufacturer`, `dosage_form`, `stock`, `stock_unit`, `expire_date`, `storage_location`, `instructions`, `contraindications`) VALUES
-(1, '苯磺酸氨氯地平片', '5mg*7片', '辉瑞制药', '片剂', 42, '片', '2026-12-31', '客厅药箱',
-  '用于高血压及冠心病。每日一次，每次一片，餐后服用。', '严重低血压患者禁用；肝功能损害患者慎用。'),
-(1, '阿卡波糖片', '50mg*30片', '拜耳制药', '片剂', 90, '片', '2027-03-15', '客厅药箱',
-  '用于2型糖尿病。进餐时与第一口食物一起嚼服，每次50mg。', '消化道功能障碍患者禁用；妊娠期禁用。'),
-(1, '阿司匹林肠溶片', '100mg*30片', '拜耳制药', '肠溶片', 60, '片', '2027-06-30', '客厅药箱',
-  '抗血栓，预防心肌梗死。每日一次，每次100mg，餐后服用。', '对阿司匹林过敏者禁用；消化道溃疡患者禁用。'),
-(1, '盐酸二甲双胍片', '500mg*60片', '华北制药', '片剂', 120, '片', '2026-09-20', '客厅药箱',
-  '用于2型糖尿病辅助治疗。每次500mg，随餐服用。', '肾功能不全者禁用；需定期监测肾功能。'),
-(1, '酒石酸美托洛尔片', '25mg*20片', '阿斯利康', '片剂', 40, '片', '2026-08-10', '客厅药箱',
-  '用于高血压、心绞痛。每日两次，每次25mg。', '心动过缓、二三度房室传导阻滞禁用。');
+INSERT INTO `med_medicine` (`family_id`, `name`, `specification`, `stock`, `stock_unit`, `expire_date`, `usage_notes`) VALUES
+(1, '苯磺酸氨氯地平片', '5mg*7片', 42, '片', '2026-12-31', '用于高血压及冠心病。每日一次，每次一片，餐后服用。'),
+(1, '阿卡波糖片', '50mg*30片', 90, '片', '2027-03-15', '用于2型糖尿病。进餐时与第一口食物一起嚼服，每次50mg。'),
+(1, '阿司匹林肠溶片', '100mg*30片', 60, '片', '2027-06-30', '抗血栓，预防心肌梗死。每日一次，每次100mg，餐后服用。'),
+(1, '盐酸二甲双胍片', '500mg*60片', 120, '片', '2026-09-20', '用于2型糖尿病辅助治疗。每次500mg，随餐服用。'),
+(1, '酒石酸美托洛尔片', '25mg*20片', 40, '片', '2026-08-10', '用于高血压、心绞痛。每日两次，每次25mg。');
 
 -- ============================================
 -- 用药计划（张爷爷 user_id=3，family_id=1）

@@ -3,6 +3,7 @@ package com.ghf.fcg.modules.medicine.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -12,15 +13,13 @@ public class MedicinePlanVO {
 
     private Long id;
     private Long userId;
-    private Long familyId;
     private Long medicineId;
-    private String dosage;
-    private String frequency;
-    private String remindTimes;
+    private BigDecimal dosage;
+    private String remindSlots;
     private LocalDate startDate;
     private LocalDate endDate;
     private String takeDays;
-    private String notes;
+    private String planRemark;
     private Integer status;
     private LocalDateTime createTime;
 }

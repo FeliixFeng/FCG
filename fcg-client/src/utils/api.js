@@ -75,6 +75,14 @@ export const deleteMedicine = (id) => http.delete(`/api/medicine/${id}`)
 /** 药品详情 */
 export const fetchMedicine = (id) => http.get(`/api/medicine/${id}`)
 
+export const recognizeMedicine = (files) => {
+  const formData = new FormData()
+  files.forEach(file => formData.append('files', file))
+  return http.post('/api/medicine/ocr', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 /** 今日计划记录联表（含 medicineName、planDosage 等）*/
 export const fetchTodayPlanRecords = (scheduledDate, userId) =>
   http.get('/api/medicine/plan/records', { params: { scheduledDate, userId, page: 1, size: 50 } })

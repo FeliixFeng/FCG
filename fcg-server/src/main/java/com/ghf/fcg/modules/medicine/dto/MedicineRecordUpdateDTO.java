@@ -1,40 +1,28 @@
 package com.ghf.fcg.modules.medicine.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Data
 public class MedicineRecordUpdateDTO {
 
-    @Schema(description = "计划ID")
-    private Long planId;
-
-    @Schema(description = "用户ID")
-    private Long userId;
-
-    @Schema(description = "药品ID")
-    private Long medicineId;
-
-    @Schema(description = "应服药日期")
+    @Schema(description = "应服日期")
     private LocalDate scheduledDate;
 
-    @Schema(description = "应服药时间")
-    private LocalTime scheduledTime;
+    @Schema(description = "应服时段（早/中/晚/睡前）")
+    private String slotName;
 
-    @Schema(description = "实际服药时间")
+    @Schema(description = "实际打卡时间")
     private LocalDateTime actualTime;
 
     @Schema(description = "状态 0-未服 1-已服 2-跳过")
-    @Min(value = 0, message = "状态范围为0-2")
-    @Max(value = 2, message = "状态范围为0-2")
+    @Min(0) @Max(2)
     private Integer status;
 
-    @Schema(description = "备注")
-    private String notes;
+    @Schema(description = "记录备注")
+    private String recordRemark;
 }

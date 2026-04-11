@@ -21,7 +21,6 @@ import com.ghf.fcg.modules.medicine.vo.MedicinePlanVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
@@ -47,22 +46,19 @@ public class MedicinePlanController {
     @PostMapping
     @Operation(summary = "新增用药计划")
     public Result<Long> create(@RequestBody @Valid MedicinePlanCreateDTO dto) {
-        Long userId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(userId);
+        Long familyId = requireFamilyId(dto.getUserId());
         validateFamilyUser(familyId, dto.getUserId());
         validateFamilyMedicine(familyId, dto.getMedicineId());
 
         MedicinePlan plan = new MedicinePlan();
         plan.setUserId(dto.getUserId());
-        plan.setFamilyId(familyId);
         plan.setMedicineId(dto.getMedicineId());
         plan.setDosage(dto.getDosage());
-        plan.setFrequency(dto.getFrequency());
-        plan.setRemindTimes(dto.getRemindTimes());
+        plan.setRemindSlots(dto.getRemindSlots());
         plan.setStartDate(dto.getStartDate());
         plan.setEndDate(dto.getEndDate());
         plan.setTakeDays(dto.getTakeDays() == null ? "1,2,3,4,5,6,7" : dto.getTakeDays());
-        plan.setNotes(dto.getNotes());
+        plan.setPlanRemark(dto.getPlanRemark());
         plan.setStatus(dto.getStatus() == null ? MedicinePlan.STATUS_ENABLED : dto.getStatus());
 
         planService.save(plan);
@@ -112,7 +108,7 @@ public class MedicinePlanController {
         Long familyId = requireFamilyId(currentUserId);
 
         LambdaQueryWrapper<MedicinePlan> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MedicinePlan::getFamilyId, familyId);
+        wrapper.eq(MedicinePlan::getUserId, currentUserId);
         if (userId != null) {
             wrapper.eq(MedicinePlan::getUserId, userId);
         }
@@ -137,7 +133,7 @@ public class MedicinePlanController {
         Long familyId = requireFamilyId(currentUserId);
 
         LambdaQueryWrapper<MedicineRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MedicineRecord::getFamilyId, familyId);
+        wrapper.eq(MedicineRecord::getUserId, currentUserId);
         if (userId != null) {
             wrapper.eq(MedicineRecord::getUserId, userId);
         }
@@ -147,8 +143,7 @@ public class MedicinePlanController {
         if (scheduledDate != null) {
             wrapper.eq(MedicineRecord::getScheduledDate, scheduledDate);
         }
-        wrapper.orderByDesc(MedicineRecord::getScheduledDate)
-                .orderByDesc(MedicineRecord::getScheduledTime);
+        wrapper.orderByDesc(MedicineRecord::getScheduledDate);
 
         Page<MedicineRecord> pageResult = recordService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
         List<MedicineRecord> records = pageResult.getRecords();
@@ -178,17 +173,15 @@ public class MedicinePlanController {
                     .medicineId(record.getMedicineId())
                     .medicineName(medicine == null ? null : medicine.getName())
                     .scheduledDate(record.getScheduledDate())
-                    .scheduledTime(record.getScheduledTime())
+                    .slotName(record.getSlotName())
                     .actualTime(record.getActualTime())
                     .recordStatus(record.getStatus())
-                    .recordNotes(record.getNotes())
                     .planDosage(plan.getDosage())
-                    .planFrequency(plan.getFrequency())
-                    .planRemindTimes(plan.getRemindTimes())
+                    .planRemindSlots(plan.getRemindSlots())
                     .planStartDate(plan.getStartDate())
                     .planEndDate(plan.getEndDate())
                     .planTakeDays(plan.getTakeDays())
-                    .planNotes(plan.getNotes())
+                    .planRemark(plan.getPlanRemark())
                     .planStatus(plan.getStatus())
                     .build());
         }
@@ -203,8 +196,8 @@ public class MedicinePlanController {
         return user.getFamilyId();
     }
 
-    private void validateFamilyUser(Long familyId, Long userId) {
-        User user = userService.getById(userId);
+    private void validateFamilyUser(Long familyId, Long targetUserId) {
+        User user = userService.getById(targetUserId);
         if (user == null || !familyId.equals(user.getFamilyId())) {
             throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
         }
@@ -219,29 +212,22 @@ public class MedicinePlanController {
 
     private MedicinePlan getFamilyPlan(Long id, Long familyId) {
         MedicinePlan plan = planService.getById(id);
-        if (plan == null || !familyId.equals(plan.getFamilyId())) {
+        if (plan == null) {
+            throw new BusinessException(MessageConstant.PLAN_NOT_EXIST);
+        }
+        Long planFamilyId = requireFamilyId(plan.getUserId());
+        if (!familyId.equals(planFamilyId)) {
             throw new BusinessException(MessageConstant.PLAN_NOT_EXIST);
         }
         return plan;
     }
 
     private void applyPlanUpdate(MedicinePlan plan, Long familyId, MedicinePlanUpdateDTO dto) {
-        if (dto.getUserId() != null) {
-            validateFamilyUser(familyId, dto.getUserId());
-            plan.setUserId(dto.getUserId());
-        }
-        if (dto.getMedicineId() != null) {
-            validateFamilyMedicine(familyId, dto.getMedicineId());
-            plan.setMedicineId(dto.getMedicineId());
-        }
         if (dto.getDosage() != null) {
             plan.setDosage(dto.getDosage());
         }
-        if (dto.getFrequency() != null) {
-            plan.setFrequency(dto.getFrequency());
-        }
-        if (dto.getRemindTimes() != null) {
-            plan.setRemindTimes(dto.getRemindTimes());
+        if (dto.getRemindSlots() != null) {
+            plan.setRemindSlots(dto.getRemindSlots());
         }
         if (dto.getStartDate() != null) {
             plan.setStartDate(dto.getStartDate());
@@ -252,8 +238,8 @@ public class MedicinePlanController {
         if (dto.getTakeDays() != null) {
             plan.setTakeDays(dto.getTakeDays());
         }
-        if (dto.getNotes() != null) {
-            plan.setNotes(dto.getNotes());
+        if (dto.getPlanRemark() != null) {
+            plan.setPlanRemark(dto.getPlanRemark());
         }
         if (dto.getStatus() != null) {
             plan.setStatus(dto.getStatus());
@@ -264,15 +250,13 @@ public class MedicinePlanController {
         return MedicinePlanVO.builder()
                 .id(plan.getId())
                 .userId(plan.getUserId())
-                .familyId(plan.getFamilyId())
                 .medicineId(plan.getMedicineId())
                 .dosage(plan.getDosage())
-                .frequency(plan.getFrequency())
-                .remindTimes(plan.getRemindTimes())
+                .remindSlots(plan.getRemindSlots())
                 .startDate(plan.getStartDate())
                 .endDate(plan.getEndDate())
                 .takeDays(plan.getTakeDays())
-                .notes(plan.getNotes())
+                .planRemark(plan.getPlanRemark())
                 .status(plan.getStatus())
                 .createTime(plan.getCreateTime())
                 .build();

@@ -46,20 +46,15 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | BIGINT | 药品ID（主键） |
+| id | BIGINT | 药品ID |
 | family_id | BIGINT | 所属家庭ID |
 | name | VARCHAR(100) | 药品名称 |
-| specification | VARCHAR(100) | 规格（如 10mg*20片） |
-| manufacturer | VARCHAR(100) | 生产厂家 |
-| dosage_form | VARCHAR(50) | 剂型（片剂/胶囊/液体等） |
-| image_url | VARCHAR(255) | 药品图片URL |
-| instructions | TEXT | 药品说明书 |
-| contraindications | TEXT | 禁忌事项 |
-| side_effects | TEXT | 副作用 |
+| specification | VARCHAR(100) | 规格 |
+| image_url | VARCHAR(500) | 封面图片URL |
 | stock | INT | 库存数量 |
-| stock_unit | VARCHAR(20) | 库存单位（片/粒/瓶） |
-| expire_date | DATE | 过期日期 |
-| storage_location | VARCHAR(100) | 存放位置 |
+| stock_unit | VARCHAR(20) | 库存单位 |
+| expire_date | DATE | 有效期 |
+| usage_notes | TEXT | 用药注意 |
 | deleted | TINYINT | 逻辑删除 |
 | create_time | DATETIME | 创建时间 |
 | update_time | DATETIME | 更新时间 |
@@ -68,18 +63,16 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | BIGINT | 计划ID（主键） |
-| user_id | BIGINT | 使用者ID（受控成员） |
-| family_id | BIGINT | 所属家庭ID |
+| id | BIGINT | 计划ID |
+| user_id | BIGINT | 使用者ID |
 | medicine_id | BIGINT | 药品ID |
-| dosage | VARCHAR(50) | 单次剂量（如 1片） |
-| frequency | VARCHAR(50) | 服药频率（如 每天3次） |
-| remind_times | VARCHAR(100) | 提醒时间点（08:00,12:00,18:00） |
+| dosage | VARCHAR(50) | 单次剂量 |
+| remind_slots | VARCHAR(50) | 提醒时段（早,中,晚） |
 | start_date | DATE | 开始日期 |
-| end_date | DATE | 结束日期（NULL表示长期） |
+| end_date | DATE | 结束日期（可空=长期） |
 | take_days | VARCHAR(20) | 服药星期（1-7，逗号分隔） |
-| notes | VARCHAR(255) | 备注（饭后服用等） |
-| status | TINYINT | 状态：0-停用 1-启用 |
+| plan_remark | VARCHAR(255) | 用药注意 |
+| status | TINYINT | 状态 0-停用 1-启用 |
 | deleted | TINYINT | 逻辑删除 |
 | create_time | DATETIME | 创建时间 |
 | update_time | DATETIME | 更新时间 |
@@ -88,16 +81,15 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | BIGINT | 记录ID（主键） |
+| id | BIGINT | 记录ID |
 | plan_id | BIGINT | 计划ID |
 | user_id | BIGINT | 用户ID |
-| family_id | BIGINT | 所属家庭ID |
 | medicine_id | BIGINT | 药品ID |
-| scheduled_date | DATE | 应服药日期 |
-| scheduled_time | TIME | 应服药时间 |
-| actual_time | DATETIME | 实际服药时间 |
-| status | TINYINT | 状态：0-未服 1-已服 2-跳过 |
-| notes | VARCHAR(255) | 备注 |
+| scheduled_date | DATE | 应服日期 |
+| scheduled_time | TIME | 应服时间 |
+| actual_time | DATETIME | 实际打卡时间 |
+| status | TINYINT | 状态 0-未服 1-已服 2-跳过 |
+| record_remark | VARCHAR(255) | 记录备注 |
 | deleted | TINYINT | 逻辑删除 |
 | create_time | DATETIME | 创建时间 |
 | update_time | DATETIME | 更新时间 |
@@ -158,4 +150,92 @@ med_plan   1 ──── N med_record
 
 ```bash
 mysql -h HOST -u USER -p DATABASE < fcg-server/src/main/resources/sql/init.sql
+```
+
+---
+
+## 3. 药品模块实施规范
+
+### 3.1 OCR识药流程
+
+```
+前端                                    后端
+───────────                          ───────────
+1. 用户拍照/上传多张图                  │
+2. 压缩每张图 (1024px, 80%)            │
+3. POST /api/medicine/ocr ←───────── MultipartFile[] files
+4. 接收识别结果                      │
+   {name, specification, expireDate, usageNotes}
+5. 第一张图显示为封面预览（本地base64）
+6. 用户可点击预览图替换
+7. 确认提交 → 上传封面到OSS → 保存数据
+```
+
+### 3.2 API接口
+
+| 功能 | 接口 | 方法 | 参数 |
+|------|------|------|------|
+| OCR识别 | `/api/medicine/ocr` | POST | MultipartFile[] files |
+| 药品列表 | `/api/medicine/list` | GET | page, size |
+| 新增药品 | `/api/medicine` | POST | {name, specification, imageUrl, stock, stockUnit, expireDate, usageNotes} |
+| 更新药品 | `/api/medicine/{id}` | PUT | 同上 |
+| 删除药品 | `/api/medicine/{id}` | DELETE | - |
+| OSS上传 | `/api/oss/upload?dir=medicine` | POST | MultipartFile file |
+
+### 3.3 前端工具函数
+
+```javascript
+// 图片压缩 utils/image.js
+import { compressImage, fileToBase64 } from '@/utils/image'
+
+// OCR识别 api.js
+import { recognizeMedicine, uploadFile, createMedicine } from '@/utils/api'
+
+// 流程示例
+const onOcrSelect = async (files) => {
+  // 1. 压缩所有图
+  const compressed = await Promise.all(files.map(f => compressImage(f)))
+  
+  // 2. OCR识别
+  const res = await recognizeMedicine(compressed)
+  const parsed = res.data.parsed
+  
+  // 3. 填充表单
+  form.name = parsed.name
+  form.specification = parsed.specification
+  form.expireDate = parsed.expireDate
+  form.usageNotes = parsed.usageNotes
+  
+  // 4. 第一张图预览
+  previewUrl.value = await fileToBase64(compressed[0])
+}
+
+const onSubmit = async () => {
+  // 1. 上传封面到OSS
+  const imageUrl = await uploadFile(previewFile.value, 'medicine')
+  
+  // 2. 保存药品
+  await createMedicine({ ...form, imageUrl })
+}
+```
+
+### 3.4 添加药品弹窗交互
+
+```
+┌─────────────────────────────────────┐
+│  📷 智能OCR            [上传/拍照]    │ ← 点击触发多图选择
+│  ┌─────────────────────────────┐    │
+│  │     封面预览图        │    │ ← 可点击替换
+│  │     (本地base64)     │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  名称: [自动填充/手动输入]          │
+│  规格: [自动填充/手动输入]        │
+│  库存: [手动输入]                │
+│  单位: [片/粒/ml] 手动选择      │
+│  有效期: [自动填充/手动选择]      │
+│  用药注意: [自动填充/手动输入]    │
+│                                     │
+│  [取消]              [确认添加]  │
+└─────────────────────────────────────┘
 ```

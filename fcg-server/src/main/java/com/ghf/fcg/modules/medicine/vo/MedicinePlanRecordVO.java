@@ -3,9 +3,9 @@ package com.ghf.fcg.modules.medicine.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Data
 @Builder
@@ -17,17 +17,15 @@ public class MedicinePlanRecordVO {
     private Long medicineId;
     private String medicineName;
     private LocalDate scheduledDate;
-    private LocalTime scheduledTime;
+    private String slotName;
     private LocalDateTime actualTime;
     private Integer recordStatus;
-    private String recordNotes;
 
-    private String planDosage;
-    private String planFrequency;
-    private String planRemindTimes;
+    private BigDecimal planDosage;
+    private String planRemindSlots;
     private LocalDate planStartDate;
     private LocalDate planEndDate;
     private String planTakeDays;
-    private String planNotes;
+    private String planRemark;
     private Integer planStatus;
 }

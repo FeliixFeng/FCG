@@ -3,14 +3,7 @@
  * 使用 Canvas 压缩图片到指定尺寸和质量
  */
 
-/**
- * 压缩图片
- * @param {File} file - 原始图片文件
- * @param {number} maxSize - 最大边长（默认 200）
- * @param {number} quality - 质量 0-1（默认 0.8）
- * @returns {Promise<File>} 压缩后的图片文件
- */
-export function compressImage(file, maxSize = 200, quality = 0.8) {
+export function compressImage(file, maxSize = 1024, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {

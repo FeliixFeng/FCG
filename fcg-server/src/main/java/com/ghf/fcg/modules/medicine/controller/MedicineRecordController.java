@@ -20,7 +20,6 @@ import com.ghf.fcg.modules.medicine.vo.MedicineRecordVO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
@@ -49,21 +48,15 @@ public class MedicineRecordController {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
-        MedicinePlan plan = validatePlan(familyId, dto.getPlanId());
-        validateFamilyUser(familyId, dto.getUserId());
-        validateFamilyMedicine(familyId, dto.getMedicineId());
-        ensurePlanRelation(plan, dto.getUserId(), dto.getMedicineId());
-
         MedicineRecord record = new MedicineRecord();
         record.setPlanId(dto.getPlanId());
         record.setUserId(dto.getUserId());
-        record.setFamilyId(familyId);
         record.setMedicineId(dto.getMedicineId());
         record.setScheduledDate(dto.getScheduledDate());
-        record.setScheduledTime(dto.getScheduledTime());
+        record.setSlotName(dto.getSlotName());
         record.setActualTime(dto.getActualTime());
         record.setStatus(dto.getStatus() == null ? MedicineRecord.STATUS_PENDING : dto.getStatus());
-        record.setNotes(dto.getNotes());
+        record.setRecordRemark(dto.getRecordRemark());
 
         recordService.save(record);
         return Result.success(record.getId());
@@ -75,8 +68,8 @@ public class MedicineRecordController {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
 
-        MedicineRecord record = getFamilyRecord(id, familyId);
-        applyRecordUpdate(record, familyId, dto);
+        MedicineRecord record = getRecord(id);
+        applyRecordUpdate(record, dto);
         recordService.updateById(record);
         return Result.success();
     }
@@ -84,10 +77,7 @@ public class MedicineRecordController {
     @DeleteMapping("/{id}")
     @Operation(summary = "删除服药记录")
     public Result<Void> delete(@PathVariable Long id) {
-        Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
-
-        MedicineRecord record = getFamilyRecord(id, familyId);
+        MedicineRecord record = getRecord(id);
         recordService.removeById(record.getId());
         return Result.success();
     }
@@ -95,10 +85,7 @@ public class MedicineRecordController {
     @GetMapping("/{id}")
     @Operation(summary = "服药记录详情")
     public Result<MedicineRecordVO> get(@PathVariable Long id) {
-        Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
-
-        MedicineRecord record = getFamilyRecord(id, familyId);
+        MedicineRecord record = getRecord(id);
         return Result.success(toRecordVO(record));
     }
 
@@ -111,10 +98,9 @@ public class MedicineRecordController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
             @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
 
         LambdaQueryWrapper<MedicineRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MedicineRecord::getFamilyId, familyId);
+        wrapper.eq(MedicineRecord::getUserId, currentUserId);
         if (userId != null) {
             wrapper.eq(MedicineRecord::getUserId, userId);
         }
@@ -127,8 +113,7 @@ public class MedicineRecordController {
         if (scheduledDate != null) {
             wrapper.eq(MedicineRecord::getScheduledDate, scheduledDate);
         }
-        wrapper.orderByDesc(MedicineRecord::getScheduledDate)
-                .orderByDesc(MedicineRecord::getScheduledTime);
+        wrapper.orderByDesc(MedicineRecord::getScheduledDate);
 
         Page<MedicineRecord> pageResult = recordService.page(new Page<>(query.getPage(), query.getSize()), wrapper);
         return Result.success(PageResult.of(pageResult,
@@ -143,64 +128,20 @@ public class MedicineRecordController {
         return user.getFamilyId();
     }
 
-    private void validateFamilyUser(Long familyId, Long userId) {
-        User user = userService.getById(userId);
-        if (user == null || !familyId.equals(user.getFamilyId())) {
-            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
-        }
-    }
-
-    private void validateFamilyMedicine(Long familyId, Long medicineId) {
-        Medicine medicine = medicineService.getById(medicineId);
-        if (medicine == null || !familyId.equals(medicine.getFamilyId())) {
-            throw new BusinessException(MessageConstant.MEDICINE_FAMILY_MISMATCH);
-        }
-    }
-
-    private MedicinePlan validatePlan(Long familyId, Long planId) {
-        MedicinePlan plan = planService.getById(planId);
-        if (plan == null || !familyId.equals(plan.getFamilyId())) {
-            throw new BusinessException(MessageConstant.PLAN_FAMILY_MISMATCH);
-        }
-        return plan;
-    }
-
-    private void ensurePlanRelation(MedicinePlan plan, Long userId, Long medicineId) {
-        if (!plan.getUserId().equals(userId)) {
-            throw new BusinessException(MessageConstant.RECORD_PLAN_USER_MISMATCH);
-        }
-        if (!plan.getMedicineId().equals(medicineId)) {
-            throw new BusinessException(MessageConstant.RECORD_PLAN_MEDICINE_MISMATCH);
-        }
-    }
-
-    private MedicineRecord getFamilyRecord(Long id, Long familyId) {
+    private MedicineRecord getRecord(Long id) {
         MedicineRecord record = recordService.getById(id);
-        if (record == null || !familyId.equals(record.getFamilyId())) {
+        if (record == null) {
             throw new BusinessException(MessageConstant.RECORD_NOT_EXIST);
         }
         return record;
     }
 
-    private void applyRecordUpdate(MedicineRecord record, Long familyId, MedicineRecordUpdateDTO dto) {
-        Long targetPlanId = dto.getPlanId() == null ? record.getPlanId() : dto.getPlanId();
-        Long targetUserId = dto.getUserId() == null ? record.getUserId() : dto.getUserId();
-        Long targetMedicineId = dto.getMedicineId() == null ? record.getMedicineId() : dto.getMedicineId();
-
-        MedicinePlan plan = validatePlan(familyId, targetPlanId);
-        validateFamilyUser(familyId, targetUserId);
-        validateFamilyMedicine(familyId, targetMedicineId);
-        ensurePlanRelation(plan, targetUserId, targetMedicineId);
-
-        record.setPlanId(targetPlanId);
-        record.setUserId(targetUserId);
-        record.setMedicineId(targetMedicineId);
-
+    private void applyRecordUpdate(MedicineRecord record, MedicineRecordUpdateDTO dto) {
         if (dto.getScheduledDate() != null) {
             record.setScheduledDate(dto.getScheduledDate());
         }
-        if (dto.getScheduledTime() != null) {
-            record.setScheduledTime(dto.getScheduledTime());
+        if (dto.getSlotName() != null) {
+            record.setSlotName(dto.getSlotName());
         }
         if (dto.getActualTime() != null) {
             record.setActualTime(dto.getActualTime());
@@ -208,8 +149,8 @@ public class MedicineRecordController {
         if (dto.getStatus() != null) {
             record.setStatus(dto.getStatus());
         }
-        if (dto.getNotes() != null) {
-            record.setNotes(dto.getNotes());
+        if (dto.getRecordRemark() != null) {
+            record.setRecordRemark(dto.getRecordRemark());
         }
     }
 
@@ -218,13 +159,12 @@ public class MedicineRecordController {
                 .id(record.getId())
                 .planId(record.getPlanId())
                 .userId(record.getUserId())
-                .familyId(record.getFamilyId())
                 .medicineId(record.getMedicineId())
                 .scheduledDate(record.getScheduledDate())
-                .scheduledTime(record.getScheduledTime())
+                .slotName(record.getSlotName())
                 .actualTime(record.getActualTime())
                 .status(record.getStatus())
-                .notes(record.getNotes())
+                .recordRemark(record.getRecordRemark())
                 .createTime(record.getCreateTime())
                 .build();
     }
