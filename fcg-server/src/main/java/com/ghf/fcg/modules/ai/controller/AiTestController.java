@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -47,7 +49,8 @@ public class AiTestController {
             log.info("Image converted to base64, length: {}", base64.length());
             
             // 调用识别
-            String aiResponse = aiService.recognizeMedicineImage(base64);
+            List<String> imageList = Collections.singletonList(base64);
+            String aiResponse = aiService.recognizeMedicineImage(imageList);
             log.info("AI response: {}", aiResponse);
             
             // 尝试解析

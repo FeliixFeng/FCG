@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -114,11 +115,11 @@ public class MedicineController {
             throw new BusinessException(MessageConstant.PARAM_ERROR);
         }
 
-        MultipartFile file = files[0];
-
-        String imageBase64;
+        List<String> imageBase64List = new ArrayList<>();
         try {
-            imageBase64 = Base64.getEncoder().encodeToString(file.getBytes());
+            for (MultipartFile file : files) {
+                imageBase64List.add(Base64.getEncoder().encodeToString(file.getBytes()));
+            }
         } catch (Exception e) {
             throw new BusinessException("图片读取失败");
         }
@@ -127,7 +128,7 @@ public class MedicineController {
         MedicineOcrParsedVO parsed = null;
         boolean fallback = false;
         try {
-            aiRaw = aiService.recognizeMedicineImage(imageBase64);
+            aiRaw = aiService.recognizeMedicineImage(imageBase64List);
             parsed = aiService.parseMedicineInfo(aiRaw);
         } catch (RuntimeException e) {
             fallback = true;

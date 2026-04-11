@@ -15,6 +15,7 @@ public class MedicineCreateDTO {
     private String name;
 
     @Schema(description = "规格（如 0.3g*20粒）")
+    @NotBlank(message = "规格不能为空")
     private String specification;
 
     @Schema(description = "封面图片URL")
