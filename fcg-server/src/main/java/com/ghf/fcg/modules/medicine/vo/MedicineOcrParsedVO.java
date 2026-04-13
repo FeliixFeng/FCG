@@ -13,5 +13,6 @@ public class MedicineOcrParsedVO {
     private String specification;
     private LocalDate expireDate;
     private String usageNotes;
+    private String indication;
     private String dosage;
 }

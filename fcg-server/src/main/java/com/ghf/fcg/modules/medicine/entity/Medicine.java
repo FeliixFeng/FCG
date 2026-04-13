@@ -29,6 +29,8 @@ public class Medicine {
 
     private String usageNotes;
 
+    private String indication;
+
     @TableLogic
     private Integer deleted;
 

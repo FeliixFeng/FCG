@@ -86,6 +86,7 @@ const planForm = reactive({
 const medicineForm = reactive({
   name: '',
   specification: '',
+  indication: '',
   stock: '',
   stockUnit: '',
   expireDate: '',
@@ -102,7 +103,7 @@ const resetPlanForm = () => {
 
 const resetMedicineForm = () => {
   Object.assign(medicineForm, {
-    name: '', specification: '', stock: '', stockUnit: '', expireDate: '', usageNotes: ''
+    name: '', specification: '', indication: '', stock: '', stockUnit: '', expireDate: '', usageNotes: ''
   })
   previewUrl.value = ''
   coverUrl.value = ''
@@ -178,6 +179,7 @@ const startOcr = async () => {
     if (parsed) {
       if (parsed.name) medicineForm.name = parsed.name
       if (parsed.specification) medicineForm.specification = parsed.specification
+      if (parsed.indication) medicineForm.indication = parsed.indication
       if (parsed.usageNotes) medicineForm.usageNotes = parsed.usageNotes
     }
   } catch (err) {
@@ -258,6 +260,7 @@ const submitMedicine = async () => {
         return d
       })(),
       usageNotes: medicineForm.usageNotes || null,
+      indication: medicineForm.indication || null,
       imageUrl: null
     })
     showAddMedicine.value = false
@@ -418,6 +421,7 @@ onMounted(() => load())
         <div class="form">
           <input v-model="medicineForm.name" class="input" placeholder="药品名称 *" />
           <input v-model="medicineForm.specification" class="input" placeholder="规格（如 0.3g*20粒）" />
+          <input v-model="medicineForm.indication" class="input" placeholder="适应症" />
           <div class="form-row">
             <input v-model="medicineForm.stock" class="input" type="number" placeholder="库存数量" />
             <select v-model="medicineForm.stockUnit" class="input">
@@ -426,7 +430,7 @@ onMounted(() => load())
             </select>
           </div>
           <input v-model="medicineForm.expireDate" class="input" placeholder="有效期(如2026-12)" />
-          <textarea v-model="medicineForm.usageNotes" class="input textarea" placeholder="用法用量/注意事项(可参考OCR识别结果)" rows="2" />
+          <textarea v-model="medicineForm.usageNotes" class="input textarea" placeholder="用法用量/注意事项" rows="2" />
         </div>
 
         <p v-if="formError" class="error">{{ formError }}</p>

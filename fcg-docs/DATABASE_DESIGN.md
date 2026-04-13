@@ -54,10 +54,31 @@
 | stock | INT | 库存数量 |
 | stock_unit | VARCHAR(20) | 库存单位 |
 | expire_date | DATE | 有效期 |
-| usage_notes | TEXT | 用药注意 |
+| usage_notes | TEXT | 用法用量 |
+| indication | VARCHAR(500) | 适应症 |
 | deleted | TINYINT | 逻辑删除 |
 | create_time | DATETIME | 创建时间 |
 | update_time | DATETIME | 更新时间 |
+
+```sql
+CREATE TABLE med_medicine (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    family_id BIGINT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    specification VARCHAR(100) NOT NULL,
+    image_url VARCHAR(500),
+    stock INT,
+    stock_unit VARCHAR(20),
+    expire_date DATE,
+    usage_notes TEXT,
+    indication VARCHAR(500),
+    deleted TINYINT DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_family_id (family_id),
+    INDEX idx_deleted (deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
 #### med_plan（用药计划表）
 
@@ -177,7 +198,7 @@ mysql -h HOST -u USER -p DATABASE < fcg-server/src/main/resources/sql/init.sql
 |------|------|------|------|
 | OCR识别 | `/api/medicine/ocr` | POST | MultipartFile[] files |
 | 药品列表 | `/api/medicine/list` | GET | page, size |
-| 新增药品 | `/api/medicine` | POST | {name, specification, imageUrl, stock, stockUnit, expireDate, usageNotes} |
+| 新增药品 | `/api/medicine` | POST | {name, specification, imageUrl, stock, stockUnit, expireDate, usageNotes, indication} |
 | 更新药品 | `/api/medicine/{id}` | PUT | 同上 |
 | 删除药品 | `/api/medicine/{id}` | DELETE | - |
 | OSS上传 | `/api/oss/upload?dir=medicine` | POST | MultipartFile file |
@@ -200,11 +221,12 @@ const onOcrSelect = async (files) => {
   const res = await recognizeMedicine(compressed)
   const parsed = res.data.parsed
   
-  // 3. 填充表单
-  form.name = parsed.name
-  form.specification = parsed.specification
-  form.expireDate = parsed.expireDate
-  form.usageNotes = parsed.usageNotes
+   // 3. 填充表单
+   form.name = parsed.name
+   form.specification = parsed.specification
+   form.expireDate = parsed.expireDate
+   form.usageNotes = parsed.usageNotes
+   form.indication = parsed.indication
   
   // 4. 第一张图预览
   previewUrl.value = await fileToBase64(compressed[0])
@@ -231,10 +253,11 @@ const onSubmit = async () => {
 │                                     │
 │  名称: [自动填充/手动输入]          │
 │  规格: [自动填充/手动输入]        │
+│  适应症: [自动填充/手动输入]       │ ← 新增
 │  库存: [手动输入]                │
 │  单位: [片/粒/ml] 手动选择      │
 │  有效期: [自动填充/手动选择]      │
-│  用药注意: [自动填充/手动输入]    │
+│  用法用量: [自动填充/手动输入]    │
 │                                     │
 │  [取消]              [确认添加]  │
 └─────────────────────────────────────┘
