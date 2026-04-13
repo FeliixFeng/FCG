@@ -30,4 +30,7 @@ public class MedicineUpdateDTO {
 
     @Schema(description = "用药注意")
     private String usageNotes;
+
+    @Schema(description = "适应症")
+    private String indication;
 }

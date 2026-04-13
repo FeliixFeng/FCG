@@ -56,6 +56,7 @@ public class MedicineController {
         medicine.setStockUnit(dto.getStockUnit());
         medicine.setExpireDate(dto.getExpireDate());
         medicine.setUsageNotes(dto.getUsageNotes());
+        medicine.setIndication(dto.getIndication());
 
         medicineService.save(medicine);
         return Result.success(medicine.getId());
@@ -183,6 +184,9 @@ public class MedicineController {
         if (dto.getUsageNotes() != null) {
             medicine.setUsageNotes(dto.getUsageNotes());
         }
+        if (dto.getIndication() != null) {
+            medicine.setIndication(dto.getIndication());
+        }
     }
 
     private MedicineVO toMedicineVO(Medicine medicine) {
@@ -196,6 +200,7 @@ public class MedicineController {
                 .stockUnit(medicine.getStockUnit())
                 .expireDate(medicine.getExpireDate())
                 .usageNotes(medicine.getUsageNotes())
+                .indication(medicine.getIndication())
                 .createTime(medicine.getCreateTime())
                 .build();
     }

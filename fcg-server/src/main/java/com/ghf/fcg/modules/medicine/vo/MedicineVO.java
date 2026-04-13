@@ -19,5 +19,6 @@ public class MedicineVO {
     private String stockUnit;
     private LocalDate expireDate;
     private String usageNotes;
+    private String indication;
     private LocalDateTime createTime;
 }
