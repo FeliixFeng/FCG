@@ -26,7 +26,7 @@
 - [x] MedicinePlan Controller：增删改查
 - [x] MedicineRecord Controller：增删改查
 - [x] 简单联表查询：计划 + 记录
-- [x] OCR 识别接口（药品图片识别）
+- [x] OCR 识别接口（药品图片识别，已升级为智谱AI GLM-4.6V-FlashX 多模态模型）
 - [x] OSS 上传接口
 
 ## 里程碑 4：健康模块基础 API

@@ -57,12 +57,12 @@
 - **样式处理**：Tailwind CSS
 
 ### 智能能力
-- **OCR**：药品包装/说明书文字识别
-- **LLM**：大语言模型 API (用药建议与禁忌分析)
+- **多模态AI识别**：智谱AI GLM-4.6V-FlashX 模型，拍照即可识别药品信息（名称、规格、有效期、用法用量等）
+- **AI 助手**：大语言模型 API，提供用药建议与禁忌分析
 
 ## 关键接口
 
-- **OCR + AI 识别**：`POST /api/medicine/ocr`（multipart/form-data，字段 `files`，返回原始OCR与结构化药品信息）
+- **药品图片识别**：`POST /api/medicine/ocr`（multipart/form-data，字段 `file`，返回结构化药品信息）
 - **OSS 上传**：`POST /api/oss/upload?dir=medicine`（multipart/form-data，字段 `file`）
 
 ## 项目结构

@@ -25,6 +25,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/family/login",    // 家庭账号登录
                         "/api/family/register", // 家庭注册
+                        "/api/ai/test/**",      // AI测试接口（开发调试用）
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
