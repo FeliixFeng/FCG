@@ -63,7 +63,7 @@ const handleLogout = () => {
 
 // 进入管理界面（仅管理员）
 const handleEnterAdmin = () => {
-  router.push({ name: 'admin-members' })
+  router.push({ name: 'admin' })
 }
 </script>
 

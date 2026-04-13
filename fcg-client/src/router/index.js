@@ -10,6 +10,7 @@ const MedicineHome = () => import('../views/MedicineHome.vue')
 const HealthHome = () => import('../views/HealthHome.vue')
 const ProfileHome = () => import('../views/ProfileHome.vue')
 const AdminLayout = () => import('../components/common/AdminLayout.vue')
+const AdminDashboard = () => import('../views/AdminHome.vue')
 const AdminMembers = () => import('../views/admin/AdminMembers.vue')
 const AdminMedicines = () => import('../views/admin/AdminMedicines.vue')
 const AdminSystem = () => import('../views/admin/AdminSystem.vue')
@@ -37,7 +38,7 @@ const router = createRouter({
       component: AdminLayout,
       meta: { requireMember: true, requireAdmin: true },
       children: [
-        { path: '', redirect: '/admin/members' },
+        { path: '', name: 'admin', component: AdminDashboard },
         { path: 'members', name: 'admin-members', component: AdminMembers },
         { path: 'medicines', name: 'admin-medicines', component: AdminMedicines },
         { path: 'system', name: 'admin-system', component: AdminSystem },
@@ -51,6 +52,11 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
+
+  // 初始化时清理残留状态，防止"游客"状态
+  if (to.name === 'landing') {
+    userStore.initCleanup()
+  }
 
   // 调试信息
   console.log('[Router Guard]', {

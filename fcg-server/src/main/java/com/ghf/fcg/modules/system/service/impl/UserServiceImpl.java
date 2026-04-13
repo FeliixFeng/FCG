@@ -3,6 +3,7 @@ package com.ghf.fcg.modules.system.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.exception.BusinessException;
+import com.ghf.fcg.modules.system.dto.MemberUpdateDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.mapper.UserMapper;
@@ -63,6 +64,72 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             throw new BusinessException(MessageConstant.USER_NOT_EXIST);
         }
         user.setCareMode(mode);
+        this.updateById(user);
+    }
+
+    @Override
+    public UserVO getMemberDetail(Long memberId) {
+        User user = this.getById(memberId);
+        if (user == null) {
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
+        }
+        return UserVO.builder()
+                .id(user.getId())
+                .nickname(user.getNickname())
+                .phone(user.getPhone())
+                .avatar(user.getAvatar())
+                .role(user.getRole())
+                .familyId(user.getFamilyId())
+                .relation(user.getRelation())
+                .careMode(user.getCareMode())
+                .createTime(user.getCreateTime())
+                .build();
+    }
+
+    @Override
+    public void updateMember(Long memberId, MemberUpdateDTO updateDTO) {
+        User user = this.getById(memberId);
+        if (user == null) {
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
+        }
+        user.setNickname(updateDTO.getNickname());
+        if (updateDTO.getPhone() != null) {
+            user.setPhone(updateDTO.getPhone());
+        }
+        if (updateDTO.getAvatar() != null) {
+            user.setAvatar(updateDTO.getAvatar());
+        }
+        if (updateDTO.getRelation() != null) {
+            user.setRelation(updateDTO.getRelation());
+        }
+        if (updateDTO.getRole() != null) {
+            if (updateDTO.getRole() < 0 || updateDTO.getRole() > 2) {
+                throw new BusinessException("角色值无效");
+            }
+            user.setRole(updateDTO.getRole());
+        }
+        this.updateById(user);
+    }
+
+    @Override
+    public void deleteMember(Long memberId) {
+        User user = this.getById(memberId);
+        if (user == null) {
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
+        }
+        this.removeById(memberId);
+    }
+
+    @Override
+    public void updateMemberRole(Long memberId, Integer role) {
+        User user = this.getById(memberId);
+        if (user == null) {
+            throw new BusinessException(MessageConstant.USER_NOT_EXIST);
+        }
+        if (role < 0 || role > 2) {
+            throw new BusinessException("角色值无效");
+        }
+        user.setRole(role);
         this.updateById(user);
     }
 }

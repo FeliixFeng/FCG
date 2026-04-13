@@ -4,6 +4,7 @@ import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
+import com.ghf.fcg.modules.system.dto.MemberUpdateDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.service.IUserService;
 import com.ghf.fcg.modules.system.vo.UserVO;
@@ -53,6 +54,37 @@ public class UserController {
             throw new BusinessException(MessageConstant.NEED_MEMBER_TOKEN);
         }
         userService.switchCareMode(memberId, mode);
+        return Result.success();
+    }
+
+    /** 获取成员详情（管理员） */
+    @GetMapping("/{userId}")
+    @Operation(summary = "获取成员详情")
+    public Result<UserVO> getMemberDetail(@PathVariable Long userId) {
+        return Result.success(userService.getMemberDetail(userId));
+    }
+
+    /** 更新成员信息（管理员） */
+    @PutMapping("/{userId}")
+    @Operation(summary = "更新成员信息")
+    public Result<Void> updateMember(@PathVariable Long userId, @RequestBody MemberUpdateDTO updateDTO) {
+        userService.updateMember(userId, updateDTO);
+        return Result.success();
+    }
+
+    /** 删除成员（管理员） */
+    @DeleteMapping("/{userId}")
+    @Operation(summary = "删除成员")
+    public Result<Void> deleteMember(@PathVariable Long userId) {
+        userService.deleteMember(userId);
+        return Result.success();
+    }
+
+    /** 修改成员角色（管理员） */
+    @PutMapping("/{userId}/role")
+    @Operation(summary = "修改成员角色")
+    public Result<Void> updateMemberRole(@PathVariable Long userId, @RequestParam Integer role) {
+        userService.updateMemberRole(userId, role);
         return Result.success();
     }
 }

@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import AvatarIcon from './AvatarIcon.vue'
+import { HomeFilled, FirstAidKit, Monitor, UserFilled, Setting } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -49,21 +50,21 @@ const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 const navItems = computed(() => {
   const role = userStore.member?.role
   const baseItems = [
-    { name: 'dashboard', label: '首页', icon: homeIcon() },
-    { name: 'medicine', label: '药品', icon: medicineIcon() },
-    { name: 'health',   label: '健康', icon: healthIcon() },
+    { name: 'dashboard', label: '首页', icon: 'HomeFilled' },
+    { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
+    { name: 'health',   label: '健康', icon: 'Monitor' },
   ]
   
   // 受控成员（role=2）无"家庭"但有"我的"
   if (role === 2) {
-    return [...baseItems, { name: 'profile', label: '我的', icon: profileIcon() }]
+    return [...baseItems, { name: 'profile', label: '我的', icon: 'User' }]
   }
   
   // 普通成员和管理员都有"家庭"和"我的"
   return [
     ...baseItems,
-    { name: 'family', label: '家庭', icon: familyIcon() },
-    { name: 'profile', label: '我的', icon: profileIcon() }
+    { name: 'family', label: '家庭', icon: 'House' },
+    { name: 'profile', label: '我的', icon: 'User' }
   ]
 })
 
@@ -71,21 +72,21 @@ const navItems = computed(() => {
 const mobileNavItems = computed(() => {
   const role = userStore.member?.role
   const baseItems = [
-    { name: 'dashboard', label: '首页', icon: homeIcon() },
-    { name: 'medicine', label: '药品', icon: medicineIcon() },
-    { name: 'health',   label: '健康', icon: healthIcon() },
+    { name: 'dashboard', label: '首页', icon: 'HomeFilled' },
+    { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
+    { name: 'health',   label: '健康', icon: 'Monitor' },
   ]
   
   // 受控成员（role=2）：4个Tab（无"家庭"）
   if (role === 2) {
-    return [...baseItems, { name: 'profile', label: '我的', icon: profileIcon() }]
+    return [...baseItems, { name: 'profile', label: '我的', icon: 'User' }]
   }
   
   // 管理员/普通成员：5个Tab
   return [
     ...baseItems,
-    { name: 'family', label: '家庭', icon: familyIcon() },
-    { name: 'profile', label: '我的', icon: profileIcon() }
+    { name: 'family', label: '家庭', icon: 'House' },
+    { name: 'profile', label: '我的', icon: 'User' }
   ]
 })
 
@@ -102,13 +103,6 @@ const handleUserCommand = (cmd) => {
     router.replace({ name: 'landing' })
   }
 }
-
-// SVG icon helpers
-function homeIcon() { return 'home' }
-function medicineIcon() { return 'medicine' }
-function healthIcon() { return 'health' }
-function familyIcon() { return 'family' }
-function profileIcon() { return 'profile' }
 </script>
 
 <template>
@@ -146,33 +140,7 @@ function profileIcon() { return 'profile' }
             :class="{ active: isActive(item.name) }"
             @click="go(item.name)"
           >
-            <span class="nav-icon">
-              <!-- home -->
-              <svg v-if="item.icon === 'home'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-              <!-- medicine -->
-              <svg v-else-if="item.icon === 'medicine'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-              </svg>
-              <!-- health -->
-              <svg v-else-if="item.icon === 'health'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-              <!-- family -->
-              <svg v-else-if="item.icon === 'family'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              <!-- profile -->
-              <svg v-else-if="item.icon === 'profile'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-            </span>
+            <component :is="item.icon" class="nav-icon" />
             {{ item.label }}
           </button>
         </nav>
@@ -248,26 +216,7 @@ function profileIcon() { return 'profile' }
         @click="go(item.name)"
       >
         <span class="tab-icon">
-          <svg v-if="item.icon === 'home'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <svg v-else-if="item.icon === 'medicine'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-          </svg>
-          <svg v-else-if="item.icon === 'health'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-          <svg v-else-if="item.icon === 'family'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          <svg v-else-if="item.icon === 'profile'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
+          <component :is="item.icon" />
         </span>
         <span class="tab-label">{{ item.label }}</span>
       </button>
@@ -428,7 +377,13 @@ function profileIcon() { return 'profile' }
 .nav-icon {
   display: flex;
   align-items: center;
+  width: 16px;
+  height: 16px;
   opacity: 0.8;
+}
+
+.nav-link.active .nav-icon {
+  opacity: 1;
 }
 
 .nav-link.active .nav-icon {
@@ -527,6 +482,11 @@ function profileIcon() { return 'profile' }
   justify-content: center;
 }
 
+.tab-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
 .tab-label {
   font-size: 0.68rem;
   font-weight: 500;
@@ -538,6 +498,11 @@ function profileIcon() { return 'profile' }
 }
 
 .bottom-bar.care-mode .tab-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.bottom-bar.care-mode .tab-icon {
   width: 28px;
   height: 28px;
 }
