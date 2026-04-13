@@ -59,6 +59,18 @@ POST /api/family/switch-member/{memberId} → 成员级 token
 
 初始化脚本：`fcg-server/src/main/resources/sql/init.sql`
 
+### 药品表设计（2025-04）
+- 字段：name, specification, image_url, stock, stock_unit, expire_date, usage_notes
+- OCR 提取：name, specification, expire_date, usage_notes
+
+### 计划表设计（2025-04）
+- 字段：user_id, medicine_id, dosage, remind_slots, start_date, end_date, take_days, plan_remark, status
+- remind_slots 时段化（如 "早,中,晚"）
+
+### 记录表设计（2025-04）
+- 字段：plan_id, user_id, medicine_id, scheduled_date, slot_name, actual_time, status, record_remark
+- slot_name 时段化（如 "早", "中", "晚", "睡前"）
+
 测试账号：
 - 家庭账号：`zhangfamily` / `test123`
 - 家庭账号：`lifamily` / `test123`

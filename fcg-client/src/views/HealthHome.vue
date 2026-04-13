@@ -199,6 +199,86 @@ const getRiskLevelInfo = (level) => {
   return map[level] || map[0]
 }
 
+// 根据体征值判断状态颜色（正常/警告/危险）
+const getVitalStatusColor = (type, value, value2) => {
+  // 血压: 收缩压/舒张压
+  if (type === 1) {
+    const sys = value
+    const dia = value2
+    // 高血压危象或低血压
+    if ((sys >= 180 || sys < 90) || (dia >= 120 || dia < 60)) {
+      return '#e74c3c' // 危险-红色
+    }
+    // 正常: 收缩压90-140, 舒张压60-90
+    if (sys >= 90 && sys <= 140 && dia >= 60 && dia <= 90) {
+      return '#27ae60' // 正常-绿色
+    }
+    return '#f39c12' // 警告-橙色
+  }
+  
+  // 血糖: value可能是对象{fasting, postMeal}或字符串
+  if (type === 2) {
+    // 兼容对象格式
+    const fastingVal = typeof value === 'object' ? value?.fasting : value
+    const postVal = typeof value === 'object' ? value?.postMeal : null
+    
+    // 检查任一值
+    const check = (v) => {
+      if (v == null) return null
+      // 危象: <2.2 或 >27.8
+      if (v < 2.2 || v > 27.8) return '#e74c3c'
+      // 空腹正常: 3.9-6.1, 餐后正常: <7.8
+      const isFasting = v <= 6.1
+      const isPost = v < 7.8
+      if (isFasting || isPost) return '#27ae60'
+      return '#f39c12'
+    }
+    
+    const fResult = check(fastingVal)
+    const pResult = check(postVal)
+    if (fResult) return fResult
+    if (pResult) return pResult
+    return null
+  }
+  
+  // 体重: 简单判断， BMI 需要身高数据暂不实现
+  // 成人正常BMI: 18.5-24，这里简化处理
+  if (type === 3) {
+    if (value == null) return null
+    // 假设正常范围40-100kg
+    if (value >= 40 && value <= 100) {
+      return '#27ae60'
+    }
+    return '#f39c12'
+  }
+  
+  return null
+}
+
+// 获取体征卡片的边框颜色
+const getVitalBorderColor = (type, todayData) => {
+  if (!todayData || todayData.length === 0) return null
+  
+  if (type === 1) {
+    const bp = todayData.find(v => v.type === 1)
+    if (!bp) return null
+    return getVitalStatusColor(1, bp.valueSystolic, bp.valueDiastolic)
+  }
+  if (type === 2) {
+    const fasting = todayData.find(v => v.type === 2 && v.measurePoint === 1)
+    const postMeal = todayData.find(v => v.type === 2 && v.measurePoint === 2)
+    const val = fasting?.value != null ? fasting.value : (postMeal?.value != null ? postMeal.value : null)
+    if (val == null) return null
+    return getVitalStatusColor(2, val)
+  }
+  if (type === 3) {
+    const wt = todayData.find(v => v.type === 3)
+    if (!wt?.value) return null
+    return getVitalStatusColor(3, wt.value)
+  }
+  return null
+}
+
 // 周报详情弹窗
 const reportDetailVisible = ref(false)
 const currentReportDetail = ref(null)
@@ -599,7 +679,7 @@ onUnmounted(() => {
       <section class="today-vitals">
         <h2 class="section-title">今日体征</h2>
         <div class="vital-cards">
-          <div v-for="t in typeOptions" :key="t.value" class="vital-card" @click="openAddDialog(t.value)">
+          <div v-for="t in typeOptions" :key="t.value" class="vital-card" :style="{ borderBottomColor: getVitalBorderColor(t.value, todayVitals) }" @click="openAddDialog(t.value)">
             <div class="card-icon">{{ t.icon }}</div>
             <div class="card-value">
               <template v-if="t.value === 2 && typeof getVitalValue(t.value, todayVitals) === 'object'">
@@ -649,7 +729,7 @@ onUnmounted(() => {
         <!-- 本周周报卡片 -->
         <div class="current-report-section">
           <h3 class="section-subtitle">本周周报</h3>
-          <div v-if="latestReport" class="current-report-card" @click="openReportDetail(latestReport)">
+          <div v-if="latestReport" class="current-report-card" :style="{ '--risk-color': getRiskLevelInfo(latestReport.riskLevel).color }" @click="openReportDetail(latestReport)">
             <div class="card-main">
               <div class="card-period">{{ latestReport.weekStart?.slice(5) }} ~ {{ latestReport.weekEnd?.slice(5) }}</div>
               <div class="card-risk" :style="{ color: getRiskLevelInfo(latestReport.riskLevel).color }">
@@ -682,6 +762,7 @@ onUnmounted(() => {
               v-for="report in reportList.slice(0, 6)" 
               :key="report.id" 
               class="report-mini-card"
+              :style="{ '--risk-color': getRiskLevelInfo(report.riskLevel).color }"
               @click="openReportDetail(report)"
             >
               <div class="mini-period">{{ report.weekStart?.slice(5) }} ~ {{ report.weekEnd?.slice(5) }}</div>
@@ -796,11 +877,12 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   min-height: 100px;
+  border-bottom: 4px solid transparent;
 }
 
 .vital-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(45, 95, 93, 0.12);
+  box-shadow: 0 4px 16px rgba(45, 95, 93, 0.15);
 }
 
 .card-icon {
@@ -989,7 +1071,7 @@ onUnmounted(() => {
   left: 0;
   width: 3px;
   height: 100%;
-  background: linear-gradient(180deg, #7fcfb8 0%, #a8e6cf 100%);
+  background: var(--risk-color, #27ae60);
 }
 
 .current-report-card:hover {
@@ -1206,6 +1288,7 @@ onUnmounted(() => {
   transition: all 0.3s;
   box-shadow: 0 4px 16px rgba(31, 38, 135, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.5);
+  border-left: 3px solid var(--risk-color, #27ae60);
 }
 
 .report-mini-card:hover {

@@ -27,9 +27,9 @@ const router = createRouter({
 
     // 业务页面（需要成员级 token）
     { path: '/dashboard', name: 'dashboard', component: Home, meta: { requireMember: true } },
-    { path: '/family', name: 'family', component: FamilyHome, meta: { requireMember: true } },
     { path: '/medicine', name: 'medicine', component: MedicineHome, meta: { requireMember: true } },
     { path: '/health', name: 'health', component: HealthHome, meta: { requireMember: true } },
+    { path: '/ai', name: 'ai', component: () => import('../views/AiHome.vue'), meta: { requireMember: true } },
     { path: '/profile', name: 'profile', component: ProfileHome, meta: { requireMember: true } },
 
     // 管理界面路由（/admin 子路由）

@@ -11,12 +11,8 @@ public class MedicineOcrParsedVO {
 
     private String name;
     private String specification;
-    private String manufacturer;
-    private String dosageForm;
-    private String instructions;
-    private String contraindications;
-    private String sideEffects;
-    private String usage;
-    private String dosage;
     private LocalDate expireDate;
+    private String usageNotes;
+    private String indication;
+    private String dosage;
 }

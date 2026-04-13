@@ -14,15 +14,10 @@ public class MedicineVO {
     private Long familyId;
     private String name;
     private String specification;
-    private String manufacturer;
-    private String dosageForm;
     private String imageUrl;
-    private String instructions;
-    private String contraindications;
-    private String sideEffects;
     private Integer stock;
     private String stockUnit;
     private LocalDate expireDate;
-    private String storageLocation;
+    private String usageNotes;
     private LocalDateTime createTime;
 }

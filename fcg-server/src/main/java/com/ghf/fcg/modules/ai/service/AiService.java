@@ -83,136 +83,32 @@ public class AiService {
      * @param imageBase64 图片base64编码（不含data:image前缀）
      * @return 结构化的药品信息JSON字符串
      */
-    public String recognizeMedicineImage(String imageBase64) {
+public String recognizeMedicineImage(List<String> imageBase64List) {
         String systemPrompt = """
             你是一个专业的药品信息识别助手。
-            请识别图片中的药品说明书或药盒信息，提取准确的药品信息，并以JSON格式返回。
-            只返回JSON，不要其他内容。
+            请仔细识别所有图片中的药品信息，并综合所有图片的结果。
             """;
 
         String userPrompt = """
-            请识别图片中的药品信息，提取以下字段并返回JSON格式：
-            {
-                "name": "药品名称",
-                "specification": "规格（如500mg）",
-                "manufacturer": "生产厂家",
-                "dosageForm": "剂型（如片剂、胶囊）",
-                "expireDate": "过期日期(YYYY-MM-DD格式，如果看不到则返回null)",
-                "usage": "主要用途/适应症",
-                "contraindications": "禁忌人群/药物",
-                "sideEffects": "常见副作用",
-                "dosage": "用法用量"
-            }
+            请仔细识别图片中的药品信息，从图片中找出以下信息（可能用不同文字描述）：
             
-            如果某项无法识别，请返回null。只返回JSON，不要任何额外说明。
+            1. 药品名称：可能叫"药名"、"药品名称"、"商品名称"、"通用名"等
+            2. 规格：可能叫"规格"、"剂型"、"含量"、"包装"等
+            3. 用法用量：可能叫"用法"、"用量"、"用法用量"、"服用方法"、"使用说明"、"用法说明"、"禁忌"、"注意事项"、"不良反应"等，描述怎么吃、吃多少，有什么禁忌或注意事项
+            4. 适应症：可能叫"适应症"、"适应证"、"主治"、"功效"、"用于治疗"、"适用症"等，描述用于治疗什么病
+            
+            重要：如果图片中找不到适应症，但能识别到药品名称，请根据药品名称推断一个最常见的适应症。
+            如果药品名称也识别不到，适应症返回空字符串""。
+            
+            综合所有图片的结果，取最完整的信息。
+            
+            返回JSON：
+            {"name":"名称","specification":"规格","usageNotes":"用法用量","indication":"适应症"}
+            
+            只返回JSON，不要其他文字。
             """;
 
-        return chatWithImage(systemPrompt, userPrompt, imageBase64);
-    }
-
-    /**
-     * 多模态对话（带图片）
-     */
-    private String chatWithImage(String systemPrompt, String userPrompt, String imageBase64) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", aiProperties.getModel());
-
-        List<Map<String, Object>> messages = new ArrayList<>();
-
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            Map<String, Object> systemMsg = new HashMap<>();
-            systemMsg.put("role", "system");
-            systemMsg.put("content", systemPrompt);
-            messages.add(systemMsg);
-        }
-
-        // 用户消息：包含文本和图片
-        Map<String, Object> userMsg = new HashMap<>();
-        userMsg.put("role", "user");
-        
-        List<Map<String, Object>> contentList = new ArrayList<>();
-        
-        // 文本内容
-        Map<String, Object> textContent = new HashMap<>();
-        textContent.put("type", "text");
-        textContent.put("text", userPrompt);
-        contentList.add(textContent);
-        
-        // 图片内容
-        Map<String, Object> imageContent = new HashMap<>();
-        imageContent.put("type", "image_url");
-        Map<String, String> imageUrl = new HashMap<>();
-        imageUrl.put("url", "data:image/jpeg;base64," + imageBase64);
-        imageContent.put("image_url", imageUrl);
-        contentList.add(imageContent);
-        
-        userMsg.put("content", contentList);
-        messages.add(userMsg);
-
-        requestBody.put("messages", messages);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + aiProperties.getApiKey());
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
-
-        try {
-            String url = aiProperties.getBaseUrl() + "/chat/completions";
-            log.info("Calling AI Vision API: {}, model: {}", url, aiProperties.getModel());
-            
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
-                if (choices != null && !choices.isEmpty()) {
-                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-                    String content = (String) message.get("content");
-                    log.info("AI Vision response received, length: {}", content != null ? content.length() : 0);
-                    return content;
-                }
-            }
-            log.warn("AI Vision response is empty: {}", response.getBody());
-            return null;
-        } catch (Exception e) {
-            log.error("AI Vision call failed: {}", e.getMessage(), e);
-            throw new RuntimeException("AI视觉识别服务调用失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 优化药品OCR结果
-     * 将OCR识别的文字优化为结构化信息
-     */
-    public String optimizeMedicineInfo(String ocrText) {
-        String systemPrompt = """
-            你是一个专业的药品信息提取助手。
-            你的任务是从OCR识别的文本中提取准确的药品信息，并以JSON格式返回。
-            只返回JSON，不要其他内容。
-            """;
-
-        String userPrompt = """
-            以下是OCR识别的药品信息文本：
-            
-            %s
-            
-            请提取以下信息并返回JSON格式：
-            {
-                "name": "药品名称",
-                "specification": "规格",
-                "manufacturer": "生产厂家",
-                "dosageForm": "剂型",
-                "expireDate": "过期日期(YYYY-MM-DD格式，如果看不到则返回null)",
-                "usage": "主要用途/适应症",
-                "contraindications": "禁忌人群/药物",
-                "sideEffects": "常见副作用",
-                "dosage": "用法用量"
-            }
-            
-            如果某项无法识别，请返回null。只返回JSON。
-            """.formatted(ocrText);
-
-        return chat(systemPrompt, userPrompt);
+        return chatWithImageList(systemPrompt, userPrompt, imageBase64List);
     }
 
     public MedicineOcrParsedVO parseMedicineInfo(String aiRawResponse) {
@@ -223,38 +119,16 @@ public class AiService {
 
         try {
             Map<String, Object> map = objectMapper.readValue(jsonPayload, Map.class);
-            String usage = normalizeString(map.get("usage"));
-            String dosage = normalizeString(map.get("dosage"));
-            String instructions = normalizeString(map.get("instructions"));
-
-            if (instructions == null) {
-                instructions = buildInstructions(usage, dosage);
-            }
-
-            String expireDateRaw = normalizeString(map.get("expireDate"));
-            if (expireDateRaw == null) {
-                expireDateRaw = normalizeString(map.get("expirationDate"));
-            }
 
             return MedicineOcrParsedVO.builder()
                     .name(normalizeString(map.get("name")))
                     .specification(normalizeString(map.get("specification")))
-                    .manufacturer(normalizeString(map.get("manufacturer")))
-                    .dosageForm(normalizeString(map.get("dosageForm")))
-                    .instructions(instructions)
-                    .contraindications(normalizeString(map.get("contraindications")))
-                    .sideEffects(normalizeString(map.get("sideEffects")))
-                    .usage(usage)
-                    .dosage(dosage)
-                    .expireDate(parseDate(expireDateRaw))
+                    .usageNotes(normalizeString(map.get("usageNotes")))
+                    .indication(normalizeString(map.get("indication")))
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("AI结构化结果解析失败: " + e.getMessage(), e);
         }
-    }
-
-    public String currentModel() {
-        return aiProperties.getModel();
     }
 
     private String extractJsonPayload(String aiRawResponse) {
@@ -278,7 +152,7 @@ public class AiService {
         }
 
         String normalized = String.valueOf(value).trim();
-        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized) || "空".equals(normalized)) {
             return null;
         }
 
@@ -323,28 +197,10 @@ public class AiService {
         return null;
     }
 
-    /**
-     * 生成用药建议
-     */
-    public String generateMedicineAdvice(String medicineName, String userInfo) {
-        String userPrompt = """
-            药品名称：%s
-            用户信息：%s
-            
-            请给出合理的用药建议，包括：
-            1. 注意事项
-            2. 可能的不良反应
-            3. 与其他药物的相互作用提醒
-            
-            请用通俗易懂的语言回答，适合老年人理解。
-            """.formatted(medicineName, userInfo);
-
-        return chat("你是一个专业的用药顾问，请给出安全、合理的建议。", userPrompt);
+    public String currentModel() {
+        return aiProperties.getModel();
     }
 
-    /**
-     * 生成健康周报AI总结
-     */
     public String generateHealthReportSummary(String vitalData, String medicineData) {
         String userPrompt = """
             体征数据：%s
@@ -360,5 +216,69 @@ public class AiService {
             """.formatted(vitalData, medicineData);
 
         return chat("你是一个专业的健康顾问，请给出科学、合理的健康建议。", userPrompt);
+    }
+
+    private String chatWithImageList(String systemPrompt, String userPrompt, List<String> imageBase64List) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", aiProperties.getModel());
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            Map<String, Object> systemMsg = new HashMap<>();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", systemPrompt);
+            messages.add(systemMsg);
+        }
+
+        Map<String, Object> userMsg = new HashMap<>();
+        userMsg.put("role", "user");
+
+        List<Map<String, Object>> contentList = new ArrayList<>();
+
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", userPrompt);
+        contentList.add(textContent);
+
+        for (String imageBase64 : imageBase64List) {
+            Map<String, Object> imageContent = new HashMap<>();
+            imageContent.put("type", "image_url");
+            Map<String, String> imageUrl = new HashMap<>();
+            imageUrl.put("url", "data:image/jpeg;base64," + imageBase64);
+            imageContent.put("image_url", imageUrl);
+            contentList.add(imageContent);
+        }
+
+        userMsg.put("content", contentList);
+        messages.add(userMsg);
+        requestBody.put("messages", messages);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + aiProperties.getApiKey());
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+
+        try {
+            String url = aiProperties.getBaseUrl() + "/chat/completions";
+            log.info("Calling AI Vision API with {} images", imageBase64List.size());
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+                    if (message != null) {
+                        return (String) message.get("content");
+                    }
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("AI Vision API 调用失败", e);
+            throw new RuntimeException("AI图像识别失败: " + e.getMessage(), e);
+        }
     }
 }

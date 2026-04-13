@@ -19,17 +19,7 @@ public class Medicine {
 
     private String specification;
 
-    private String manufacturer;
-
-    private String dosageForm;
-
     private String imageUrl;
-
-    private String instructions;
-
-    private String contraindications;
-
-    private String sideEffects;
 
     private Integer stock;
 
@@ -37,7 +27,9 @@ public class Medicine {
 
     private LocalDate expireDate;
 
-    private String storageLocation;
+    private String usageNotes;
+
+    private String indication;
 
     @TableLogic
     private Integer deleted;

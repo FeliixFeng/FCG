@@ -1,87 +1,48 @@
 # FCG 待办清单 (TODO)
 
-## 里程碑 0：现状对齐（后端）
-- [x] 数据库表结构设计（7 张核心表）
-- [x] 统一返回结果封装（Result）
-- [x] 全局异常处理
-- [x] 实体/Mapper/Service（system/medicine/health）
-- [x] JWT/BCrypt 工具类
-- [x] Swagger/Knife4j 基础配置
+## 当前状态 (2026-04-13)
 
-## 里程碑 1：认证闭环
-- [x] JWT 认证拦截器（解析 token、设置当前用户上下文）
-- [x] 统一处理未登录/无权限异常
-- [x] CORS 配置
+### 已完成
 
-## 里程碑 2：家庭账号体系
-- [x] 改造为家庭账号登录（sys_family 存 username/password）
-- [x] 成员无独立登录账号，通过"选人"切换身份
-- [x] JWT 双 token：家庭级（familyId）+ 成员级（familyId+memberId+role）
-- [x] 管理员二次验证（用家庭密码）
-- [x] FamilyController：register、login、members、switch-member、verify-admin、add-member
-- [x] UserController：info、update、care-mode
+#### 后端
+- 数据库表设计 (7张)
+- 认证 (JWT/CORS/拦截器)
+- 家庭账号体系
+- 药品API (CRUD + OCR + OSS)
+- 健康API (体征 + 周报)
 
-## 里程碑 3：药品模块基础 API
-- [x] Medicine Controller：增删改查
-- [x] MedicinePlan Controller：增删改查
-- [x] MedicineRecord Controller：增删改查
-- [x] 简单联表查询：计划 + 记录
-- [x] OCR 识别接口（药品图片识别，已升级为智谱AI GLM-4.6V-FlashX 多模态模型）
-- [x] OSS 上传接口
+#### 前端 - 5个Tab导航
+| 页面 | 功能 | 状态 |
+|-----|------|------|
+| 首页 | 成员选择后主页 | ✅ 完成 |
+| 药品 | 列表/添加/OCR/创建计划 | ⚠️ 基本完成 |
+| 健康 | 体征录入/趋势图表/周报 | ✅ 完成 |
+| AI | 占位页 | ❌ 待开发 |
+| 我的 | 个人信息/切换成员/退出登录 | ✅ 完成 |
 
-## 里程碑 4：健康模块基础 API
-- [x] Vital Controller：增删改查
-- [x] HealthReport Controller：增删改查
-- [x] 近一周体征查询接口
+#### 管理界面
+- 成员管理 (增删改查)
+- 药品/系统/数据统计 (占位)
 
-## 里程碑 5：前端基础框架
-- [x] Vue 3 + Vite 项目初始化
-- [x] Vue Router（含路由守卫，区分家庭级/成员级 token）
-- [x] Pinia 状态管理（user store）
-- [x] Axios 封装 + API 层
-- [x] 登录页 / 注册页 / 选人页
-- [x] 首页（Home）/ 管理员页（AdminHome）骨架
-- [x] 家庭页 / 药品页 / 健康页 骨架
-- [x] Landing 落地页（Hero + 功能卡片 + Steps + CTA + Footer）
-- [x] AuthDialog 登录/注册弹窗（两栏布局）
+---
 
-## 下一步（前端功能实现）
+## 待开发 (按优先级)
 
-### 用户界面
-- [ ] 首页（/dashboard）：待设计
-- [ ] 药品页（/medicine）
-  - 药品列表展示
-  - 添加药品（含OCR拍照识别入口）
-  - 用药计划管理
-- [ ] 健康页（/health）
-  - 体征录入（血压、血糖等）
-  - 近一周趋势图表（ECharts）
-- [ ] 家庭页（/family）
-  - 成员列表
-  - 添加成员
-  - 关怀模式切换
-- [ ] 我的（/profile）
-  - 个人信息展示
-  - 进入管理界面入口（仅管理员）
-  - **AI用药助手**（问答入口）
+### 高优先级
+1. **药品页 - 封面图上传OSS** - 当前 `imageUrl: null`
+2. **药品页 - 创建计划时显示 usageNotes** - 选择药品后无参考
 
-### 管理界面（仅管理员）
-- [x] 成员管理（/admin/members）
-  - [x] 成员列表展示
-  - [x] 添加成员
-  - [x] 查看成员详情（扩展信息）
-  - [x] 编辑成员信息（含扩展字段 + 头像）
-  - [x] 删除成员
-  - [x] 修改成员角色
-  - [x] 头像选择器（内置头像 + OSS上传）
-- [ ] 药品管理（/admin/medicines）
-- [ ] 系统设置（/admin/system）
-- [ ] 数据统计（/admin/data）
+### 中优先级
+3. **药品页 - 编辑/删除药品**
+4. **药品页 - 打卡功能** (服药后扣库存)
+5. **AI助手页** - 对话界面实现
 
-### AI功能集成
-- **OCR拍照识别**：入口在药品页"添加药品"按钮旁
-- **AI用药助手**：入口在"我的"页面，作为健康问答入口
+### 低优先级
+6. 管理界面完善 (药品/系统/数据统计)
 
-### 后续功能
-- [ ] 关怀模式：大字体/简化 UI 适配
-- [ ] 健康周报：AI 生成摘要展示
+---
+
+## 备注
+- 已无独立"家庭"页面，相关功能在"我的"中
+- 健康页已完成体征录入、趋势图表、健康周报
+- 关怀模式通过角色控制 (受控成员role=2)

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,16 +51,11 @@ public class MedicineController {
         medicine.setFamilyId(familyId);
         medicine.setName(dto.getName());
         medicine.setSpecification(dto.getSpecification());
-        medicine.setManufacturer(dto.getManufacturer());
-        medicine.setDosageForm(dto.getDosageForm());
         medicine.setImageUrl(dto.getImageUrl());
-        medicine.setInstructions(dto.getInstructions());
-        medicine.setContraindications(dto.getContraindications());
-        medicine.setSideEffects(dto.getSideEffects());
         medicine.setStock(dto.getStock());
         medicine.setStockUnit(dto.getStockUnit());
         medicine.setExpireDate(dto.getExpireDate());
-        medicine.setStorageLocation(dto.getStorageLocation());
+        medicine.setUsageNotes(dto.getUsageNotes());
 
         medicineService.save(medicine);
         return Result.success(medicine.getId());
@@ -113,26 +109,26 @@ public class MedicineController {
     }
 
     @PostMapping("/ocr")
-    @Operation(summary = "药品图片智能识别（多模态AI一步完成）")
-    public Result<MedicineOcrEnhancedVO> ocr(@RequestPart("file") MultipartFile file) {
-        if (file == null || file.isEmpty()) {
+    @Operation(summary = "药品图片智能识别（支持多图）")
+    public Result<MedicineOcrEnhancedVO> ocr(@RequestPart("files") MultipartFile[] files) {
+        if (files == null || files.length == 0) {
             throw new BusinessException(MessageConstant.PARAM_ERROR);
         }
 
-        // 1. 转换为Base64
-        String imageBase64;
+        List<String> imageBase64List = new ArrayList<>();
         try {
-            imageBase64 = Base64.getEncoder().encodeToString(file.getBytes());
+            for (MultipartFile file : files) {
+                imageBase64List.add(Base64.getEncoder().encodeToString(file.getBytes()));
+            }
         } catch (Exception e) {
             throw new BusinessException("图片读取失败");
         }
 
-        // 2. 调用多模态AI识别（OCR + 结构化一步完成）
         String aiRaw = null;
         MedicineOcrParsedVO parsed = null;
         boolean fallback = false;
         try {
-            aiRaw = aiService.recognizeMedicineImage(imageBase64);
+            aiRaw = aiService.recognizeMedicineImage(imageBase64List);
             parsed = aiService.parseMedicineInfo(aiRaw);
         } catch (RuntimeException e) {
             fallback = true;
@@ -172,23 +168,8 @@ public class MedicineController {
         if (dto.getSpecification() != null) {
             medicine.setSpecification(dto.getSpecification());
         }
-        if (dto.getManufacturer() != null) {
-            medicine.setManufacturer(dto.getManufacturer());
-        }
-        if (dto.getDosageForm() != null) {
-            medicine.setDosageForm(dto.getDosageForm());
-        }
         if (dto.getImageUrl() != null) {
             medicine.setImageUrl(dto.getImageUrl());
-        }
-        if (dto.getInstructions() != null) {
-            medicine.setInstructions(dto.getInstructions());
-        }
-        if (dto.getContraindications() != null) {
-            medicine.setContraindications(dto.getContraindications());
-        }
-        if (dto.getSideEffects() != null) {
-            medicine.setSideEffects(dto.getSideEffects());
         }
         if (dto.getStock() != null) {
             medicine.setStock(dto.getStock());
@@ -199,8 +180,8 @@ public class MedicineController {
         if (dto.getExpireDate() != null) {
             medicine.setExpireDate(dto.getExpireDate());
         }
-        if (dto.getStorageLocation() != null) {
-            medicine.setStorageLocation(dto.getStorageLocation());
+        if (dto.getUsageNotes() != null) {
+            medicine.setUsageNotes(dto.getUsageNotes());
         }
     }
 
@@ -210,16 +191,11 @@ public class MedicineController {
                 .familyId(medicine.getFamilyId())
                 .name(medicine.getName())
                 .specification(medicine.getSpecification())
-                .manufacturer(medicine.getManufacturer())
-                .dosageForm(medicine.getDosageForm())
                 .imageUrl(medicine.getImageUrl())
-                .instructions(medicine.getInstructions())
-                .contraindications(medicine.getContraindications())
-                .sideEffects(medicine.getSideEffects())
                 .stock(medicine.getStock())
                 .stockUnit(medicine.getStockUnit())
                 .expireDate(medicine.getExpireDate())
-                .storageLocation(medicine.getStorageLocation())
+                .usageNotes(medicine.getUsageNotes())
                 .createTime(medicine.getCreateTime())
                 .build();
     }

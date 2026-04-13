@@ -12,37 +12,22 @@ public class MedicineUpdateDTO {
     @Schema(description = "药品名称")
     private String name;
 
-    @Schema(description = "规格")
+    @Schema(description = "规格（如 0.3g*20粒）")
     private String specification;
 
-    @Schema(description = "生产厂家")
-    private String manufacturer;
-
-    @Schema(description = "剂型")
-    private String dosageForm;
-
-    @Schema(description = "药品图片URL")
+    @Schema(description = "封面图片URL")
     private String imageUrl;
-
-    @Schema(description = "说明书")
-    private String instructions;
-
-    @Schema(description = "禁忌事项")
-    private String contraindications;
-
-    @Schema(description = "副作用")
-    private String sideEffects;
 
     @Schema(description = "库存数量")
     @Min(value = 0, message = "库存不能为负数")
     private Integer stock;
 
-    @Schema(description = "库存单位")
+    @Schema(description = "库存单位（片/粒/ml）")
     private String stockUnit;
 
-    @Schema(description = "过期日期")
+    @Schema(description = "有效期")
     private LocalDate expireDate;
 
-    @Schema(description = "存放位置")
-    private String storageLocation;
+    @Schema(description = "用药注意")
+    private String usageNotes;
 }

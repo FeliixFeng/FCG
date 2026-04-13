@@ -2,6 +2,7 @@ package com.ghf.fcg.modules.medicine.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -14,15 +15,11 @@ public class MedicinePlan {
 
     private Long userId;
 
-    private Long familyId;
-
     private Long medicineId;
 
-    private String dosage;
+    private BigDecimal dosage;
 
-    private String frequency;
-
-    private String remindTimes;
+    private String remindSlots;
 
     private LocalDate startDate;
 
@@ -30,7 +27,7 @@ public class MedicinePlan {
 
     private String takeDays;
 
-    private String notes;
+    private String planRemark;
 
     private Integer status;
 
