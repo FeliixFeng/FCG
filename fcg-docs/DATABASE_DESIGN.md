@@ -32,7 +32,7 @@
 | password | VARCHAR(100) | 密码（加密） |
 | nickname | VARCHAR(50) | 昵称 |
 | phone | VARCHAR(20) | 手机号 |
-| avatar | VARCHAR(255) | 头像URL |
+| avatar | MEDIUMTEXT | 头像URL（OSS地址） |
 | role | TINYINT | 角色：0-管理员 1-普通成员 2-受控成员 |
 | family_id | BIGINT | 所属家庭ID |
 | care_mode | TINYINT | 关怀模式：0-关闭 1-开启 |

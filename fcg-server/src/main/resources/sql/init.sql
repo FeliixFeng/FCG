@@ -31,7 +31,7 @@ CREATE TABLE `sys_user` (
     `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '成员ID',
     `nickname`    VARCHAR(50)  NOT NULL COMMENT '昵称（必填，选人页展示用）',
     `phone`       VARCHAR(20)  DEFAULT NULL COMMENT '手机号',
-    `avatar`      VARCHAR(255) DEFAULT NULL COMMENT '头像URL（存OSS地址）',
+    `avatar`      MEDIUMTEXT   DEFAULT NULL COMMENT '头像URL（存OSS地址/Base64）',
     `role`        TINYINT      NOT NULL DEFAULT 1 COMMENT '角色 0-管理员 1-普通成员 2-关怀成员（老人）',
     `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
     `relation`    VARCHAR(20)  DEFAULT NULL COMMENT '家庭关系（父亲/母亲/爷爷等）',
@@ -42,6 +42,23 @@ CREATE TABLE `sys_user` (
     PRIMARY KEY (`id`),
     KEY `idx_family_id` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家庭成员表';
+
+-- 2.1 成员扩展信息表（1:1 关联 sys_user）
+DROP TABLE IF EXISTS `sys_user_profile`;
+CREATE TABLE `sys_user_profile` (
+    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `user_id`     BIGINT       NOT NULL COMMENT '成员ID（关联 sys_user）',
+    `birthday`    DATE         DEFAULT NULL COMMENT '出生日期',
+    `height`     DECIMAL(5,1) DEFAULT NULL COMMENT '身高（cm）',
+    `weight`     DECIMAL(5,1) DEFAULT NULL COMMENT '体重（kg）',
+    `disease`    VARCHAR(255) DEFAULT NULL COMMENT '病史（高血压/糖尿病等，逗号分隔）',
+    `allergy`    VARCHAR(255) DEFAULT NULL COMMENT '过敏史',
+    `remark`     VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成员扩展信息表';
 
 -- ============================================
 -- 药品模块

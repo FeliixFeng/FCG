@@ -419,7 +419,7 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 
 ## Development Status
 
-### Completed (2026-03-27)
+### Completed (2026-04-08)
 - ✅ Database schema design (7 tables)
 - ✅ MyBatis-Plus Generator configuration
 - ✅ Entity classes (7 entities)
@@ -445,6 +445,10 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ 桌面端"我的"Tab导航（5个Tab）
 - ✅ 移动端顶部显示家庭名字
 - ✅ 路由守卫优化（刷新时加载member信息后再检查权限）
+- ✅ 成员扩展信息表 sys_user_profile（birthday, height, weight, disease, allergy, remark）
+- ✅ 成员管理：查看/编辑弹窗（扩展信息字段）
+- ✅ 头像选择器 AvatarPicker（内置8个头像 + OSS上传）
+- ✅ sys_user.avatar 字段改为 MEDIUMTEXT 支持 OSS URL
 
 ### Next Steps
 - ✅ OCR + AI 智能识别（智谱AI GLM-4.6V-FlashX 多模态模型一步完成）

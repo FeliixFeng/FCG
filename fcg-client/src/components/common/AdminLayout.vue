@@ -290,6 +290,8 @@ const exitAdmin = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
+  height: 22px;
   margin-bottom: 2px;
   transition: transform 0.2s ease;
 }

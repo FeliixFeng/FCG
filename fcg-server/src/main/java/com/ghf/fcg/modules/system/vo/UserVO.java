@@ -2,6 +2,8 @@ package com.ghf.fcg.modules.system.vo;
 
 import lombok.Data;
 import lombok.Builder;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -16,10 +18,17 @@ public class UserVO {
     private String nickname;
     private String phone;
     private String avatar;
-    private Integer role;       // 0-管理员 1-普通成员 2-关怀成员
+    private Integer role;
     private Long familyId;
     private String relation;
     private Integer careMode;
-    private String token;       // 成员级 token（含 familyId + memberId + role）
+    private String token;
     private LocalDateTime createTime;
+    
+    private LocalDate birthday;
+    private BigDecimal height;
+    private BigDecimal weight;
+    private String disease;
+    private String allergy;
+    private String remark;
 }

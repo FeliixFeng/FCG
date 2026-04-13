@@ -1,5 +1,16 @@
 import http from './http'
 
+// ========== 文件模块 ==========
+
+/** 上传文件到 OSS */
+export const uploadFile = (file, dir = 'avatar') => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return http.post(`/api/oss/upload?dir=${dir}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 // ========== 家庭模块 ==========
 
 /** 家庭注册 */
@@ -77,15 +88,23 @@ export const updateMedicineRecord = (id, data) => http.put(`/api/medicine/record
 export const fetchWeeklyVitals = (userId, type) =>
   http.get('/api/health/vital/weekly', { params: { userId, type } })
 
-/** 今日是否有体征记录（列表查，取第一页第一条） */
-export const fetchTodayVitals = (userId) => {
-  const today = new Date()
-  const start = `${today.toISOString().slice(0, 10)}T00:00:00`
-  const end   = `${today.toISOString().slice(0, 10)}T23:59:59`
-  return http.get('/api/health/vital/list', {
-    params: { userId, startTime: start, endTime: end, page: 1, size: 1 },
-  })
-}
+/** 今日最新体征（每种类型一条） */
+export const fetchTodayVitals = (userId) =>
+  http.get('/api/health/vital/today', { params: { userId } })
+
+/** 体征记录列表（分页） */
+export const fetchVitalList = (params) =>
+  http.get('/api/health/vital/list', { params })
+
+/** 新增体征记录 */
+export const createVital = (data) => http.post('/api/health/vital', data)
+
+/** 删除体征记录 */
+export const deleteVital = (id) => http.delete(`/api/health/vital/${id}`)
+
+/** 获取成员健康档案 */
+export const fetchUserProfile = (userId) => 
+  http.get('/api/user/profile', { params: { userId } })
 
 /** 健康周报列表 */
 export const fetchHealthReports = (params) => http.get('/api/health/report/list', { params })

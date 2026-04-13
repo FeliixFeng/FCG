@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useUserStore } from '../../stores/user'
 import { fetchFamilyMembers, addMember, fetchMemberDetail, updateMember, deleteMember, updateMemberRole } from '../../utils/api'
 import AvatarIcon from '../../components/common/AvatarIcon.vue'
+import AvatarPicker from '../../components/common/AvatarPicker.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const userStore = useUserStore()
@@ -26,10 +27,17 @@ const showEditModal = ref(false)
 const editing = ref(false)
 const editForm = ref({
   userId: null,
+  avatar: '',
   nickname: '',
   relation: '',
   role: 1,
-  phone: ''
+  phone: '',
+  birthday: '',
+  height: '',
+  weight: '',
+  disease: '',
+  allergy: '',
+  remark: ''
 })
 
 const roleOptions = [
@@ -50,6 +58,27 @@ const relationOptions = [
 
 const roleLabel = (role) => {
   return roleOptions.find(o => o.value === role)?.label || '未知'
+}
+
+// 从生日计算年龄
+const getAge = (birthday) => {
+  if (!birthday) return null
+  const birth = new Date(birthday)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--
+  }
+  return age >= 0 ? age : null
+}
+
+// 病史简写（取前两个）
+const getDiseaseShort = (disease) => {
+  if (!disease) return null
+  const list = disease.split(',').map(d => d.trim()).filter(d => d)
+  if (list.length === 0) return null
+  return list.slice(0, 2).join(',') + (list.length > 2 ? '...' : '')
 }
 
 async function loadMembers() {
@@ -102,10 +131,17 @@ const handleEdit = async (member) => {
     const data = res.data
     editForm.value = {
       userId: data.id,
+      avatar: data.avatar || '',
       nickname: data.nickname,
       relation: data.relation || '',
       role: data.role,
-      phone: data.phone || ''
+      phone: data.phone || '',
+      birthday: data.birthday || '',
+      height: data.height || '',
+      weight: data.weight || '',
+      disease: data.disease || '',
+      allergy: data.allergy || '',
+      remark: data.remark || ''
     }
     showEditModal.value = true
   } catch (err) {
@@ -118,6 +154,25 @@ const closeEditModal = () => {
   error.value = ''
 }
 
+// 查看弹窗
+const showViewModal = ref(false)
+const viewForm = ref({})
+
+const handleView = async (member) => {
+  error.value = ''
+  try {
+    const res = await fetchMemberDetail(member.userId)
+    viewForm.value = res.data
+    showViewModal.value = true
+  } catch (err) {
+    ElMessage.error('获取成员信息失败')
+  }
+}
+
+const closeViewModal = () => {
+  showViewModal.value = false
+}
+
 const handleUpdate = async () => {
   if (!editForm.value.nickname) {
     ElMessage.warning('请填写昵称')
@@ -126,10 +181,17 @@ const handleUpdate = async () => {
   try {
     editing.value = true
     await updateMember(editForm.value.userId, {
+      avatar: editForm.value.avatar || null,
       nickname: editForm.value.nickname,
       relation: editForm.value.relation,
       role: editForm.value.role,
-      phone: editForm.value.phone
+      phone: editForm.value.phone,
+      birthday: editForm.value.birthday || null,
+      height: editForm.value.height || null,
+      weight: editForm.value.weight || null,
+      disease: editForm.value.disease || '',
+      allergy: editForm.value.allergy || '',
+      remark: editForm.value.remark || ''
     })
     ElMessage.success('更新成功')
     showEditModal.value = false
@@ -248,6 +310,7 @@ onMounted(() => {
         <span class="col-avatar">头像</span>
         <span class="col-name">昵称</span>
         <span class="col-relation">关系</span>
+        <span class="col-phone">手机号</span>
         <span class="col-role">角色</span>
         <span class="col-actions">操作</span>
       </div>
@@ -267,6 +330,7 @@ onMounted(() => {
           <span v-if="member.userId === userStore.member?.userId" class="self-tag">我</span>
         </div>
         <div class="col-relation">{{ member.relation || '-' }}</div>
+        <div class="col-phone">{{ member.phone || '-' }}</div>
         <div class="col-role">
           <select 
             class="role-select" 
@@ -280,6 +344,7 @@ onMounted(() => {
           </select>
         </div>
         <div class="col-actions">
+          <button class="btn-action btn-view" @click="handleView(member)">查看</button>
           <button class="btn-action btn-edit" @click="handleEdit(member)">编辑</button>
           <button 
             class="btn-action btn-delete" 
@@ -292,6 +357,67 @@ onMounted(() => {
       <div v-if="members.length === 0" class="empty">暂无成员</div>
     </div>
 
+    <!-- 查看弹窗 -->
+    <div v-if="showViewModal" class="modal-mask" @click.self="showViewModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>查看成员信息</h3>
+          <button class="btn-close" @click="closeViewModal">&times;</button>
+        </div>
+        <div class="modal-body view-body">
+          <div class="view-row">
+            <span class="view-label">昵称</span>
+            <span class="view-value">{{ viewForm.nickname }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-label">关系</span>
+            <span class="view-value">{{ viewForm.relation || '-' }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-label">手机号</span>
+            <span class="view-value">{{ viewForm.phone || '-' }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-label">角色</span>
+            <span class="view-value">{{ roleLabel(viewForm.role) }}</span>
+          </div>
+          
+          <div v-if="viewForm.birthday || viewForm.height || viewForm.weight || viewForm.disease || viewForm.allergy || viewForm.remark" class="view-section">
+            <div class="view-section-title">扩展信息</div>
+            <div v-if="viewForm.birthday" class="view-row">
+              <span class="view-label">出生日期</span>
+              <span class="view-value">{{ viewForm.birthday }} ({{ getAge(viewForm.birthday) }}岁)</span>
+            </div>
+            <div v-if="viewForm.height" class="view-row">
+              <span class="view-label">身高</span>
+              <span class="view-value">{{ viewForm.height }} cm</span>
+            </div>
+            <div v-if="viewForm.weight" class="view-row">
+              <span class="view-label">体重</span>
+              <span class="view-value">{{ viewForm.weight }} kg</span>
+            </div>
+            <div v-if="viewForm.disease" class="view-row">
+              <span class="view-label">病史</span>
+              <span class="view-value">{{ viewForm.disease }}</span>
+            </div>
+            <div v-if="viewForm.allergy" class="view-row">
+              <span class="view-label">过敏史</span>
+              <span class="view-value">{{ viewForm.allergy }}</span>
+            </div>
+            <div v-if="viewForm.remark" class="view-row">
+              <span class="view-label">备注</span>
+              <span class="view-value">{{ viewForm.remark }}</span>
+            </div>
+          </div>
+          
+          <div v-else class="view-empty">暂无扩展信息</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-submit" @click="showViewModal = false; handleEdit({userId: viewForm.id})">编辑信息</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 编辑弹窗 -->
     <div v-if="showEditModal" class="modal-mask" @click.self="showEditModal = false">
       <div class="modal-content">
@@ -300,6 +426,14 @@ onMounted(() => {
           <button class="btn-close" @click="closeEditModal">&times;</button>
         </div>
         <div class="modal-body">
+          <div class="form-field">
+            <label>头像</label>
+            <AvatarPicker 
+              v-model="editForm.avatar" 
+              :current-relation="editForm.relation"
+              :current-role="editForm.role"
+            />
+          </div>
           <div class="form-field">
             <label>昵称 *</label>
             <input v-model="editForm.nickname" />
@@ -325,6 +459,34 @@ onMounted(() => {
               </option>
             </select>
           </div>
+          
+          <div class="form-section-title">扩展信息（选填）</div>
+          <div class="form-field">
+            <label>出生日期</label>
+            <input type="date" v-model="editForm.birthday" />
+          </div>
+          <div class="form-field-row">
+            <div class="form-field">
+              <label>身高(cm)</label>
+              <input type="number" v-model="editForm.height" placeholder="如：170" />
+            </div>
+            <div class="form-field">
+              <label>体重(kg)</label>
+              <input type="number" v-model="editForm.weight" placeholder="如：65" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label>病史</label>
+            <input v-model="editForm.disease" placeholder="高血压,糖尿病" />
+          </div>
+          <div class="form-field">
+            <label>过敏史</label>
+            <input v-model="editForm.allergy" placeholder="如：青霉素" />
+          </div>
+          <div class="form-field">
+            <label>备注</label>
+            <textarea v-model="editForm.remark" placeholder="其他说明..." />
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn-cancel" @click="showEditModal = false">取消</button>
@@ -339,7 +501,7 @@ onMounted(() => {
 
 <style scoped>
 .admin-members {
-  max-width: 900px;
+  max-width: 100%;
 }
 
 .page-header {
@@ -411,15 +573,22 @@ onMounted(() => {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
   padding: 10px 12px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 0.9rem;
 }
 
+.form-field input::placeholder,
+.form-field textarea::placeholder {
+  color: #aaa;
+}
+
 .form-field input:focus,
-.form-field select:focus {
+.form-field select:focus,
+.form-field textarea:focus {
   outline: none;
   border-color: #2d5f5d;
 }
@@ -473,6 +642,7 @@ onMounted(() => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(45, 95, 93, 0.08);
+  width: 100%;
 }
 
 .table-header {
@@ -508,7 +678,8 @@ onMounted(() => {
 
 .col-name {
   flex: 1;
-  padding-left: 12px;
+  min-width: 100px;
+  padding-left: 16px;
   font-weight: 500;
 }
 
@@ -523,18 +694,63 @@ onMounted(() => {
 }
 
 .col-relation {
-  width: 80px;
+  flex: 1;
+  min-width: 80px;
   color: #666;
 }
 
+.col-phone {
+  flex: 1;
+  min-width: 100px;
+  color: #888;
+  font-size: 0.85rem;
+}
+
 .col-role {
-  width: 100px;
+  flex: 1;
+  min-width: 80px;
+}
+
+.profile-age {
+  color: #2d5f5d;
+  font-weight: 500;
+}
+
+.profile-disease {
+  background: #fef3e7;
+  color: #d68910;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+.profile-allergy {
+  background: #fdecea;
+  color: #c0392b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+.profile-empty {
+  color: #bbb;
 }
 
 .col-actions {
-  width: 120px;
+  flex: 1;
+  min-width: 160px;
   display: flex;
   gap: 8px;
+}
+
+.btn-action {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
 }
 
 .role-select {
@@ -562,7 +778,7 @@ onMounted(() => {
 }
 
 .btn-action {
-  padding: 4px 10px;
+  padding: 6px 12px;
   border: none;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -572,6 +788,11 @@ onMounted(() => {
 .btn-edit {
   background: #e8f4f8;
   color: #2874a6;
+}
+
+.btn-view {
+  background: #e4f0ef;
+  color: #2d5f5d;
 }
 
 .btn-delete {
@@ -632,6 +853,64 @@ onMounted(() => {
   gap: 16px;
 }
 
+.form-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  padding: 8px 0;
+  border-top: 1px dashed #eee;
+  margin-top: 8px;
+}
+
+/* 查看弹窗 */
+.view-body {
+  padding: 20px;
+}
+
+.view-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.view-label {
+  color: #888;
+}
+
+.view-value {
+  color: #333;
+  font-weight: 500;
+}
+
+.view-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #ddd;
+}
+
+.view-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2d5f5d;
+  margin-bottom: 12px;
+}
+
+.view-empty {
+  padding: 20px;
+  text-align: center;
+  color: #aaa;
+}
+
+.form-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-field-row .form-field {
+  flex: 1;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -640,7 +919,7 @@ onMounted(() => {
   border-top: 1px solid #eee;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .header-row {
     flex-direction: column;
     gap: 12px;
@@ -658,30 +937,65 @@ onMounted(() => {
     display: none;
   }
   
+  .member-table {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: transparent;
+    box-shadow: none;
+  }
+  
   .table-row {
+    display: flex;
     flex-wrap: wrap;
     gap: 12px;
     padding: 16px;
+    background: white;
+    border-radius: 12px;
+    align-items: center;
   }
   
   .col-avatar {
-    width: auto;
+    width: 48px;
+    flex-shrink: 0;
   }
   
   .col-name {
-    flex: 1 1 calc(100% - 60px);
-    padding-left: 12px;
+    flex: 1;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  
+  .self-tag {
+    margin-left: 6px;
+    font-size: 0.65rem;
+    padding: 2px 6px;
   }
   
   .col-relation,
+  .col-phone,
   .col-role {
-    width: auto;
-    padding-left: 52px;
+    flex: 1;
+    font-size: 0.8rem;
+    color: #666;
+  }
+  
+  .col-phone {
+    color: #888;
   }
   
   .col-actions {
     width: 100%;
-    padding-left: 52px;
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .btn-action {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    text-align: center;
   }
 }
 </style>
