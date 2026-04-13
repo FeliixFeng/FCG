@@ -5,7 +5,7 @@ import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetch
 import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
 import BaseLayout from '../components/common/BaseLayout.vue'
 import * as echarts from 'echarts'
-import { Delete, Plus, Refresh } from '@element-plus/icons-vue'
+import { Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 
@@ -102,6 +102,8 @@ watch(selectedMember, (newVal, oldVal) => {
     loadWeeklyData()
     loadLatestReport()
     loadReportList()
+    // 切换成员后重新初始化图表，避免 dispose 后容器失效
+    setTimeout(initChart, 100)
   }
 })
 
@@ -161,7 +163,7 @@ const loadReportList = async () => {
     
     reportList.value = allReports.filter(report => {
       const reportStart = new Date(report.weekStart)
-      return reportStart < weekStart || reportStart.getTime() === weekStart.getTime()
+      return reportStart < weekStart
     }).slice(0, 6)
   } catch (e) {
     console.error('加载历史周报失败', e)
@@ -173,6 +175,7 @@ const handleGenerateReport = async () => {
   try {
     await generateHealthReport(selectedMember.value)
     await loadLatestReport()
+    await loadReportList()
     ElMessage.success('周报生成成功')
   } catch (e) {
     console.error('生成周报失败', e)
@@ -695,9 +698,6 @@ onUnmounted(() => {
             <div class="card-unit">
               {{ t.value === 2 ? (todayVitals.some(v => v.type === 2) ? 'mmol/L' : '点击记录') : (todayVitals.some(v => v.type === t.value) ? t.unit : '点击记录') }}
             </div>
-            <div class="card-add">
-              <Plus />
-            </div>
           </div>
         </div>
       </section>
@@ -724,8 +724,14 @@ onUnmounted(() => {
       </section>
 
       <section class="health-report">
-        <h2 class="section-title">健康周报</h2>
-        
+        <div class="report-section-header">
+          <h2 class="section-title">健康周报</h2>
+          <button class="regen-btn" @click="handleGenerateReport" :disabled="reportLoading">
+            <Refresh class="btn-icon" :class="{ spinning: reportLoading }" />
+            {{ latestReport ? '重新生成' : '生成周报' }}
+          </button>
+        </div>
+
         <!-- 本周周报卡片 -->
         <div class="current-report-section">
           <h3 class="section-subtitle">本周周报</h3>
@@ -738,19 +744,11 @@ onUnmounted(() => {
             </div>
             <div class="card-info">
               <span class="info-item">用药依从率: {{ latestReport.complianceRate }}%</span>
-              <span class="info-arrow">查看详情 ></span>
+              <span class="info-arrow">查看详情 ›</span>
             </div>
           </div>
           <div v-else class="report-empty">
-            <p>暂无本周周报</p>
-            <el-button type="primary" @click="handleGenerateReport" :loading="reportLoading">
-              生成周报
-            </el-button>
-          </div>
-          <div v-if="latestReport" class="report-actions">
-            <el-button size="small" @click="handleGenerateReport" :loading="reportLoading" class="regen-btn">
-              <Refresh class="btn-icon" /> 重新生成
-            </el-button>
+            <p>暂无本周周报，点击右上角生成</p>
           </div>
         </div>
 
@@ -799,7 +797,7 @@ onUnmounted(() => {
         v-model:visible="dialogVisible"
         :type="dialogType"
         :user-id="selectedMember"
-        @success="() => { loadTodayVitals(); loadWeeklyData(); }"
+        @success="() => { loadTodayVitals(); loadWeeklyData(); loadReportList() }"
       />
     </BaseLayout>
   </div>
@@ -906,27 +904,6 @@ onUnmounted(() => {
   font-size: 0.75rem;
   color: #999;
   margin-top: 2px;
-}
-
-.card-add {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(45, 95, 93, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #2d5f5d;
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.vital-card:hover .card-add {
-  opacity: 1;
 }
 
 .trend-chart {
@@ -1044,6 +1021,17 @@ onUnmounted(() => {
   margin-bottom: 32px;
 }
 
+.report-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.report-section-header .section-title {
+  margin: 0;
+}
+
 /* 本周周报卡片 */
 .current-report-section {
   margin-bottom: 20px;
@@ -1112,56 +1100,6 @@ onUnmounted(() => {
   opacity: 0.8;
 }
 
-.report-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.report-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.report-period {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.report-risk {
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.report-compliance {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.report-compliance .label {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.report-compliance .value {
-  color: #2d5f5d;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.report-ai {
-  border-top: 1px solid #eee;
-  padding-top: 16px;
-}
-
 .ai-title {
   font-size: 0.9rem;
   font-weight: 600;
@@ -1223,40 +1161,59 @@ onUnmounted(() => {
 
 .report-empty {
   text-align: center;
-  padding: 40px;
-  background: #fff;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .report-empty p {
   color: #999;
-  margin-bottom: 16px;
-}
-
-.report-actions {
-  text-align: center;
-  margin-top: 12px;
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 .btn-icon {
   width: 14px;
   height: 14px;
   margin-right: 4px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.btn-icon.spinning {
+  animation: spin 1s linear infinite;
 }
 
 .regen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(45, 95, 93, 0.2);
+  border-radius: 20px;
   color: #2d5f5d;
-  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.06);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.regen-btn:hover {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 6px 20px rgba(31, 38, 135, 0.1);
+.regen-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #2d5f5d;
+}
+
+.regen-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* 历史周报 */
@@ -1369,6 +1326,11 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .report-section-header {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .vital-cards {
