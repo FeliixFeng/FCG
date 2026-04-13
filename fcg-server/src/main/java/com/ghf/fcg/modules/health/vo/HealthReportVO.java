@@ -13,6 +13,7 @@ public class HealthReportVO {
 
     private Long id;
     private Long userId;
+    private String userName;
     private Long familyId;
     private LocalDate weekStart;
     private LocalDate weekEnd;

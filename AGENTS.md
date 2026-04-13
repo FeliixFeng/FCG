@@ -419,7 +419,7 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 
 ## Development Status
 
-### Completed (2026-04-08)
+### Completed (2026-04-11)
 - ✅ Database schema design (7 tables)
 - ✅ MyBatis-Plus Generator configuration
 - ✅ Entity classes (7 entities)
@@ -449,14 +449,28 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - ✅ 成员管理：查看/编辑弹窗（扩展信息字段）
 - ✅ 头像选择器 AvatarPicker（内置8个头像 + OSS上传）
 - ✅ sys_user.avatar 字段改为 MEDIUMTEXT 支持 OSS URL
+- ✅ 健康页：体征录入、近一周趋势图表（血压/血糖/体重）
+- ✅ 健康页：血压输入框添加高压/低压标签
+- ✅ 健康页：血糖区分空腹/餐后 + 参考值提示
+- ✅ 健康页：后端同类型数据覆盖逻辑
+- ✅ 健康页：图表固定7天日期、动态Y轴、连线显示
+- ✅ 健康页：趋势分析提示（按类型过滤数据）
+- ✅ 健康页：管理员切换成员显示"查看：XXX"
+- ✅ 健康周报：手动生成 + AI 总结（glm-4.6v-flashx）
+- ✅ 健康周报：覆盖模式（同本周只保留一条）
+- ✅ 健康周报：Markdown 渲染展示
+- ✅ 健康周报：本周周报点击弹窗查看详情
+- ✅ 健康周报：历史周报过滤本周、Grid布局（桌面6列/移动3列）
+- ✅ 健康周报：无体征数据时禁止生成 + 前端弹窗提示
+- ✅ 健康页面：液态玻璃样式设计
+- ✅ 用药依从率计算 API
+- ✅ 前端超时时间调整为 60s
 
 ### Next Steps
-- ✅ OCR + AI 智能识别（智谱AI GLM-4.6V-FlashX 多模态模型一步完成）
-- 🔄 健康页：体征录入、近一周趋势图表
 - 🔄 家庭页：成员列表、基础信息展示
 - 🔄 管理员页：成员管理完善
 - 🔄 关怀模式：大字体/简化 UI 统一适配
-- ⏸️ 健康周报：AI 生成摘要展示
+- 🔄 健康周报内容优化（后续迭代）
 
 ## CI/CD (GitHub Actions + Alibaba Cloud ACR)
 

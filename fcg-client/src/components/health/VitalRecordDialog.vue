@@ -21,6 +21,7 @@ const form = ref({
   valueSystolic: null,
   valueDiastolic: null,
   value: null,
+  measurePoint: null,
   notes: ''
 })
 
@@ -29,14 +30,18 @@ const loading = ref(false)
 const typeOptions = [
   { value: 1, label: '血压', unit: 'mmHg' },
   { value: 2, label: '血糖', unit: 'mmol/L' },
-  { value: 3, label: '心率', unit: 'bpm' },
-  { value: 4, label: '体温', unit: '℃' },
-  { value: 5, label: '体重', unit: 'kg' }
+  { value: 3, label: '体重', unit: 'kg' }
+]
+
+const measurePointOptions = [
+  { value: 1, label: '空腹' },
+  { value: 2, label: '餐后' }
 ]
 
 const currentType = computed(() => typeOptions.find(t => t.value === props.type))
 
 const isBloodPressure = computed(() => props.type === 1)
+const isBloodSugar = computed(() => props.type === 2)
 
 watch(() => props.visible, (val) => {
   if (val) {
@@ -44,6 +49,7 @@ watch(() => props.visible, (val) => {
       valueSystolic: null,
       valueDiastolic: null,
       value: null,
+      measurePoint: null,
       notes: ''
     }
   }
@@ -53,6 +59,15 @@ const handleSubmit = async () => {
   if (isBloodPressure.value) {
     if (!form.value.valueSystolic || !form.value.valueDiastolic) {
       ElMessage.warning('请填写收缩压和舒张压')
+      return
+    }
+  } else if (isBloodSugar.value) {
+    if (!form.value.value) {
+      ElMessage.warning('请填写血糖值')
+      return
+    }
+    if (!form.value.measurePoint) {
+      ElMessage.warning('请选择测量时点（空腹/餐后）')
       return
     }
   } else {
@@ -68,7 +83,7 @@ const handleSubmit = async () => {
       userId: props.userId,
       type: props.type,
       measureTime: new Date().toISOString(),
-      measurePoint: null,
+      measurePoint: isBloodSugar.value ? form.value.measurePoint : null,
       ...(isBloodPressure.value ? {
         valueSystolic: form.value.valueSystolic,
         valueDiastolic: form.value.valueDiastolic,
@@ -100,34 +115,66 @@ const handleSubmit = async () => {
     :close-on-click-modal="false"
   >
     <el-form label-position="top">
-      <el-form-item :label="currentType?.label">
-        <div v-if="isBloodPressure" class="blood-pressure-input">
-          <el-input-number
-            v-model="form.valueSystolic"
-            :min="60"
-            :max="250"
-            :precision="0"
-            placeholder="收缩压"
-            controls-position="right"
-          />
+      <el-form-item v-if="isBloodPressure" label="血压 (mmHg)">
+        <div class="blood-pressure-input">
+          <div class="bp-field">
+            <span class="bp-label">收缩压(高压)</span>
+            <el-input-number
+              v-model="form.valueSystolic"
+              :min="60"
+              :max="250"
+              :precision="0"
+              placeholder="120"
+              controls-position="right"
+            />
+          </div>
           <span class="separator">/</span>
-          <el-input-number
-            v-model="form.valueDiastolic"
-            :min="40"
-            :max="150"
-            :precision="0"
-            placeholder="舒张压"
-            controls-position="right"
-          />
-          <span class="unit">{{ currentType?.unit }}</span>
+          <div class="bp-field">
+            <span class="bp-label">舒张压(低压)</span>
+            <el-input-number
+              v-model="form.valueDiastolic"
+              :min="40"
+              :max="150"
+              :precision="0"
+              placeholder="80"
+              controls-position="right"
+            />
+          </div>
         </div>
-        <div v-else class="single-input">
+      </el-form-item>
+
+      <el-form-item v-else-if="isBloodSugar" :label="currentType?.label">
+        <div class="blood-sugar-form">
+          <el-radio-group v-model="form.measurePoint" class="measure-point-group">
+            <el-radio :value="1">空腹</el-radio>
+            <el-radio :value="2">餐后</el-radio>
+          </el-radio-group>
+          <div class="sugar-hint" v-if="form.measurePoint">
+            <span v-if="form.measurePoint === 1">正常参考：3.9~6.1 mmol/L</span>
+            <span v-else-if="form.measurePoint === 2">正常参考：< 7.8 mmol/L</span>
+          </div>
+          <div class="single-input" style="margin-top: 12px;">
+            <el-input-number
+              v-model="form.value"
+              :min="0"
+              :max="100"
+              :precision="1"
+              :step="0.1"
+              controls-position="right"
+            />
+            <span class="unit">{{ currentType?.unit }}</span>
+          </div>
+        </div>
+      </el-form-item>
+
+      <el-form-item v-else-if="props.type === 3" :label="currentType?.label">
+        <div class="single-input">
           <el-input-number
             v-model="form.value"
             :min="0"
-            :max="props.type === 5 ? 300 : 100"
+            :max="300"
             :precision="1"
-            :step="props.type === 3 ? 1 : 0.1"
+            :step="1"
             controls-position="right"
           />
           <span class="unit">{{ currentType?.unit }}</span>
@@ -156,15 +203,25 @@ const handleSubmit = async () => {
 <style scoped>
 .blood-pressure-input {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 12px;
+}
+.bp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bp-label {
+  font-size: 12px;
+  color: #999;
 }
 .blood-pressure-input :deep(.el-input-number) {
-  width: 120px;
+  width: 110px;
 }
 .separator {
-  font-size: 18px;
+  font-size: 20px;
   color: #999;
+  padding-bottom: 8px;
 }
 .unit {
   color: #666;
@@ -177,5 +234,17 @@ const handleSubmit = async () => {
 }
 .single-input :deep(.el-input-number) {
   width: 180px;
+}
+.blood-sugar-form {
+  display: flex;
+  flex-direction: column;
+}
+.measure-point-group {
+  margin-bottom: 8px;
+}
+.sugar-hint {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 8px;
 }
 </style>

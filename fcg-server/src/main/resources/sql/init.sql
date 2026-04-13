@@ -147,7 +147,7 @@ CREATE TABLE `health_vital` (
     `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '记录ID',
     `user_id`        BIGINT       NOT NULL COMMENT '用户ID',
     `family_id`      BIGINT       NOT NULL COMMENT '所属家庭ID',
-    `type`           TINYINT      NOT NULL COMMENT '类型 1-血压 2-血糖 3-心率 4-体温 5-体重',
+    `type`           TINYINT      NOT NULL COMMENT '类型 1-血压 2-血糖 3-体重',
     `value_systolic` DECIMAL(5,1) DEFAULT NULL COMMENT '收缩压（血压专用）',
     `value_diastolic` DECIMAL(5,1) DEFAULT NULL COMMENT '舒张压（血压专用）',
     `value`          DECIMAL(6,2) DEFAULT NULL COMMENT '数值（血糖/心率/体温/体重）',
@@ -377,10 +377,14 @@ INSERT INTO `health_vital` (`user_id`, `family_id`, `type`, `value`, `unit`, `me
 (3, 1, 2, 9.6, 'mmol/L', '2026-03-10 10:08:00', 2, '早餐后2小时'),
 (3, 1, 2, 6.7, 'mmol/L', '2026-03-11 07:00:00', 1, '今日空腹');
 
--- 心率（近3天）
+-- 体重记录（近7天）
 INSERT INTO `health_vital` (`user_id`, `family_id`, `type`, `value`, `unit`, `measure_time`) VALUES
-(3, 1, 3, 72.0, 'bpm', '2026-03-09 07:35:00'),
-(3, 1, 3, 75.0, 'bpm', '2026-03-10 07:38:00'),
-(3, 1, 3, 71.0, 'bpm', '2026-03-11 07:35:00');
+(3, 1, 3, 75.5, 'kg', '2026-03-05 07:00:00'),
+(3, 1, 3, 75.3, 'kg', '2026-03-06 07:00:00'),
+(3, 1, 3, 75.2, 'kg', '2026-03-07 07:00:00'),
+(3, 1, 3, 75.0, 'kg', '2026-03-08 07:00:00'),
+(3, 1, 3, 74.8, 'kg', '2026-03-09 07:00:00'),
+(3, 1, 3, 74.6, 'kg', '2026-03-10 07:00:00'),
+(3, 1, 3, 74.5, 'kg', '2026-03-11 07:00:00');
 
 SET FOREIGN_KEY_CHECKS = 1;

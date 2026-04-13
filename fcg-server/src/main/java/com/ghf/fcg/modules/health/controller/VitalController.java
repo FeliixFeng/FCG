@@ -24,7 +24,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,11 +40,41 @@ public class VitalController {
     private final IUserService userService;
 
     @PostMapping
-    @Operation(summary = "新增体征记录")
+    @Operation(summary = "新增体征记录", description = "当天同类型记录仅保留最新一条（覆盖）")
     public Result<Long> create(@RequestBody @Valid VitalCreateDTO dto) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
         validateFamilyUser(familyId, dto.getUserId());
+
+        LocalDateTime measureTime = dto.getMeasureTime();
+        LocalDate today = measureTime.toLocalDate();
+        LocalDateTime dayStart = today.atStartOfDay();
+        LocalDateTime dayEnd = today.atTime(LocalTime.MAX);
+
+        LambdaQueryWrapper<Vital> queryWrapper = new LambdaQueryWrapper<Vital>()
+                .eq(Vital::getUserId, dto.getUserId())
+                .eq(Vital::getType, dto.getType())
+                .ge(Vital::getMeasureTime, dayStart)
+                .le(Vital::getMeasureTime, dayEnd);
+
+        // 血糖需要区分测量时点（空腹/餐后），其他类型不需要
+        if (dto.getType() == Vital.TYPE_BLOOD_SUGAR && dto.getMeasurePoint() != null) {
+            queryWrapper.eq(Vital::getMeasurePoint, dto.getMeasurePoint());
+        }
+
+        Vital existing = vitalService.getOne(queryWrapper);
+
+        if (existing != null) {
+            existing.setValueSystolic(dto.getValueSystolic());
+            existing.setValueDiastolic(dto.getValueDiastolic());
+            existing.setValue(dto.getValue());
+            existing.setUnit(dto.getUnit());
+            existing.setMeasureTime(measureTime);
+            existing.setMeasurePoint(dto.getMeasurePoint());
+            existing.setNotes(dto.getNotes());
+            vitalService.updateById(existing);
+            return Result.success(existing.getId());
+        }
 
         Vital vital = new Vital();
         vital.setUserId(dto.getUserId());
@@ -52,7 +84,7 @@ public class VitalController {
         vital.setValueDiastolic(dto.getValueDiastolic());
         vital.setValue(dto.getValue());
         vital.setUnit(dto.getUnit());
-        vital.setMeasureTime(dto.getMeasureTime());
+        vital.setMeasureTime(measureTime);
         vital.setMeasurePoint(dto.getMeasurePoint());
         vital.setNotes(dto.getNotes());
 
@@ -181,38 +213,48 @@ public class VitalController {
     public Result<List<VitalVO>> today(@RequestParam(required = false) Long userId) {
         Long currentUserId = UserContext.get().getUserId();
         
-        Vital sampleVital = vitalService.getOne(new LambdaQueryWrapper<Vital>()
-                .eq(Vital::getUserId, currentUserId)
-                .last("LIMIT 1"));
-        
-        Long familyId = sampleVital != null ? sampleVital.getFamilyId() : null;
-        if (familyId == null) {
-            familyId = requireFamilyId(currentUserId);
-        }
-
         Long targetUserId = userId;
         if (targetUserId == null) {
             targetUserId = currentUserId;
         }
+        
+        // 先获取目标用户的 familyId
+        User user = userService.getById(targetUserId);
+        Long familyId = user != null && user.getFamilyId() != null ? user.getFamilyId() : requireFamilyId(currentUserId);
 
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         LocalDateTime todayEnd = LocalDateTime.now();
 
         List<VitalVO> result = new java.util.ArrayList<>();
 
-        for (int type = 1; type <= 5; type++) {
-            LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Vital::getFamilyId, familyId)
-                    .eq(Vital::getUserId, targetUserId)
-                    .eq(Vital::getType, type)
-                    .ge(Vital::getMeasureTime, todayStart)
-                    .le(Vital::getMeasureTime, todayEnd)
-                    .orderByDesc(Vital::getMeasureTime)
-                    .last("LIMIT 1");
+        for (int type = 1; type <= 3; type++) {
+            if (type == 2) {
+                LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(Vital::getFamilyId, familyId)
+                        .eq(Vital::getUserId, targetUserId)
+                        .eq(Vital::getType, type)
+                        .ge(Vital::getMeasureTime, todayStart)
+                        .le(Vital::getMeasureTime, todayEnd)
+                        .orderByDesc(Vital::getMeasureTime);
+                List<Vital> vitals = vitalService.list(wrapper);
+                for (Vital vital : vitals) {
+                    result.add(toVitalVO(vital));
+                }
+            } else {
+                // 其他类型只返回最新一条
+                LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(Vital::getFamilyId, familyId)
+                        .eq(Vital::getUserId, targetUserId)
+                        .eq(Vital::getType, type)
+                        .ge(Vital::getMeasureTime, todayStart)
+                        .le(Vital::getMeasureTime, todayEnd)
+                        .orderByDesc(Vital::getMeasureTime)
+                        .last("LIMIT 1");
 
-            Vital vital = vitalService.getOne(wrapper);
-            if (vital != null) {
-                result.add(toVitalVO(vital));
+                Vital vital = vitalService.getOne(wrapper);
+                if (vital != null) {
+                    result.add(toVitalVO(vital));
+                }
             }
         }
 

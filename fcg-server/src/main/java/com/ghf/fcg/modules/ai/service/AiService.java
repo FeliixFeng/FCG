@@ -35,7 +35,6 @@ public class AiService {
      */
     public String chat(String systemPrompt, String userPrompt) {
         Map<String, Object> requestBody = new HashMap<>();
-        // 使用纯文本模型
         requestBody.put("model", aiProperties.getModel());
 
         List<Map<String, Object>> messages = new ArrayList<>();

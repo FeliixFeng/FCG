@@ -108,3 +108,11 @@ export const fetchUserProfile = (userId) =>
 
 /** 健康周报列表 */
 export const fetchHealthReports = (params) => http.get('/api/health/report/list', { params })
+
+/** 生成健康周报 */
+export const generateHealthReport = (userId) => 
+  http.post('/api/health/report/generate', null, { params: { userId } })
+
+/** 获取最新周报 */
+export const fetchLatestReport = (userId) => 
+  http.get('/api/health/report/latest', { params: { userId } })

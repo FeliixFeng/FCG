@@ -41,9 +41,7 @@ public class Vital {
 
     public static final int TYPE_BLOOD_PRESSURE = 1;
     public static final int TYPE_BLOOD_SUGAR = 2;
-    public static final int TYPE_HEART_RATE = 3;
-    public static final int TYPE_TEMPERATURE = 4;
-    public static final int TYPE_WEIGHT = 5;
+    public static final int TYPE_WEIGHT = 3;
 
     public static final int POINT_FASTING = 1;
     public static final int POINT_AFTER_MEAL = 2;

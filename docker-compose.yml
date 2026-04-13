@@ -10,6 +10,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/
+      - TZ=Asia/Shanghai
 
   fcg-web:
     image: fcg-web:latest
