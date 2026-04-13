@@ -18,6 +18,7 @@ const formError = ref('')
 
 const showAddMedicine = ref(false)
 const ocrLoading = ref(false)
+const ocrStep = ref(0) // 0: 分析图片, 1: 识别文字, 2: 生成结果
 const previewUrl = ref('')
 const coverUrl = ref('')
 
@@ -172,6 +173,15 @@ const removeOcrImage = (idx) => {
 const startOcr = async () => {
   if (ocrFiles.value.length === 0) return
   ocrLoading.value = true
+  ocrStep.value = 0
+  
+  // 步骤动画：每个2秒，最后一个一直跳
+  const stepTimer = setInterval(() => {
+    if (ocrStep.value < 2) {
+      ocrStep.value++
+    }
+  }, 2000)
+  
   try {
     const ocrRes = await recognizeMedicine(ocrFiles.value)
     const parsed = ocrRes.data?.parsed
@@ -186,7 +196,9 @@ const startOcr = async () => {
     console.error('OCR识别失败:', err)
     formError.value = '识别失败，请重试'
   } finally {
+    clearInterval(stepTimer)
     ocrLoading.value = false
+    ocrStep.value = 0
   }
 }
 
@@ -415,7 +427,12 @@ onMounted(() => load())
             </div>
           </div>
           <button v-if="ocrPreviews.length > 0 && !ocrLoading" class="btn-ocr" @click.stop="startOcr">AI识别</button>
-          <div v-if="ocrLoading" class="ocr-loading">识别中...</div>
+          <div v-if="ocrLoading" class="ocr-loading">
+            <div class="ocr-step-single">
+              <span class="step-icon">{{ ['💊', '📷', '🧠'][ocrStep] }}</span>
+              <span class="step-text">{{ ['分析图片中', '识别文字中', '生成结果中'][ocrStep] }}</span>
+            </div>
+          </div>
         </div>
         
         <div class="form">
@@ -494,7 +511,7 @@ onMounted(() => load())
 .btn-link { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.9rem; }
 
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: grid; place-items: center; z-index: 100; }
-.modal { width: min(420px, 92vw); max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 16px; padding: 24px; display: grid; gap: 16px; }
+.modal { width: min(420px, 92vw); max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 16px; padding: 16px; display: grid; gap: 16px; }
 .modal h3 { font-size: 1.1rem; font-weight: 600; text-align: center; }
 
 .ocr-area { border: 2px dashed #dcdfe6; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; }
@@ -502,7 +519,18 @@ onMounted(() => load())
 .preview-img img { max-height: 150px; border-radius: 8px; }
 .preview-multiple { position: relative; }
 .preview-multiple img { max-height: 120px; border-radius: 8px; }
-.ocr-loading { position: absolute; inset: 0; background: rgba(255,255,255,0.8); display: grid; place-items: center; color: var(--primary); font-weight: 600; }
+.ocr-loading { 
+  position: absolute; inset: 0; 
+  background: rgba(255,255,255,0.7);
+  display: flex; align-items: center; justify-content: center;
+}
+.ocr-step-single { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ocr-step-single .step-icon { font-size: 2rem; animation: bounce 0.6s ease-in-out infinite; }
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.ocr-step-single .step-text { font-size: 1rem; color: var(--primary); font-weight: 600; }
 .ocr-tip { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
 .btn-ocr { margin-top: 8px; width: 100%; background: var(--primary); color: #fff; padding: 8px; border-radius: 8px; font-size: 0.9rem; }
 
