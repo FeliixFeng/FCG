@@ -1,8 +1,8 @@
 <script setup>
 import BaseLayout from '../components/common/BaseLayout.vue'
 import { onMounted, ref, reactive, computed } from 'vue'
-import { ElMessage } from 'element-plus'
-import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine } from '../utils/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, updatePlan, deletePlan } from '../utils/api'
 import { useUserStore } from '../stores/user'
 import { compressImage, fileToBase64 } from '../utils/image'
 
@@ -13,16 +13,20 @@ const planList = ref([])
 const loading = ref(false)
 const error = ref('')
 
+const activeTab = ref('cabinet')
+const familyMembers = ref([])
+const planFormMemberId = ref(null)
+
 const showCreatePlan = ref(false)
 const submitting = ref(false)
 const formError = ref('')
 
 const showAddMedicine = ref(false)
-const showEditMedicine = ref(false)  // 详情弹窗
-const showEditMedicineForm = ref(false)  // 编辑弹窗
+const showEditMedicine = ref(false)
+const showEditMedicineForm = ref(false)
 const editingMedicine = ref(null)
 const ocrLoading = ref(false)
-const ocrStep = ref(0) // 0: 分析图片, 1: 识别文字, 2: 生成结果
+const ocrStep = ref(0)
 const previewUrl = ref('')
 const coverUrl = ref('')
 
@@ -46,35 +50,38 @@ const load = async () => {
   }
 }
 
-const todayPlans = computed(() => {
-  const today = new Date().getDay() || 7
-  return planList.value.filter(p => {
-    if (p.status === 0) return false
-    const days = p.takeDays?.split(',') || []
-    return days.includes(String(today))
-  })
+const lowStockCount = computed(() =>
+  medicineList.value.filter(m => m.stock != null && m.stock < 10).length
+)
+
+const expiringSoonCount = computed(() => {
+  const now = new Date()
+  const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  return medicineList.value.filter(m => {
+    if (!m.expireDate) return false
+    const d = new Date(m.expireDate)
+    return d > now && d <= soon
+  }).length
 })
 
-const lowStockCount = computed(() => {
-  return medicineList.value.filter(m => m.stock != null && m.stock < 10).length
-})
+const getMedicineName = (medicineId) =>
+  medicineList.value.find(m => m.id == medicineId)?.name || '未知药品'
 
-const plansByUser = computed(() => {
-  const map = {}
-  planList.value.forEach(p => {
-    const userId = p.userId
-    if (!map[userId]) map[userId] = []
-    map[userId].push(p)
-  })
-  return map
-})
+const getExpireStatus = (expireDate) => {
+  if (!expireDate) return null
+  const now = new Date()
+  const d = new Date(expireDate)
+  if (d < now) return 'expired'
+  const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  return d <= soon ? 'soon' : 'ok'
+}
 
-const medicineOptions = computed(() => {
-  return medicineList.value.map(m => ({
+const medicineOptions = computed(() =>
+  medicineList.value.map(m => ({
     value: m.id,
     label: m.name + (m.specification ? ` (${m.specification})` : '')
   }))
-})
+)
 
 const stockUnitOptions = ['片', '粒', 'ml', '支', '瓶']
 
@@ -98,7 +105,28 @@ const medicineForm = reactive({
   usageNotes: ''
 })
 
+const slotOptions = [
+  { value: '早', label: '早' },
+  { value: '中', label: '中' },
+  { value: '晚', label: '晚' },
+  { value: '睡前', label: '睡前' }
+]
+
+const dayOptions = [
+  { value: '1', label: '一' },
+  { value: '2', label: '二' },
+  { value: '3', label: '三' },
+  { value: '4', label: '四' },
+  { value: '5', label: '五' },
+  { value: '6', label: '六' },
+  { value: '7', label: '日' }
+]
+
+const ocrFiles = ref([])
+const ocrPreviews = ref([])
+
 const resetPlanForm = () => {
+  planFormMemberId.value = currentMemberId.value
   Object.assign(planForm, {
     medicineId: '', dosage: '', remindSlots: [], takeDays: [],
     startDate: new Date().toISOString().split('T')[0], endDate: '', planRemark: ''
@@ -121,90 +149,47 @@ const handleCoverFile = async (e, isEdit = false) => {
   if (!file) return
   try {
     const base64 = await fileToBase64(await compressImage(file))
-    if (isEdit) {
-      coverUrl.value = base64
-    } else {
-      previewUrl.value = base64
-    }
+    if (isEdit) coverUrl.value = base64
+    else previewUrl.value = base64
   } catch (err) {
     console.error(err)
   }
 }
 
-// 标准化日期格式 (OCR可能返回 2027-3-2，需要转成 2027-03-02)
 const normalizeDate = (d) => {
   if (!d) return null
   const match = d.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
-  if (match) {
-    return `${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`
-  }
+  if (match) return `${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`
   return d
 }
-
-const slotOptions = [
-  { value: '早', label: '早' },
-  { value: '中', label: '中' },
-  { value: '晚', label: '晚' },
-  { value: '睡前', label: '睡前' }
-]
-
-const dayOptions = [
-  { value: '1', label: '一' },
-  { value: '2', label: '二' },
-  { value: '3', label: '三' },
-  { value: '4', label: '四' },
-  { value: '5', label: '五' },
-  { value: '6', label: '六' },
-  { value: '7', label: '日' }
-]
-
-const ocrFiles = ref([])
-const ocrPreviews = ref([])
 
 const handleMedicineFile = async (e) => {
   const files = Array.from(e.target.files || [])
   if (files.length === 0) return
-  // 每次只添加一张
   const file = files[0]
   const compressed = await compressImage(file)
   const base64 = await fileToBase64(compressed)
   ocrFiles.value.push(compressed)
   ocrPreviews.value.push(base64)
-  // 默认第一张作为封面
-  if (ocrPreviews.value.length === 1) {
-    coverUrl.value = base64
-  }
-  // 清空input以便重复选择同一张图片
+  if (ocrPreviews.value.length === 1) coverUrl.value = base64
   e.target.value = ''
 }
 
 const removeOcrImage = (idx) => {
   ocrFiles.value.splice(idx, 1)
   ocrPreviews.value.splice(idx, 1)
-  // 更新封面
-  if (idx === 0 && ocrPreviews.value.length > 0) {
-    coverUrl.value = ocrPreviews.value[0]
-  } else if (ocrPreviews.value.length === 0) {
-    coverUrl.value = ''
-  }
+  if (idx === 0 && ocrPreviews.value.length > 0) coverUrl.value = ocrPreviews.value[0]
+  else if (ocrPreviews.value.length === 0) coverUrl.value = ''
 }
 
 const startOcr = async () => {
   if (ocrFiles.value.length === 0) return
   ocrLoading.value = true
   ocrStep.value = 0
-  
-  // 步骤动画：每个2秒，最后一个一直跳
-  const stepTimer = setInterval(() => {
-    if (ocrStep.value < 2) {
-      ocrStep.value++
-    }
-  }, 2000)
-  
+  const stepTimer = setInterval(() => { if (ocrStep.value < 2) ocrStep.value++ }, 2000)
   try {
     const ocrRes = await recognizeMedicine(ocrFiles.value)
     const parsed = ocrRes.data?.parsed
-    
     if (parsed) {
       if (parsed.name) medicineForm.name = parsed.name
       if (parsed.specification) medicineForm.specification = parsed.specification
@@ -231,7 +216,7 @@ const submitPlan = async () => {
   try {
     await createPlan({
       medicineId: Number(planForm.medicineId),
-      userId: Number(currentMemberId.value),
+      userId: Number(planFormMemberId.value || currentMemberId.value),
       dosage: planForm.dosage,
       remindSlots: planForm.remindSlots.join(','),
       takeDays: planForm.takeDays.join(','),
@@ -253,36 +238,19 @@ const submitPlan = async () => {
 const submitMedicine = async () => {
   const nameVal = (medicineForm.name || '').trim()
   const specVal = (medicineForm.specification || '').trim()
-  if (!nameVal) { 
-    formError.value = '请填写药品名称'; 
-    return 
-  }
-  if (!specVal) { 
-    formError.value = '请填写规格'; 
-    return 
-  }
-  if (!medicineForm.stock && medicineForm.stock !== 0) { 
-    formError.value = '请填写库存数量'; 
-    return 
-  }
-  if (!medicineForm.stockUnit) { 
-    formError.value = '请选择库存单位'; 
-    return 
-  }
-  if (!medicineForm.expireDate) { 
-    formError.value = '请填写有效期'; 
-    return 
-  }
+  if (!nameVal) { formError.value = '请填写药品名称'; return }
+  if (!specVal) { formError.value = '请填写规格'; return }
+  if (!medicineForm.stock && medicineForm.stock !== 0) { formError.value = '请填写库存数量'; return }
+  if (!medicineForm.stockUnit) { formError.value = '请选择库存单位'; return }
+  if (!medicineForm.expireDate) { formError.value = '请填写有效期'; return }
   formError.value = ''
   submitting.value = true
   try {
-    // Upload first image to OSS if exists
     let imageUrl = null
     if (ocrFiles.value.length > 0) {
       const uploadRes = await uploadFile(ocrFiles.value[0], 'medicine')
       imageUrl = uploadRes.data || uploadRes.url || uploadRes
     }
-    
     await createMedicine({
       name: medicineForm.name.trim(),
       specification: medicineForm.specification.trim(),
@@ -304,17 +272,10 @@ const submitMedicine = async () => {
   }
 }
 
-const isToday = (dayStr) => {
-  const today = new Date().getDay() || 7
-  return dayStr?.includes(String(today))
-}
-
-// 点击药品卡片 - 查看详情
 const onMedicineClick = async (medicine) => {
   try {
     const res = await fetchMedicine(medicine.id)
     editingMedicine.value = res.data
-    // 回填到表单
     medicineForm.name = res.data.name || ''
     medicineForm.specification = res.data.specification || ''
     medicineForm.indication = res.data.indication || ''
@@ -328,23 +289,18 @@ const onMedicineClick = async (medicine) => {
   }
 }
 
-// 打开编辑表单
 const openEditForm = () => {
-  // 回填到表单（已有数据在 medicineForm 中）
   coverUrl.value = editingMedicine.value?.imageUrl || ''
   showEditMedicine.value = false
   showEditMedicineForm.value = true
 }
 
-// 取消编辑 - 返回详情页
 const cancelEdit = () => {
   showEditMedicineForm.value = false
   resetMedicineForm()
-  // 重新打开详情
   onMedicineClick(editingMedicine.value)
 }
 
-// 保存编辑（编辑弹窗）
 const submitEditMedicine = async () => {
   const nameVal = (medicineForm.name || '').trim()
   const specVal = (medicineForm.specification || '').trim()
@@ -353,27 +309,20 @@ const submitEditMedicine = async () => {
   if (!medicineForm.stock && medicineForm.stock !== 0) { ElMessage.warning('请填写库存数量'); return }
   if (!medicineForm.stockUnit) { ElMessage.warning('请选择库存单位'); return }
   if (!medicineForm.expireDate) { ElMessage.warning('请填写有效期'); return }
-
   submitting.value = true
   try {
-    // 如果有新图片，先上传
     let imageUrl = editingMedicine.value?.imageUrl || null
     if (coverUrl.value && coverUrl.value !== editingMedicine.value?.imageUrl) {
-      // coverUrl 是 base64，需要转为 File
       const base64 = coverUrl.value.split(',')[1]
       const byteCharacters = atob(base64)
       const byteNumbers = new Array(byteCharacters.length)
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i)
-      }
+      for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i)
       const byteArray = new Uint8Array(byteNumbers)
       const blob = new Blob([byteArray], { type: 'image/jpeg' })
       const file = new File([blob], 'medicine.jpg', { type: 'image/jpeg' })
-      
       const uploadRes = await uploadFile(file, 'medicine')
       imageUrl = uploadRes.data || uploadRes.url || uploadRes
     }
-
     await updateMedicine(editingMedicine.value.id, {
       name: medicineForm.name.trim(),
       specification: medicineForm.specification.trim(),
@@ -396,134 +345,240 @@ const submitEditMedicine = async () => {
   }
 }
 
-onMounted(() => load())
+const deleteCurrentMedicine = async () => {
+  try {
+    await ElMessageBox.confirm('确认删除该药品？删除后无法恢复。', '删除药品', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deleteMedicine(editingMedicine.value.id)
+    showEditMedicine.value = false
+    load()
+    ElMessage.success('删除成功')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e?.message || '删除失败')
+  }
+}
+
+const openCreatePlanFromDetail = () => {
+  resetPlanForm()
+  planForm.medicineId = editingMedicine.value.id
+  showEditMedicine.value = false
+  showCreatePlan.value = true
+}
+
+const togglePlanStatus = async (plan) => {
+  const newStatus = plan.status === 1 ? 0 : 1
+  try {
+    await updatePlan(plan.id, { status: newStatus })
+    plan.status = newStatus
+  } catch (e) {
+    ElMessage.error(e?.message || '操作失败')
+  }
+}
+
+const deletePlanItem = async (plan) => {
+  try {
+    await ElMessageBox.confirm('确认删除该计划？', '删除计划', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deletePlan(plan.id)
+    planList.value = planList.value.filter(p => p.id !== plan.id)
+    ElMessage.success('删除成功')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e?.message || '删除失败')
+  }
+}
+
+const loadFamilyMembers = async () => {
+  try {
+    familyMembers.value = await userStore.fetchMembers()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+onMounted(async () => {
+  planFormMemberId.value = currentMemberId.value
+  if (userStore.isAdmin) await loadFamilyMembers()
+  load()
+})
 </script>
 
 <template>
   <BaseLayout>
     <section class="page">
-      <div class="header">
-        <h1>💊 用药计划</h1>
-        <button class="btn-primary" @click="showCreatePlan = true">+ 创建</button>
+      <!-- Tab bar -->
+      <div class="tab-bar">
+        <button class="tab-btn" :class="{ active: activeTab === 'cabinet' }" @click="activeTab = 'cabinet'">
+          药箱
+        </button>
+        <button class="tab-btn" :class="{ active: activeTab === 'plan' }" @click="activeTab = 'plan'">
+          计划
+        </button>
       </div>
 
-      <div class="status-bar">
-        <div class="status-card">
-          <div class="status-num">{{ todayPlans.length }}</div>
-          <div class="status-label">今日待服</div>
-        </div>
-        <div class="status-card warning">
-          <div class="status-num">{{ lowStockCount }}</div>
-          <div class="status-label">库存紧张</div>
-        </div>
-      </div>
-
-      <div class="section">
+      <!-- 药箱 Tab -->
+      <div v-if="activeTab === 'cabinet'" class="tab-content">
         <div class="section-header">
-          <h2>我的药箱 ({{ medicineList.length }})</h2>
-          <button class="btn-link" @click="showAddMedicine = true; resetMedicineForm()">+ 添加药品</button>
+          <span class="section-title">我的药箱</span>
+          <button class="btn-primary-sm" @click="showAddMedicine = true; resetMedicineForm()">+ 添加药品</button>
         </div>
-        <div v-if="medicineList.length > 0" class="medicine-grid">
-          <div v-for="m in medicineList" :key="m.id" class="medicine-card" @click="onMedicineClick(m)">
-            <div class="medicine-card-header">
-              <div class="medicine-name">{{ m.name }}</div>
-              <span v-if="m.imageUrl" class="medicine-img-icon">📷</span>
-            </div>
-            <div class="medicine-spec">{{ m.specification || '-' }}</div>
-            <div class="medicine-stock" :class="{ low: m.stock < 10 }">
-              库存: {{ m.stock ?? 0 }}{{ m.stockUnit || '' }}
-              <span v-if="m.expireDate" class="medicine-expire">· 有效期: {{ m.expireDate }}</span>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-num">{{ medicineList.length }}</div>
+            <div class="stat-label">药品总数</div>
+          </div>
+          <div class="stat-card" :class="{ 'stat-warn': lowStockCount > 0 }">
+            <div class="stat-num">{{ lowStockCount }}</div>
+            <div class="stat-label">库存紧张</div>
+          </div>
+          <div class="stat-card" :class="{ 'stat-warn': expiringSoonCount > 0 }">
+            <div class="stat-num">{{ expiringSoonCount }}</div>
+            <div class="stat-label">即将过期</div>
+          </div>
+        </div>
+
+        <div v-if="loading" class="empty-state">加载中...</div>
+        <div v-else-if="medicineList.length === 0" class="empty-state">暂无药品，点击添加</div>
+        <div v-else class="medicine-grid">
+          <div v-for="m in medicineList" :key="m.id" class="med-card" @click="onMedicineClick(m)">
+            <img v-if="m.imageUrl" :src="m.imageUrl" class="card-thumb" />
+            <div class="med-info">
+              <div class="med-name">{{ m.name }}</div>
+              <div class="med-spec">{{ m.specification || '-' }}</div>
+              <div class="med-footer">
+                <span class="card-stock" :class="{ 'stock-low': m.stock != null && m.stock < 10 }">
+                  库存 {{ m.stock ?? 0 }}{{ m.stockUnit || '' }}
+                </span>
+                <span v-if="m.expireDate" class="card-expire"
+                  :class="{
+                    'expire-expired': getExpireStatus(m.expireDate) === 'expired',
+                    'expire-soon': getExpireStatus(m.expireDate) === 'soon'
+                  }">
+                  {{ m.expireDate }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-        <div v-else class="empty-small">暂无药品，点击添加</div>
       </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="loading" class="muted">加载中...</p>
+      <!-- 计划 Tab -->
+      <div v-if="activeTab === 'plan'" class="tab-content">
+        <div class="section-header">
+          <span class="section-title">用药计划</span>
+          <button class="btn-primary-sm" @click="showCreatePlan = true; resetPlanForm()">+ 创建计划</button>
+        </div>
 
-      <div v-if="!loading && planList.length === 0 && !error" class="empty">
-        <p>暂无用药计划</p>
-        <p class="muted">点击右上角创建计划</p>
-      </div>
-
-      <div v-for="(plans, userId) in plansByUser" :key="userId" class="plan-group">
-        <div class="group-header">{{ userId == currentMemberId ? currentMemberName : '成员' }}的计划</div>
-        <div class="plan-list">
-          <div v-for="plan in plans" :key="plan.id" class="plan-card" :class="{ disabled: plan.status === 0 }">
-            <div class="plan-left">
-              <div class="plan-medicine">{{ medicineOptions.find(m => m.value == plan.medicineId)?.label || '药品' }}</div>
+        <div v-if="loading" class="empty-state">加载中...</div>
+        <div v-else-if="planList.length === 0" class="empty-state">暂无计划，点击创建</div>
+        <div v-else class="plan-list">
+          <div v-for="plan in planList" :key="plan.id" class="plan-card" :class="{ 'plan-disabled': plan.status === 0 }">
+            <div class="plan-status-dot" :class="plan.status === 1 ? 'dot-active' : 'dot-inactive'"></div>
+            <div class="plan-body">
+              <div class="plan-name-row">
+                <span class="plan-name">{{ getMedicineName(plan.medicineId) }}</span>
+                <span class="plan-dosage-badge">{{ plan.dosage }}</span>
+              </div>
               <div class="plan-slots">
                 <span v-for="slot in plan.remindSlots?.split(',')" :key="slot" class="slot-tag">{{ slot }}</span>
               </div>
-              <div class="plan-days" :class="{ today: isToday(plan.takeDays) }">
-                {{ ['一二三四五六日'].map((d, i) => plan.takeDays?.includes(String(i+1)) ? d : '').filter(d => d).join('') || '���天' }}
+              <div class="plan-days">
+                <span v-for="d in dayOptions" :key="d.value" class="day-chip"
+                  :class="{
+                    'day-active': plan.takeDays?.split(',').includes(d.value),
+                    'day-today': d.value === String(new Date().getDay() || 7)
+                  }">{{ d.label }}</span>
               </div>
+              <div class="plan-range">{{ plan.startDate }} ~ {{ plan.endDate || '长期' }}</div>
             </div>
-            <div class="plan-right">
-              <span class="plan-dosage">{{ plan.dosage }}</span>
+            <div class="plan-actions">
+              <button class="action-btn" @click.stop="togglePlanStatus(plan)">
+                {{ plan.status === 1 ? '停用' : '启用' }}
+              </button>
+              <button class="action-btn danger" @click.stop="deletePlanItem(plan)">删除</button>
             </div>
           </div>
         </div>
-      </div>
-
-      <div v-if="planList.length > 0" class="footer-tip">
-        <button class="btn-link" @click="showAddMedicine = true; resetMedicineForm()">+ 添加新药品</button>
       </div>
     </section>
 
-    <div v-if="showCreatePlan" class="modal-mask" @click.self="showCreatePlan = false; resetPlanForm()" @keyup.enter="submitPlan">
-      <div class="modal">
-        <h3>创建用药计划</h3>
-        <div class="form">
-          <select v-model="planForm.medicineId" class="input">
-            <option value="">选择药品</option>
-            <option v-for="m in medicineOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
-          </select>
-
-          <input :value="currentMemberName" class="input" disabled />
-
-          <input v-model="planForm.dosage" class="input" placeholder="剂量（如 1片）" />
-
-          <div class="field-label">服药时段</div>
-          <div class="checkbox-group">
-            <label v-for="s in slotOptions" :key="s.value" class="checkbox">
-              <input type="checkbox" :value="s.value" v-model="planForm.remindSlots" />
-              <span>{{ s.label }}</span>
-            </label>
-          </div>
-
-          <div class="field-label">服药星期</div>
-          <div class="checkbox-group">
-            <label v-for="d in dayOptions" :key="d.value" class="checkbox">
-              <input type="checkbox" :value="d.value" v-model="planForm.takeDays" />
-              <span>{{ d.label }}</span>
-            </label>
-          </div>
-
-          <div class="form-row">
-            <input v-model="planForm.startDate" class="input" type="date" />
-            <span class="muted">至</span>
-            <input v-model="planForm.endDate" class="input" type="date" />
-          </div>
-
-          <input v-model="planForm.planRemark" class="input" placeholder="用药注意（可选）" />
+    <!-- 创建计划弹窗 -->
+    <el-dialog v-model="showCreatePlan" title="创建用药计划" width="min(460px, 92vw)"
+      :close-on-click-modal="false" @close="resetPlanForm" @keyup.enter="submitPlan">
+      <div class="dlg-form">
+        <div class="dlg-field">
+          <label class="dlg-label">药品</label>
+          <el-select v-model="planForm.medicineId" placeholder="选择药品" style="width:100%">
+            <el-option v-for="m in medicineOptions" :key="m.value" :value="m.value" :label="m.label" />
+          </el-select>
         </div>
 
-        <p v-if="formError" class="error">{{ formError }}</p>
-        <div class="modal-actions">
-          <button class="btn ghost" @click="showCreatePlan = false; resetPlanForm()">取消</button>
-          <button class="btn-primary" :disabled="submitting" @click="submitPlan">
-            {{ submitting ? '提交中...' : '确认' }}
-          </button>
+        <div v-if="userStore.isAdmin && familyMembers.length > 0" class="dlg-field">
+          <label class="dlg-label">为谁创建</label>
+          <el-select v-model="planFormMemberId" style="width:100%">
+            <el-option v-for="m in familyMembers" :key="m.id" :value="m.id" :label="m.nickname || m.username" />
+          </el-select>
         </div>
+        <div v-else class="dlg-field">
+          <label class="dlg-label">成员</label>
+          <el-input :model-value="currentMemberName" disabled />
+        </div>
+
+        <div class="dlg-field">
+          <label class="dlg-label">剂量</label>
+          <el-input v-model="planForm.dosage" placeholder="如：1片、5ml" />
+        </div>
+
+        <div class="dlg-field">
+          <label class="dlg-label">服药时段</label>
+          <div class="chip-group">
+            <label v-for="s in slotOptions" :key="s.value" class="chip-label">
+              <input type="checkbox" :value="s.value" v-model="planForm.remindSlots" hidden />
+              <span class="chip" :class="{ 'chip-active': planForm.remindSlots.includes(s.value) }">{{ s.label }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="dlg-field">
+          <label class="dlg-label">服药星期</label>
+          <div class="chip-group">
+            <label v-for="d in dayOptions" :key="d.value" class="chip-label">
+              <input type="checkbox" :value="d.value" v-model="planForm.takeDays" hidden />
+              <span class="chip" :class="{ 'chip-active': planForm.takeDays.includes(d.value) }">{{ d.label }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="dlg-field">
+          <label class="dlg-label">日期范围</label>
+          <div class="date-row">
+            <el-date-picker v-model="planForm.startDate" type="date" value-format="YYYY-MM-DD"
+              placeholder="开始日期" style="flex:1" />
+            <span class="date-sep">至</span>
+            <el-date-picker v-model="planForm.endDate" type="date" value-format="YYYY-MM-DD"
+              placeholder="长期" style="flex:1" />
+          </div>
+        </div>
+
+        <div class="dlg-field">
+          <label class="dlg-label">备注（可选）</label>
+          <el-input v-model="planForm.planRemark" placeholder="用药注意事项" />
+        </div>
+
+        <p v-if="formError" class="dlg-error">{{ formError }}</p>
       </div>
-    </div>
+      <template #footer>
+        <el-button @click="showCreatePlan = false; resetPlanForm()">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitPlan">确认创建</el-button>
+      </template>
+    </el-dialog>
 
-    <div v-if="showAddMedicine" class="modal-mask" @click.self="showAddMedicine = false; resetMedicineForm()" @keyup.enter="submitMedicine">
-      <div class="modal">
-        <h3>添加药品</h3>
-        
+    <!-- 添加药品弹窗 -->
+    <el-dialog v-model="showAddMedicine" title="添加药品" width="min(460px, 92vw)"
+      :close-on-click-modal="false" @close="resetMedicineForm" @keyup.enter="submitMedicine">
+      <div class="dlg-form">
         <div class="image-uploader">
           <div class="image-list">
             <div v-for="(url, idx) in ocrPreviews" :key="idx" class="image-thumb">
@@ -536,292 +591,274 @@ onMounted(() => load())
               <span>+</span>
             </div>
           </div>
-          <button v-if="ocrPreviews.length > 0 && !ocrLoading" class="btn-ocr" @click.stop="startOcr">AI识别</button>
-          <div v-if="ocrLoading" class="ocr-loading">
-            <div class="ocr-step-single">
-              <span class="step-icon">{{ ['💊', '📷', '🧠'][ocrStep] }}</span>
-              <span class="step-text">{{ ['分析图片中', '识别文字中', '生成结果中'][ocrStep] }}</span>
-            </div>
+          <el-button v-if="ocrPreviews.length > 0 && !ocrLoading" size="small" @click.stop="startOcr">
+            AI 识别
+          </el-button>
+          <div v-if="ocrLoading" class="ocr-loading-row">
+            <span class="step-icon" style="animation: bounce 0.6s ease-in-out infinite">
+              {{ ['💊', '📷', '🧠'][ocrStep] }}
+            </span>
+            <span class="step-text">{{ ['分析图片中', '识别文字中', '生成结果中'][ocrStep] }}</span>
           </div>
-        </div>
-        
-        <div class="form">
-          <input v-model="medicineForm.name" class="input" placeholder="药品名称 *" />
-          <input v-model="medicineForm.specification" class="input" placeholder="规格（如 0.3g*20粒）" />
-          <input v-model="medicineForm.indication" class="input" placeholder="适应症" />
-          <div class="form-row">
-            <input v-model="medicineForm.stock" class="input" type="number" placeholder="库存数量" />
-            <select v-model="medicineForm.stockUnit" class="input">
-              <option value="">单位</option>
-              <option v-for="u in stockUnitOptions" :key="u" :value="u">{{ u }}</option>
-            </select>
-          </div>
-          <input v-model="medicineForm.expireDate" class="input" placeholder="有效期(如2026-12-31)" />
-          <textarea v-model="medicineForm.usageNotes" class="input textarea" placeholder="用法用量/注意事项" rows="2" />
         </div>
 
-        <p v-if="formError" class="error">{{ formError }}</p>
-        <div class="modal-actions">
-          <button class="btn ghost" @click="showAddMedicine = false; resetMedicineForm()">取消</button>
-          <button class="btn-primary" :disabled="submitting" @click="submitMedicine" @keyup.enter="submitMedicine">
-            {{ submitting ? '提交中...' : '确认添加' }}
-          </button>
+        <el-input v-model="medicineForm.name" placeholder="药品名称 *" />
+        <el-input v-model="medicineForm.specification" placeholder="规格（如 0.3g×20粒）" />
+        <el-input v-model="medicineForm.indication" placeholder="适应症" />
+        <div class="date-row">
+          <el-input v-model="medicineForm.stock" type="number" placeholder="库存数量" style="flex:1" />
+          <el-select v-model="medicineForm.stockUnit" placeholder="单位" style="width:90px">
+            <el-option v-for="u in stockUnitOptions" :key="u" :value="u" :label="u" />
+          </el-select>
         </div>
+        <el-date-picker v-model="medicineForm.expireDate" type="date" value-format="YYYY-MM-DD"
+          placeholder="有效期" style="width:100%" />
+        <el-input v-model="medicineForm.usageNotes" type="textarea" :rows="2" placeholder="用法用量/注意事项" />
+
+        <p v-if="formError" class="dlg-error">{{ formError }}</p>
       </div>
-    </div>
+      <template #footer>
+        <el-button @click="showAddMedicine = false; resetMedicineForm()">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitMedicine">确认添加</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 药品详情弹窗 -->
-    <div v-if="showEditMedicine" class="modal-mask" @click.self="showEditMedicine = false">
-      <div class="modal modal-detail">
-        <div class="detail-header">
-          <div class="detail-cover-small" v-if="editingMedicine?.imageUrl">
-            <img :src="editingMedicine.imageUrl" alt="药品图片" />
+    <el-dialog v-model="showEditMedicine" :title="editingMedicine?.name" width="min(420px, 92vw)"
+      :close-on-click-modal="true">
+      <div v-if="editingMedicine" class="detail-body">
+        <div v-if="editingMedicine.imageUrl" class="detail-img-wrap">
+          <img :src="editingMedicine.imageUrl" class="detail-img" />
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">规格</span>
+            <span class="detail-val">{{ editingMedicine.specification || '-' }}</span>
           </div>
-          <div class="detail-header-text">
-            <h2 class="detail-title">{{ editingMedicine?.name }}</h2>
-            <p class="detail-spec">{{ editingMedicine?.specification }}</p>
+          <div class="detail-item">
+            <span class="detail-label">库存</span>
+            <span class="detail-val" :class="{ 'val-warn': editingMedicine.stock != null && editingMedicine.stock < 10 }">
+              {{ editingMedicine.stock ?? 0 }}{{ editingMedicine.stockUnit || '' }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">有效期</span>
+            <span class="detail-val"
+              :class="{
+                'val-danger': getExpireStatus(editingMedicine.expireDate) === 'expired',
+                'val-warn': getExpireStatus(editingMedicine.expireDate) === 'soon'
+              }">
+              {{ editingMedicine.expireDate || '-' }}
+            </span>
           </div>
         </div>
-        
-        <div class="detail-info">
-          <div class="info-row">
-            <span class="info-label">适应症</span>
-            <span class="info-value">{{ editingMedicine?.indication || '暂无' }}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">用法用量</span>
-            <span class="info-value">{{ editingMedicine?.usageNotes || '暂无' }}</span>
-          </div>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">库存</span>
-              <span class="value">{{ editingMedicine?.stock ?? 0 }}{{ editingMedicine?.stockUnit || '' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">有效期</span>
-              <span class="value">{{ editingMedicine?.expireDate || '-' }}</span>
-            </div>
-          </div>
+        <div v-if="editingMedicine.indication" class="detail-section">
+          <span class="detail-label">适应症</span>
+          <p class="detail-text">{{ editingMedicine.indication }}</p>
         </div>
-
-        <div class="modal-actions">
-          <button class="btn danger" @click="deleteCurrentMedicine">删除</button>
-          <div class="action-right">
-            <button class="btn ghost" @click="showEditMedicine = false">关闭</button>
-            <button class="btn-primary" @click="openEditForm">编辑</button>
-          </div>
+        <div v-if="editingMedicine.usageNotes" class="detail-section">
+          <span class="detail-label">用法用量</span>
+          <p class="detail-text">{{ editingMedicine.usageNotes }}</p>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <div style="display:flex;justify-content:space-between;width:100%">
+          <el-button type="danger" plain @click="deleteCurrentMedicine">删除</el-button>
+          <div style="display:flex;gap:8px">
+            <el-button @click="openCreatePlanFromDetail">创建计划</el-button>
+            <el-button type="primary" @click="openEditForm">编辑</el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- 编辑药品弹窗 -->
-    <div v-if="showEditMedicineForm" class="modal-mask" @click.self="cancelEdit">
-      <div class="modal">
-        <h3>编辑药品</h3>
-        
-        <div class="edit-cover-center" @click="$refs.editFileInput.click()">
-          <div v-if="coverUrl || editingMedicine?.imageUrl" class="edit-cover-img">
-            <img :src="coverUrl || editingMedicine?.imageUrl" alt="药品图片" />
-          </div>
+    <el-dialog v-model="showEditMedicineForm" title="编辑药品" width="min(460px, 92vw)"
+      :close-on-click-modal="false" @close="cancelEdit">
+      <div class="dlg-form">
+        <div class="edit-cover-wrap" @click="$refs.editFileInput.click()">
+          <img v-if="coverUrl || editingMedicine?.imageUrl" :src="coverUrl || editingMedicine?.imageUrl" class="edit-cover-img" />
           <div v-else class="edit-cover-placeholder">
-            <span class="plus">📷</span>
-            <span class="text">点击上传</span>
+            <span>📷</span>
+            <span class="edit-cover-hint">点击上传封面</span>
           </div>
           <input ref="editFileInput" type="file" accept="image/*" hidden @change="(e) => handleCoverFile(e, true)" />
         </div>
-        
-        <div class="form">
-          <input v-model="medicineForm.name" class="input" placeholder="药品名称 *" />
-          <input v-model="medicineForm.specification" class="input" placeholder="规格（如 0.3g*20粒）" />
-          <input v-model="medicineForm.indication" class="input" placeholder="适应症" />
-          <div class="form-row">
-            <input v-model="medicineForm.stock" class="input" type="number" placeholder="库存数量" />
-            <select v-model="medicineForm.stockUnit" class="input">
-              <option value="">单位</option>
-              <option v-for="u in stockUnitOptions" :key="u" :value="u">{{ u }}</option>
-            </select>
-          </div>
-          <input v-model="medicineForm.expireDate" class="input" placeholder="有效期(如2026-12-31)" />
-          <textarea v-model="medicineForm.usageNotes" class="input textarea" placeholder="用法用量/注意事项" rows="2" />
-        </div>
 
-        <div class="modal-actions">
-          <button class="btn ghost" @click="cancelEdit">取消</button>
-          <button class="btn-primary" :disabled="submitting" @click="submitEditMedicine">
-            {{ submitting ? '保存中...' : '保存' }}
-          </button>
+        <el-input v-model="medicineForm.name" placeholder="药品名称 *" />
+        <el-input v-model="medicineForm.specification" placeholder="规格（如 0.3g×20粒）" />
+        <el-input v-model="medicineForm.indication" placeholder="适应症" />
+        <div class="date-row">
+          <el-input v-model="medicineForm.stock" type="number" placeholder="库存数量" style="flex:1" />
+          <el-select v-model="medicineForm.stockUnit" placeholder="单位" style="width:90px">
+            <el-option v-for="u in stockUnitOptions" :key="u" :value="u" :label="u" />
+          </el-select>
         </div>
+        <el-date-picker v-model="medicineForm.expireDate" type="date" value-format="YYYY-MM-DD"
+          placeholder="有效期" style="width:100%" />
+        <el-input v-model="medicineForm.usageNotes" type="textarea" :rows="2" placeholder="用法用量/注意事项" />
       </div>
-    </div>
+      <template #footer>
+        <el-button @click="cancelEdit">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitEditMedicine">保存</el-button>
+      </template>
+    </el-dialog>
   </BaseLayout>
 </template>
 
 <style scoped>
-.page { padding: 20px; display: grid; gap: 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; }
-.header h1 { font-size: 1.25rem; font-weight: 600; color: var(--primary); }
+/* ===== Layout ===== */
+.page { padding: 20px; display: flex; flex-direction: column; gap: 16px; min-height: 100%; }
 
-.status-bar { display: flex; gap: 12px; }
-.status-card {
-  flex: 1; background: #fff; border-radius: 12px; padding: 16px;
-  text-align: center; border-bottom: 3px solid var(--primary);
+/* ===== Tab bar ===== */
+.tab-bar {
+  display: flex; gap: 4px;
+  background: rgba(255,255,255,0.6); backdrop-filter: blur(8px);
+  border-radius: 12px; padding: 4px;
+  border: 1px solid rgba(255,255,255,0.8);
 }
-.status-card.warning { border-bottom-color: #f59e0b; }
-.status-num { font-size: 1.5rem; font-weight: 700; }
-.status-label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.tab-btn {
+  flex: 1; padding: 8px 0; border-radius: 9px; font-size: 0.9rem; font-weight: 500;
+  color: #888; background: transparent; transition: all 0.2s; cursor: pointer;
+}
+.tab-btn.active { background: #fff; color: #2d5f5d; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 
-.section { background: #fff; border-radius: 12px; padding: 16px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.section-header h2 { font-size: 1rem; font-weight: 600; }
+/* ===== Tab content ===== */
+.tab-content { display: flex; flex-direction: column; gap: 14px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; }
+.section-title { font-size: 1rem; font-weight: 600; color: #1a1a1a; }
+.btn-primary-sm {
+  background: #2d5f5d; color: #fff; padding: 6px 14px;
+  border-radius: 20px; font-size: 0.85rem; cursor: pointer; transition: opacity 0.15s;
+}
+.btn-primary-sm:active { opacity: 0.8; }
 
-.medicine-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-.medicine-card { background: #fff; border-radius: 12px; padding: 14px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; border: 1px solid #f0f0f0; }
-.medicine-card:active { transform: scale(0.98); }
-.medicine-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.medicine-name { font-weight: 600; font-size: 0.95rem; color: #333; line-height: 1.3; }
-.medicine-img-icon { font-size: 0.85rem; }
-.medicine-spec { font-size: 0.85rem; color: #666; margin-top: 6px; line-height: 1.4; }
-.medicine-stock { font-size: 0.8rem; margin-top: 8px; color: #888; display: flex; flex-wrap: wrap; gap: 4px; }
-.medicine-stock.low { color: #f59e0b; }
-.medicine-expire { color: #888; font-size: 0.75rem; }
-.empty-small { text-align: center; padding: 20px; color: var(--muted); font-size: 0.9rem; }
+/* ===== Stats row ===== */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-card {
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);
+  border-radius: 12px; padding: 12px 8px; text-align: center;
+  border: 1px solid rgba(255,255,255,0.9);
+}
+.stat-card.stat-warn { border-color: #fbbf24; }
+.stat-num { font-size: 1.4rem; font-weight: 700; color: #2d5f5d; }
+.stat-card.stat-warn .stat-num { color: #d97706; }
+.stat-label { font-size: 0.72rem; color: #999; margin-top: 2px; }
 
-.plan-group { display: grid; gap: 8px; }
-.group-header { font-size: 0.85rem; color: var(--muted); padding: 8px 0; }
-.plan-list { display: grid; gap: 8px; }
+/* ===== Medicine grid ===== */
+.medicine-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.med-card {
+  background: rgba(255,255,255,0.9); border-radius: 14px; overflow: hidden;
+  cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+  border: 1px solid rgba(255,255,255,0.9); display: flex; flex-direction: column;
+}
+.med-card:active { transform: scale(0.97); }
+.card-thumb { width: 100%; height: 90px; object-fit: cover; flex-shrink: 0; }
+.med-info { padding: 10px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.med-name { font-weight: 600; font-size: 0.9rem; color: #1a1a1a; line-height: 1.3; }
+.med-spec { font-size: 0.78rem; color: #888; }
+.med-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; flex-wrap: wrap; gap: 2px; }
+.card-stock { font-size: 0.75rem; color: #666; }
+.stock-low { color: #d97706; font-weight: 600; }
+.card-expire { font-size: 0.72rem; color: #aaa; }
+.expire-expired { color: #dc2626; font-weight: 600; }
+.expire-soon { color: #d97706; font-weight: 600; }
+
+/* ===== Plan list ===== */
+.plan-list { display: flex; flex-direction: column; gap: 10px; }
 .plan-card {
-  background: #fff; border-radius: 12px; padding: 14px 16px;
-  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(255,255,255,0.9); border-radius: 14px; padding: 14px;
+  display: flex; gap: 10px; align-items: flex-start;
+  border: 1px solid rgba(255,255,255,0.9); transition: opacity 0.2s;
 }
-.plan-card.disabled { opacity: 0.5; }
-.plan-medicine { font-weight: 600; font-size: 0.95rem; }
-.plan-slots { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-.slot-tag {
-  font-size: 0.75rem; background: #e0f2fe; color: #0369a1;
-  padding: 2px 8px; border-radius: 10px;
-}
-.plan-days { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
-.plan-days.today { color: var(--primary); font-weight: 600; }
-.plan-dosage { font-size: 0.85rem; color: var(--muted); }
-
-.empty { text-align: center; padding: 40px; color: var(--muted); }
-.footer-tip { text-align: center; padding: 20px; }
-.btn-link { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.9rem; }
-
-.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: grid; place-items: center; z-index: 100; }
-.modal { width: min(420px, 92vw); max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 16px; padding: 16px; display: grid; gap: 12px; animation: fadeInUp 0.25s ease-out; }
-.modal-detail { padding: 20px; overflow: hidden; }
-.modal h3 { font-size: 1rem; font-weight: 600; text-align: center; margin: 0 0 8px 0; }
-
-.ocr-area { border: 2px dashed #dcdfe6; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; }
-.ocr-placeholder { color: var(--muted); font-size: 0.9rem; }
-.preview-img img { max-height: 150px; border-radius: 8px; }
-.preview-multiple { position: relative; }
-.preview-multiple img { max-height: 120px; border-radius: 8px; }
-.ocr-loading { 
-  position: absolute; inset: 0; 
-  background: rgba(255,255,255,0.7);
+.plan-disabled { opacity: 0.5; }
+.plan-status-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.dot-active { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+.dot-inactive { background: #d1d5db; }
+.plan-body { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.plan-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plan-name { font-weight: 600; font-size: 0.95rem; color: #1a1a1a; }
+.plan-dosage-badge { font-size: 0.75rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.plan-slots { display: flex; gap: 5px; flex-wrap: wrap; }
+.slot-tag { font-size: 0.75rem; background: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 10px; }
+.plan-days { display: flex; gap: 4px; }
+.day-chip {
+  width: 22px; height: 22px; border-radius: 50%; font-size: 0.7rem;
   display: flex; align-items: center; justify-content: center;
+  background: #f3f4f6; color: #9ca3af;
 }
-.ocr-step-single { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.ocr-step-single .step-icon { font-size: 2rem; animation: bounce 0.6s ease-in-out infinite; }
+.day-active { background: #2d5f5d; color: #fff; }
+.day-active.day-today { background: #1a3d3b; box-shadow: 0 0 0 2px rgba(45,95,93,0.3); }
+.plan-range { font-size: 0.75rem; color: #aaa; }
+.plan-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.action-btn {
+  font-size: 0.75rem; padding: 4px 10px; border-radius: 8px;
+  border: 1px solid #d1d5db; color: #555; background: #fff; cursor: pointer;
+  white-space: nowrap; transition: all 0.15s;
+}
+.action-btn:hover { border-color: #2d5f5d; color: #2d5f5d; }
+.action-btn.danger { border-color: #fca5a5; color: #dc2626; }
+.action-btn.danger:hover { background: #fef2f2; }
+
+/* ===== Empty state ===== */
+.empty-state { text-align: center; padding: 40px 20px; color: #aaa; font-size: 0.9rem; }
+
+/* ===== Dialog form ===== */
+.dlg-form { display: flex; flex-direction: column; gap: 12px; }
+.dlg-field { display: flex; flex-direction: column; gap: 6px; }
+.dlg-label { font-size: 0.82rem; color: #666; font-weight: 500; }
+.dlg-error { color: #dc2626; font-size: 0.82rem; margin: 0; }
+.date-row { display: flex; gap: 8px; align-items: center; }
+.date-sep { color: #aaa; font-size: 0.85rem; flex-shrink: 0; }
+.chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-label { cursor: pointer; }
+.chip { display: block; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; background: #f3f4f6; color: #555; transition: all 0.15s; user-select: none; }
+.chip-active { background: #2d5f5d; color: #fff; }
+
+/* ===== Image uploader ===== */
+.image-uploader { display: flex; flex-direction: column; gap: 10px; }
+.image-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.image-thumb { position: relative; width: 68px; height: 68px; border-radius: 8px; overflow: hidden; }
+.image-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.image-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.55); color: #fff; font-size: 0.65rem; text-align: center; padding: 2px; }
+.image-del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: rgba(0,0,0,0.55); color: #fff; border-radius: 50%; text-align: center; line-height: 18px; cursor: pointer; font-size: 0.8rem; }
+.image-add { width: 68px; height: 68px; border: 2px dashed #dcdfe6; border-radius: 8px; display: grid; place-items: center; font-size: 1.4rem; color: #ccc; cursor: pointer; }
+.ocr-loading-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.step-icon { font-size: 1.4rem; }
+.step-text { font-size: 0.85rem; color: #2d5f5d; font-weight: 500; }
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-6px); }
 }
-.ocr-step-single .step-text { font-size: 1rem; color: var(--primary); font-weight: 600; }
-.ocr-tip { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
-.btn-ocr { margin-top: 8px; width: 100%; background: var(--primary); color: #fff; padding: 8px; border-radius: 8px; font-size: 0.9rem; }
 
-.form { display: grid; gap: 12px; }
-.form-row { display: flex; gap: 8px; align-items: center; }
-.form-row .input { flex: 1; }
-.form-row-2 { display: flex; gap: 12px; }
-.form-row-2 .ocr-area { flex: 1; }
+/* ===== Detail dialog ===== */
+.detail-body { display: flex; flex-direction: column; gap: 14px; }
+.detail-img-wrap { border-radius: 12px; overflow: hidden; }
+.detail-img { width: 100%; height: 160px; object-fit: cover; }
+.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.detail-item { background: #f8f9fa; border-radius: 10px; padding: 10px; }
+.detail-label { display: block; font-size: 0.72rem; color: #999; margin-bottom: 4px; }
+.detail-val { font-size: 0.9rem; font-weight: 600; color: #1a1a1a; }
+.val-warn { color: #d97706; }
+.val-danger { color: #dc2626; }
+.detail-section { display: flex; flex-direction: column; gap: 4px; }
+.detail-text { font-size: 0.88rem; color: #444; line-height: 1.6; margin: 0; }
 
-.image-uploader { display: grid; gap: 12px; }
-.image-list { display: flex; gap: 8px; flex-wrap: wrap; }
-.image-thumb { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; }
-.image-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.image-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 0.7rem; text-align: center; padding: 2px; }
-.image-del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 50%; text-align: center; line-height: 16px; cursor: pointer; }
-.image-add { width: 70px; height: 70px; border: 2px dashed #dcdfe6; border-radius: 8px; display: grid; place-items: center; font-size: 1.5rem; color: #dcdfe6; cursor: pointer; }
-.field-label { font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
-.checkbox-group { display: flex; gap: 8px; flex-wrap: wrap; }
-.checkbox { display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer; }
-.checkbox input { display: none; }
-.checkbox span { padding: 6px 12px; background: #f5f5f5; border-radius: 8px; }
-.checkbox:has(input:checked) span { background: var(--primary); color: #fff; }
-
-.input { padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 8px; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
-.input:disabled { background: #f5f5f5; }
-.textarea { resize: vertical; min-height: 60px; }
-
-.modal-actions { display: flex; gap: 12px; justify-content: space-between; margin-top: 8px; }
-.modal-actions .action-right { display: flex; gap: 8px; }
-.btn-primary { background: var(--primary); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; }
-.btn-primary:disabled { opacity: 0.6; }
-.btn.ghost { background: transparent; border: 1px solid var(--primary); color: var(--primary); padding: 10px 20px; border-radius: 8px; }
-.btn.danger { background: #dc2626; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; }
-.detail-item { display: flex; flex-direction: column; gap: 4px; }
-.detail-label { font-size: 0.8rem; color: var(--muted); }
-.detail-value { font-size: 0.95rem; color: #333; line-height: 1.4; }
-.error { color: #dc2626; font-size: 0.85rem; }
-.muted { color: var(--muted); }
-
-/* 详情弹窗样式 */
-.modal-detail { padding: 20px; }
-.detail-header { display: flex; gap: 14px; margin-bottom: 16px; }
-.detail-cover-small { width: 80px; height: 80px; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: #f5f5f5; }
-.detail-cover-small img { width: 100%; height: 100%; object-fit: cover; }
-.detail-header-text { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-.detail-title { font-size: 1.15rem; font-weight: 600; color: #1a1a1a; margin: 0 0 6px 0; line-height: 1.3; }
-.detail-spec { font-size: 0.9rem; color: #666; margin: 0; line-height: 1.4; }
-
-.detail-info { background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%); border-radius: 14px; padding: 16px; border: 1px solid #eee; }
-.info-row { margin-bottom: 14px; }
-.info-row:last-of-type { margin-bottom: 0; }
-.info-label { display: block; font-size: 0.75rem; color: #999; margin-bottom: 4px; font-weight: 500; }
-.info-value { font-size: 0.9rem; color: #333; line-height: 1.5; }
-.info-grid { display: flex; gap: 16px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed #eee; }
-.info-item { flex: 1; }
-.info-item .label { display: block; font-size: 0.75rem; color: #999; margin-bottom: 4px; }
-.info-item .value { font-size: 1rem; font-weight: 600; color: var(--primary); }
-
-/* 编辑封面 - 居中正方形 */
-.edit-cover-center { width: 140px; height: 140px; border-radius: 16px; overflow: hidden; margin: 0 auto 16px; cursor: pointer; position: relative; background: #f5f5f5; }
-.edit-cover-center .edit-cover-img { width: 100%; height: 100%; }
-.edit-cover-center .edit-cover-img img { width: 100%; height: 100%; object-fit: cover; }
-.edit-cover-center .edit-cover-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px dashed #dee2e6; border-radius: 16px; transition: all 0.2s; }
-.edit-cover-center .edit-cover-placeholder:hover { border-color: var(--primary); background: linear-gradient(135deg, #e8f5f3 0%, #d0ede8 100%); }
-.edit-cover-center .plus { font-size: 2.2rem; margin-bottom: 6px; }
-.edit-cover-center .text { font-size: 0.8rem; color: #868e96; }
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ===== Edit cover ===== */
+.edit-cover-wrap {
+  width: 120px; height: 120px; border-radius: 14px; overflow: hidden;
+  margin: 0 auto; cursor: pointer; background: #f3f4f6;
+  display: flex; align-items: center; justify-content: center;
 }
-.modal { animation: fadeInUp 0.25s ease-out; }
+.edit-cover-img { width: 100%; height: 100%; object-fit: cover; }
+.edit-cover-placeholder { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #aaa; font-size: 1.6rem; }
+.edit-cover-hint { font-size: 0.75rem; }
 
 @media (max-width: 768px) {
   .page { padding: 12px; gap: 12px; }
-  .header { flex-direction: row; align-items: center; }
-  .header h1 { font-size: 1.1rem; }
-  .btn-primary { padding: 8px 16px; font-size: 0.9rem; }
-  .status-bar { gap: 8px; }
-  .status-card { padding: 12px; }
-  .status-num { font-size: 1.2rem; }
-  .section { padding: 12px; }
-  .medicine-grid { grid-template-columns: 1fr; gap: 8px; }
-  .medicine-card { padding: 10px; }
-  .modal { width: 94vw; padding: 12px; gap: 12px; }
-  .modal h3 { font-size: 1rem; }
-  .form { gap: 10px; }
-  .form-row { flex-direction: column; gap: 8px; }
-  .form-row .input { width: 100%; }
-  .input { padding: 8px 10px; font-size: 0.9rem; }
-  .modal-actions { flex-direction: column; }
-  .modal-actions .action-right { justify-content: flex-end; }
-  .btn.ghost, .btn-primary, .btn.danger { flex: 1; text-align: center; }
+  .medicine-grid { gap: 8px; }
+  .card-thumb { height: 70px; }
+  .stats-row { gap: 8px; }
+  .stat-num { font-size: 1.2rem; }
 }
 </style>
