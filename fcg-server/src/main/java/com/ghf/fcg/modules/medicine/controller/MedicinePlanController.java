@@ -106,12 +106,17 @@ public class MedicinePlanController {
             @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
         Long familyId = requireFamilyId(currentUserId);
+        
+        User currentUser = userService.getById(currentUserId);
+        boolean isAdmin = currentUser != null && currentUser.getRole() != null && currentUser.getRole() == 0;
 
         LambdaQueryWrapper<MedicinePlan> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MedicinePlan::getUserId, currentUserId);
-        if (userId != null) {
-            wrapper.eq(MedicinePlan::getUserId, userId);
+        
+        if (!isAdmin || userId != null) {
+            Long targetUserId = (userId != null) ? userId : currentUserId;
+            wrapper.eq(MedicinePlan::getUserId, targetUserId);
         }
+        
         if (status != null) {
             wrapper.eq(MedicinePlan::getStatus, status);
         }

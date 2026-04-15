@@ -92,6 +92,8 @@ export const updateMedicineRecord = (id, data) => http.put(`/api/medicine/record
 
 export const createPlan = (data) => http.post('/api/medicine/plan', data)
 
+export const deletePlan = (id) => http.delete(`/api/medicine/plan/${id}`)
+
 export const fetchPlanList = (params) => http.get('/api/medicine/plan/list', { params })
 
 // ========== 健康模块 ==========

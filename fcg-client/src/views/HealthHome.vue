@@ -5,7 +5,7 @@ import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetch
 import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
 import BaseLayout from '../components/common/BaseLayout.vue'
 import * as echarts from 'echarts'
-import { Delete, Plus, Refresh } from '@element-plus/icons-vue'
+import { Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 
@@ -102,6 +102,8 @@ watch(selectedMember, (newVal, oldVal) => {
     loadWeeklyData()
     loadLatestReport()
     loadReportList()
+    // 切换成员后重新初始化图表，避免 dispose 后容器失效
+    setTimeout(initChart, 100)
   }
 })
 
@@ -161,7 +163,7 @@ const loadReportList = async () => {
     
     reportList.value = allReports.filter(report => {
       const reportStart = new Date(report.weekStart)
-      return reportStart < weekStart || reportStart.getTime() === weekStart.getTime()
+      return reportStart < weekStart
     }).slice(0, 6)
   } catch (e) {
     console.error('加载历史周报失败', e)
@@ -169,10 +171,20 @@ const loadReportList = async () => {
 }
 
 const handleGenerateReport = async () => {
+  if (!selectedMember.value) {
+    ElMessage.warning('请先选择成员')
+    return
+  }
+  const userId = Number(selectedMember.value)
+  if (isNaN(userId) || userId <= 0) {
+    ElMessage.warning('成员信息无效')
+    return
+  }
   reportLoading.value = true
   try {
-    await generateHealthReport(selectedMember.value)
+    await generateHealthReport(userId)
     await loadLatestReport()
+    await loadReportList()
     ElMessage.success('周报生成成功')
   } catch (e) {
     console.error('生成周报失败', e)
@@ -679,24 +691,27 @@ onUnmounted(() => {
       <section class="today-vitals">
         <h2 class="section-title">今日体征</h2>
         <div class="vital-cards">
-          <div v-for="t in typeOptions" :key="t.value" class="vital-card" :style="{ borderBottomColor: getVitalBorderColor(t.value, todayVitals) }" @click="openAddDialog(t.value)">
-            <div class="card-icon">{{ t.icon }}</div>
-            <div class="card-value">
-              <template v-if="t.value === 2 && typeof getVitalValue(t.value, todayVitals) === 'object'">
-                <span>空腹{{ getVitalValue(t.value, todayVitals).fasting }}</span>
-                <br>
-                <span>餐后{{ getVitalValue(t.value, todayVitals).postMeal }}</span>
-              </template>
-              <template v-else>
-                {{ getVitalValue(t.value, todayVitals) }}
-              </template>
-            </div>
-            <div class="card-label">{{ t.label }}</div>
-            <div class="card-unit">
-              {{ t.value === 2 ? (todayVitals.some(v => v.type === 2) ? 'mmol/L' : '点击记录') : (todayVitals.some(v => v.type === t.value) ? t.unit : '点击记录') }}
-            </div>
-            <div class="card-add">
-              <Plus />
+          <div v-for="t in typeOptions" :key="t.value" class="vital-card" @click="openAddDialog(t.value)">
+            <div class="vital-card-content">
+              <div class="vital-icon-wrap">
+                <span class="vital-icon">{{ t.icon }}</span>
+              </div>
+              <div class="vital-text">
+                <div class="vital-value">
+                  <template v-if="t.value === 2 && typeof getVitalValue(t.value, todayVitals) === 'object'">
+                    <span>空腹 {{ getVitalValue(t.value, todayVitals).fasting }}</span>
+                    <span class="vital-divider">/</span>
+                    <span>餐后 {{ getVitalValue(t.value, todayVitals).postMeal }}</span>
+                  </template>
+                  <template v-else>
+                    {{ getVitalValue(t.value, todayVitals) }}
+                  </template>
+                </div>
+                <div class="vital-unit">
+                  {{ t.value === 2 ? (todayVitals.some(v => v.type === 2) ? 'mmol/L' : '点击记录') : (todayVitals.some(v => v.type === t.value) ? t.unit : '点击记录') }}
+                </div>
+              </div>
+              <div class="vital-label">{{ t.label }}</div>
             </div>
           </div>
         </div>
@@ -724,8 +739,14 @@ onUnmounted(() => {
       </section>
 
       <section class="health-report">
-        <h2 class="section-title">健康周报</h2>
-        
+        <div class="report-section-header">
+          <h2 class="section-title">健康周报</h2>
+          <button class="regen-btn" @click="handleGenerateReport" :disabled="reportLoading">
+            <Refresh class="btn-icon" :class="{ spinning: reportLoading }" />
+            {{ latestReport ? '重新生成' : '生成周报' }}
+          </button>
+        </div>
+
         <!-- 本周周报卡片 -->
         <div class="current-report-section">
           <h3 class="section-subtitle">本周周报</h3>
@@ -738,19 +759,11 @@ onUnmounted(() => {
             </div>
             <div class="card-info">
               <span class="info-item">用药依从率: {{ latestReport.complianceRate }}%</span>
-              <span class="info-arrow">查看详情 ></span>
+              <span class="info-arrow">查看详情 ›</span>
             </div>
           </div>
           <div v-else class="report-empty">
-            <p>暂无本周周报</p>
-            <el-button type="primary" @click="handleGenerateReport" :loading="reportLoading">
-              生成周报
-            </el-button>
-          </div>
-          <div v-if="latestReport" class="report-actions">
-            <el-button size="small" @click="handleGenerateReport" :loading="reportLoading" class="regen-btn">
-              <Refresh class="btn-icon" /> 重新生成
-            </el-button>
+            <p>暂无本周周报，点击右上角生成</p>
           </div>
         </div>
 
@@ -799,7 +812,7 @@ onUnmounted(() => {
         v-model:visible="dialogVisible"
         :type="dialogType"
         :user-id="selectedMember"
-        @success="() => { loadTodayVitals(); loadWeeklyData(); }"
+        @success="() => { loadTodayVitals(); loadWeeklyData(); loadReportList() }"
       />
     </BaseLayout>
   </div>
@@ -863,70 +876,146 @@ onUnmounted(() => {
 .vital-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .vital-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .vital-card {
+    padding: 10px 8px;
+  }
+  .vital-icon-wrap {
+    width: 32px;
+    height: 32px;
+  }
+  .vital-icon { font-size: 1.1rem; }
+  .vital-value { font-size: 0.9rem; }
+  .vital-unit { font-size: 0.6rem; }
+  .vital-label { font-size: 0.65rem; padding: 2px 6px; }
 }
 
 .vital-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 16px;
-  text-align: center;
+  border-radius: 12px;
+  padding: 14px 12px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   position: relative;
+  border: 1px solid;
+  border-left: 4px solid #5bb5b3;
   overflow: hidden;
-  min-height: 100px;
-  border-bottom: 4px solid transparent;
+}
+
+.vital-card:nth-child(1) {
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+  border-color: #e0f2fe;
+}
+.vital-card:nth-child(2) {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  border-color: #ffedd5;
+}
+.vital-card:nth-child(3) {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  border-color: #dcfce7;
 }
 
 .vital-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: 0 4px 16px rgba(45, 95, 93, 0.15);
+  border-color: #2d5f5d;
 }
 
-.card-icon {
-  font-size: 1.5rem;
-  margin-bottom: 8px;
+.vital-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 16px rgba(45, 95, 93, 0.15);
+  border-color: #2d5f5d;
 }
 
-.card-value {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #2d5f5d;
+.vital-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
-.card-label {
-  font-size: 0.85rem;
-  color: #666;
-  margin-top: 4px;
-}
-
-.card-unit {
-  font-size: 0.75rem;
-  color: #999;
-  margin-top: 2px;
-}
-
-.card-add {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(45, 95, 93, 0.1);
+.vital-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2d5f5d;
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  margin-bottom: 6px;
 }
 
-.vital-card:hover .card-add {
-  opacity: 1;
+.vital-icon { font-size: 1.4rem; }
+
+.vital-text {
+  text-align: center;
+  width: 100%;
+}
+
+.vital-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.vital-divider { margin: 0 4px; color: #94a3b8; }
+
+.vital-unit {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.vital-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  background: rgba(255,255,255,0.6);
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin-top: 6px;
+}
+
+.vital-icon { font-size: 1.5rem; }
+
+.vital-card-right { flex: 1; text-align: left; min-width: 0; }
+.vital-card-right > * { white-space: nowrap; }
+
+.vital-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.vital-divider { margin: 0 6px; color: #94a3b8; }
+
+.vital-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: nowrap;
+}
+
+.vital-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.vital-unit {
+  font-size: 0.7rem;
+  color: #94a3b8;
 }
 
 .trend-chart {
@@ -1044,6 +1133,51 @@ onUnmounted(() => {
   margin-bottom: 32px;
 }
 
+.report-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.report-section-header .section-title {
+  margin: 0;
+}
+
+.regen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #2d5f5d;
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  position: relative;
+  z-index: 2;
+}
+
+.regen-btn:hover:not(:disabled) {
+  background: #1e403f;
+  transform: translateY(-1px);
+}
+
+.regen-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.report-section-header .section-title {
+  margin: 0;
+}
+
 /* 本周周报卡片 */
 .current-report-section {
   margin-bottom: 20px;
@@ -1112,56 +1246,6 @@ onUnmounted(() => {
   opacity: 0.8;
 }
 
-.report-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.report-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.report-period {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.report-risk {
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.report-compliance {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.report-compliance .label {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.report-compliance .value {
-  color: #2d5f5d;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.report-ai {
-  border-top: 1px solid #eee;
-  padding-top: 16px;
-}
-
 .ai-title {
   font-size: 0.9rem;
   font-weight: 600;
@@ -1223,40 +1307,59 @@ onUnmounted(() => {
 
 .report-empty {
   text-align: center;
-  padding: 40px;
-  background: #fff;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .report-empty p {
   color: #999;
-  margin-bottom: 16px;
-}
-
-.report-actions {
-  text-align: center;
-  margin-top: 12px;
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 .btn-icon {
   width: 14px;
   height: 14px;
   margin-right: 4px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.btn-icon.spinning {
+  animation: spin 1s linear infinite;
 }
 
 .regen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(45, 95, 93, 0.2);
+  border-radius: 20px;
   color: #2d5f5d;
-  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.06);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.regen-btn:hover {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 6px 20px rgba(31, 38, 135, 0.1);
+.regen-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #2d5f5d;
+}
+
+.regen-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* 历史周报 */
@@ -1369,6 +1472,11 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .report-section-header {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .vital-cards {

@@ -534,6 +534,32 @@ mvn test -Dtest=UserServiceTest#shouldCreateUser
 - Vite (build tool)
 - Installed: Element Plus, Axios, Pinia, Tailwind CSS
 
+## Git Merge Conventions
+
+### 禁止 Fast-Forward 合并
+
+项目已配置 `git config --local merge.ff=false`，确保每次合并都创建 merge commit，避免历史变成直线。
+
+**合并时必须指定描述信息**，格式：
+```bash
+git merge dev -m "Merge: [功能完成/修复/Bug] - 简要说明"
+```
+
+示例：
+- `git merge dev -m "Merge: 药品OCR功能完成"` - 功能开发完成
+- `git merge dev -m "Merge: 修复登录页面样式问题"` - Bug 修复
+
+**禁止**：直接 `git merge dev` 不加 `-m` 参数，或者使用 `--no-commit` 跳过描述。
+
+### 原因
+
+清晰的 merge commit 信息有助于：
+- 回溯历史：快速定位某个功能是哪个提交引入的
+- 代码审查：明确区分功能开发和 bug 修复
+- 团队协作：后续维护者能理解合并意图
+
+---
+
 ## Common Tasks
 
 ```bash
