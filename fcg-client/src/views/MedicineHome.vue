@@ -98,6 +98,22 @@ const load = async () => {
   }
 }
 
+// 滚动到指定区块
+const scrollToSection = (section, filter = null) => {
+  if (section === 'plans') {
+    const el = document.getElementById('section-plans')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  } else if (section === 'meds') {
+    activeMedFilter.value = filter || 'all'
+    const el = document.getElementById('section-meds')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+}
+
 // 切换成员（管理员）
 const handleMemberChange = (userId) => {
   selectedMemberId.value = userId
@@ -166,7 +182,7 @@ const displayMedicines = computed(() => {
   }
   
   if (activeMedFilter.value === 'low') {
-    list = list.filter(m => m.stock < 10)
+    list = list.filter(m => m.stock < 5)
   } else if (activeMedFilter.value === 'expiring') {
     const now = new Date().getTime()
     list = list.filter(m => {
@@ -184,7 +200,7 @@ const totalFilteredMedsCount = computed(() => {
     const q = searchMedQuery.value.toLowerCase()
     list = list.filter(m => m.name?.toLowerCase().includes(q) || m.indication?.toLowerCase().includes(q))
   }
-  if (activeMedFilter.value === 'low') list = list.filter(m => m.stock < 10)
+  if (activeMedFilter.value === 'low') list = list.filter(m => m.stock < 5)
   else if (activeMedFilter.value === 'expiring') {
     const now = new Date().getTime()
     list = list.filter(m => m.expireDate && (new Date(m.expireDate).getTime() - now) < 30 * 24 * 3600 * 1000 && (new Date(m.expireDate).getTime() - now) > 0)
@@ -197,7 +213,7 @@ const todayPlans = computed(() => {
   const today = new Date().getDay() || 7
   return planList.value.filter(p => p.status !== 0 && (p.takeDays?.split(',') || []).includes(String(today)))
 })
-const lowStockCount = computed(() => medicineList.value.filter(m => m.stock != null && m.stock < 10).length)
+const lowStockCount = computed(() => medicineList.value.filter(m => m.stock != null && m.stock < 5).length)
 const expiringCount = computed(() => {
   const now = new Date().getTime()
   return medicineList.value.filter(m => {
@@ -206,6 +222,31 @@ const expiringCount = computed(() => {
     return (exp - now) < 30 * 24 * 3600 * 1000 && (exp - now) > 0
   }).length
 })
+
+// 判断单个药品是否临期（30天内）
+const isExpiringSoon = (expireDate) => {
+  if (!expireDate) return false
+  const now = new Date().getTime()
+  const exp = new Date(expireDate).getTime()
+  return (exp - now) < 30 * 24 * 3600 * 1000 && (exp - now) > 0
+}
+
+// 判断单个药品是否已过期
+const isExpired = (expireDate) => {
+  if (!expireDate) return false
+  const now = new Date().getTime()
+  const exp = new Date(expireDate).getTime()
+  return exp - now < 0
+}
+
+// 计算药品状态优先级（用于左边框颜色）
+const getMedicineStatus = (m) => {
+  if (isExpired(m.expireDate)) return 'expired'      // 已过期 → 红色
+  if (m.stock < 5 && isExpiringSoon(m.expireDate)) return 'expired'  // 库存不足+临期 → 红色
+  if (m.stock < 5) return 'low'                       // 仅库存不足 → 橙色
+  if (isExpiringSoon(m.expireDate)) return 'expiring' // 仅临期 → 红色
+  return 'normal'
+}
 
 const medicineOptions = computed(() => {
   return medicineList.value.map(m => ({
@@ -275,9 +316,20 @@ const handleCoverFile = async (e, isEdit = false) => {
 
 const normalizeDate = (d) => {
   if (!d) return null
-  const match = d.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
-  if (match) return `${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`
-  return d
+  // 替换常见分隔符为统一格式
+  const normalized = d.trim().replace(/\//g, '-').replace(/\./g, '-')
+  // 验证格式 YYYY-MM-DD
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (!match) return null
+  // 验证日期有效性
+  const year = parseInt(match[1])
+  const month = parseInt(match[2])
+  const day = parseInt(match[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  if (month === 2 && day > 29) return null
+  if ([4,6,9,11].includes(month) && day > 30) return null
+  // 返回标准化格式
+  return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`
 }
 
 const slotOptions = [ { value: '早', label: '早' }, { value: '中', label: '中' }, { value: '晚', label: '晚' }, { value: '睡前', label: '睡前' } ]
@@ -394,7 +446,17 @@ const handleDeletePlan = async (plan) => {
 }
 
 const submitMedicine = async () => {
-  if (!medicineForm.name || !medicineForm.specification || medicineForm.stock === undefined || !medicineForm.stockUnit || !medicineForm.expireDate) {
+  // 验证日期格式
+  if (!medicineForm.expireDate || !medicineForm.expireDate.trim()) {
+    formError.value = '请填写效期'
+    return
+  }
+  const normalizedDate = normalizeDate(medicineForm.expireDate)
+  if (!normalizedDate) {
+    formError.value = '效期格式错误，请使用 YYYY-MM-DD 格式（如：2026-12-31）'
+    return
+  }
+  if (!medicineForm.name || !medicineForm.specification || medicineForm.stock === undefined || !medicineForm.stockUnit) {
     formError.value = '请填写完整的必要信息'; return;
   }
   formError.value = ''
@@ -408,7 +470,7 @@ const submitMedicine = async () => {
     await createMedicine({
       name: medicineForm.name.trim(), specification: medicineForm.specification.trim(),
       stock: Number(medicineForm.stock), stockUnit: medicineForm.stockUnit || null,
-      expireDate: normalizeDate(medicineForm.expireDate), usageNotes: medicineForm.usageNotes || null,
+      expireDate: normalizedDate, usageNotes: medicineForm.usageNotes || null,
       indication: medicineForm.indication || null, imageUrl
     })
     showAddMedicine.value = false
@@ -469,9 +531,20 @@ const cancelEdit = () => {
 }
 
 const submitEditMedicine = async () => {
-  if (!medicineForm.name || !medicineForm.specification || medicineForm.stock === undefined || !medicineForm.stockUnit || !medicineForm.expireDate) {
+  // 验证日期格式
+  if (!medicineForm.expireDate || !medicineForm.expireDate.trim()) {
+    formError.value = '请填写效期'
+    return
+  }
+  const normalizedDate = normalizeDate(medicineForm.expireDate)
+  if (!normalizedDate) {
+    formError.value = '效期格式错误，请使用 YYYY-MM-DD 格式（如：2026-12-31）'
+    return
+  }
+  if (!medicineForm.name || !medicineForm.specification || medicineForm.stock === undefined || !medicineForm.stockUnit) {
     ElMessage.warning('请填写完整的必要信息'); return;
   }
+  formError.value = ''
   submitting.value = true
   try {
     let imageUrl = editingMedicine.value?.imageUrl || null
@@ -531,21 +604,21 @@ onUnmounted(() => {
       <!-- 模块 1：顶部数据看板 (代替废话欢迎语，提供3个核心指标) -->
       <div class="page-section-title">用药概览</div>
       <div class="stats-dashboard">
-        <div class="stat-card blue">
+        <div class="stat-card blue" @click="scrollToSection('plans')" style="cursor: pointer;">
           <div class="stat-icon">💊</div>
           <div class="stat-info">
             <span class="stat-num">{{ todayPlans.length }}</span>
             <span class="stat-desc">今日待服(次)</span>
           </div>
         </div>
-        <div class="stat-card orange">
+        <div class="stat-card orange" @click="scrollToSection('meds', 'low')" style="cursor: pointer;">
           <div class="stat-icon">⚠️</div>
           <div class="stat-info">
             <span class="stat-num">{{ lowStockCount }}</span>
             <span class="stat-desc">库存紧张(款)</span>
           </div>
         </div>
-        <div class="stat-card red">
+        <div class="stat-card red" @click="scrollToSection('meds', 'expiring')" style="cursor: pointer;">
           <div class="stat-icon">⏳</div>
           <div class="stat-info">
             <span class="stat-num">{{ expiringCount }}</span>
@@ -555,7 +628,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 模块 2：用药计划 -->
-      <section class="med-section">
+      <section id="section-plans" class="med-section">
         <h2 class="section-title">
           提醒计划
           <span v-if="currentViewerName" class="viewer-tag">查看：{{ currentViewerName }}</span>
@@ -609,7 +682,7 @@ onUnmounted(() => {
       </section>
 
       <!-- 模块 3：我的药箱 -->
-      <section class="med-section">
+      <section id="section-meds" class="med-section">
         <h2 class="section-title">我的药箱 <span class="title-count">({{ medicineList.length }})</span></h2>
         
         <div class="plan-header-row">
@@ -627,18 +700,18 @@ onUnmounted(() => {
         </div>
         
         <div v-if="displayMedicines.length > 0" class="med-grid">
-          <div v-for="m in displayMedicines" :key="m.id" class="med-card" @click="onMedicineClick(m)">
-            <div class="med-cover">
-              <img v-if="m.imageUrl" :src="m.imageUrl" />
+          <div v-for="m in displayMedicines" :key="m.id" class="med-card" :class="getMedicineStatus(m)" @click="onMedicineClick(m)">
+            <div class="med-header">
+              <span v-if="m.imageUrl" class="med-img">
+                <img :src="m.imageUrl" />
+              </span>
               <span v-else class="med-fallback-icon">💊</span>
-            </div>
-            <div class="med-info">
               <h3 class="med-name">{{ m.name }}</h3>
-              <p class="med-spec">{{ m.specification || '暂无规格' }}</p>
-              <div class="med-status">
-                <span class="stock-tag" :class="{ 'is-low': m.stock < 10 }">余量: {{ m.stock ?? 0 }}{{ m.stockUnit }}</span>
-                <span class="expire-text" v-if="m.expireDate">效期: {{ m.expireDate }}</span>
-              </div>
+            </div>
+            <div class="med-tags">
+              <span class="med-tag spec-tag">{{ m.specification || '暂无规格' }}</span>
+              <span class="med-tag stock-tag" :class="{ 'is-low': m.stock < 5, 'is-expired': isExpired(m.expireDate) }">{{ isExpired(m.expireDate) ? '⚠️ 告罄' : '余量: ' + (m.stock ?? 0) + m.stockUnit }}</span>
+              <span v-if="m.expireDate" class="med-tag expire-tag" :class="{ 'is-expiring': isExpiringSoon(m.expireDate), 'is-expired': isExpired(m.expireDate) }">{{ isExpired(m.expireDate) ? '🚫 已过期' : (isExpiringSoon(m.expireDate) ? '⚠️ 临期' : '效期: ' + m.expireDate) }}</span>
             </div>
           </div>
           
@@ -732,13 +805,16 @@ onUnmounted(() => {
             <div v-if="ocrPreviews.length < 4" class="img-add-btn" @click="$refs.fileInput.click()"><input ref="fileInput" type="file" accept="image/*" hidden @change="handleMedicineFile" /><span class="icon">📷</span><span class="txt">拍药盒</span></div>
           </div>
           <button v-if="ocrPreviews.length > 0 && !ocrLoading" class="ai-btn" @click.stop="startOcr">✨ AI 智能解析</button>
-          <div v-if="ocrLoading" class="ocr-loading-overlay"><div class="loading-icon">🧠</div><div class="loading-txt">解析中...</div></div>
+          <div v-if="ocrLoading" class="ocr-loading-overlay">
+            <div class="loading-icon">{{ ocrStep === 0 ? '📤' : (ocrStep === 1 ? '🔍' : '🧠') }}</div>
+            <div class="loading-txt">{{ ocrStep === 0 ? '正在上传...' : (ocrStep === 1 ? '正在识别...' : '正在解析...') }}</div>
+          </div>
         </div>
         <div class="form-group"><label>药品名称 <span class="req">*</span></label><el-input v-model="medicineForm.name" /></div>
         <div class="form-group"><label>规格 <span class="req">*</span></label><el-input v-model="medicineForm.specification" /></div>
         <div class="form-group"><label>适应症</label><el-input v-model="medicineForm.indication" /></div>
-        <div class="form-group"><label>当前库存 <span class="req">*</span></label><div style="display:flex;gap:8px;"><el-input-number v-model="medicineForm.stock" :min="0" style="flex:2" /><el-select v-model="medicineForm.stockUnit" style="flex:1"><el-option v-for="u in stockUnitOptions" :key="u" :label="u" :value="u" /></el-select></div></div>
-        <div class="form-group"><label>有效期至 <span class="req">*</span></label><el-date-picker v-model="medicineForm.expireDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></div>
+        <div class="form-group"><label>当前库存 <span class="req">*</span></label><div style="display:flex;gap:8px;"><el-input-number v-model="medicineForm.stock" :min="0" style="flex:2" /><el-select v-model="medicineForm.stockUnit" placeholder="单位" style="flex:1"><el-option v-for="u in stockUnitOptions" :key="u" :label="u" :value="u" /></el-select></div></div>
+        <div class="form-group"><label>有效期至 <span class="req">*</span></label><el-input v-model="medicineForm.expireDate" placeholder="如：2026-12-31" /></div>
         <div class="form-group"><label>用法说明建议</label><el-input type="textarea" v-model="medicineForm.usageNotes" :rows="2" /></div>
         <p v-if="formError" class="form-error">{{ formError }}</p>
       </div>
@@ -749,31 +825,47 @@ onUnmounted(() => {
 
     <!-- 药品详情抽屉 -->
     <el-drawer v-model="showEditMedicine" title="药品详情" :direction="drawerDirection" :size="drawerSize" class="custom-drawer" destroy-on-close>
-      <div v-if="editingMedicine" class="form-wrapper">
-        <div style="display:flex; gap:16px; margin-bottom:16px; align-items:center;">
-          <div style="width:80px;height:80px;border-radius:12px;background:#f8fafc;border:1px solid #eee;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-            <img v-if="editingMedicine.imageUrl" :src="editingMedicine.imageUrl" style="width:100%;height:100%;object-fit:cover;"/><span v-else style="font-size:2.5rem;">💊</span>
+      <div v-if="editingMedicine" class="detail-wrapper">
+        <!-- 头部 -->
+        <div class="detail-header">
+          <div class="detail-cover">
+            <img v-if="editingMedicine.imageUrl" :src="editingMedicine.imageUrl" />
+            <span v-else class="detail-fallback-icon">💊</span>
           </div>
-          <div>
-            <h3 style="font-size:1.2rem;font-weight: 600;margin:0 0 4px 0;color:#333;">{{ editingMedicine.name }}</h3>
-            <p style="color:#666;font-size:0.9rem;margin:0;">{{ editingMedicine.specification }}</p>
+          <div class="detail-title">
+            <h3 class="detail-name">{{ editingMedicine.name }}</h3>
+            <p class="detail-spec">{{ editingMedicine.specification || '暂无规格' }}</p>
           </div>
         </div>
-        <div style="background:#f8fafc;border-radius:12px;padding:16px;">
-          <div style="margin-bottom:12px;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">适应症</span><span style="color:#333;">{{ editingMedicine.indication || '暂无说明' }}</span></div>
-          <div style="margin-bottom:16px;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">建议用法</span><span style="color:#333;">{{ editingMedicine.usageNotes || '暂无说明' }}</span></div>
-          <div style="display:flex; gap:16px; border-top:1px dashed #ddd; padding-top:16px;">
-            <div style="flex:1;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">剩余库存</span><span style="color:var(--primary);font-size:1.2rem;font-weight: 600;">{{ editingMedicine.stock ?? 0 }} <small style="font-size:0.9rem">{{ editingMedicine.stockUnit }}</small></span></div>
-            <div style="flex:1;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">有效期至</span><span style="color:#333;font-weight: 600;">{{ editingMedicine.expireDate || '-' }}</span></div>
+        
+        <!-- 信息卡片 -->
+        <div class="detail-info-card">
+          <div class="info-row">
+            <span class="info-label">💡 适应症</span>
+            <span class="info-value">{{ editingMedicine.indication || '暂无说明' }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">📖 用法用量</span>
+            <span class="info-value">{{ editingMedicine.usageNotes || '暂无说明' }}</span>
+          </div>
+          <div class="info-row-row">
+            <div class="info-col">
+              <span class="info-label">📦 剩余库存</span>
+              <span class="info-value highlight">{{ editingMedicine.stock ?? 0 }}<small>{{ editingMedicine.stockUnit }}</small></span>
+            </div>
+            <div class="info-col">
+              <span class="info-label">🗓️ 有效期至</span>
+              <span class="info-value">{{ editingMedicine.expireDate || '-' }}</span>
+            </div>
           </div>
         </div>
       </div>
       <template #footer>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="detail-footer">
           <el-button type="danger" plain @click="deleteCurrentMedicine">删除</el-button>
-          <div style="display:flex;gap:8px;">
+          <div class="detail-actions">
             <el-button plain @click="openEditForm">编辑</el-button>
-            <el-button type="primary" @click="handleCreatePlanFromDetail">➕ 制定计划</el-button>
+            <el-button type="primary" @click="handleCreatePlanFromDetail">制定计划</el-button>
           </div>
         </div>
       </template>
@@ -781,18 +873,36 @@ onUnmounted(() => {
 
     <!-- 编辑药品抽屉 -->
     <el-drawer v-model="showEditMedicineForm" title="更新药品信息" :direction="drawerDirection" :size="drawerSize" :destroy-on-close="true" @closed="cancelEdit" class="custom-drawer">
-      <div class="form-wrapper">
-        <div style="width:100px;height:100px;border-radius:16px;margin:0 auto 16px;background:#f8fafc;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;" @click="$refs.editFileInput.click()">
-          <img v-if="coverUrl || editingMedicine?.imageUrl" :src="coverUrl || editingMedicine?.imageUrl" style="width:100%;height:100%;object-fit:cover;" />
-          <span v-else style="font-size:0.8rem;color:#888;">📷 上传照片</span>
+      <div class="edit-form-wrapper">
+        <!-- 上传图片 -->
+        <div class="edit-cover-wrap" @click="$refs.editFileInput.click()">
+          <img v-if="coverUrl || editingMedicine?.imageUrl" :src="coverUrl || editingMedicine?.imageUrl" />
+          <span v-else class="edit-cover-placeholder">📷 上传照片</span>
           <input ref="editFileInput" type="file" accept="image/*" hidden @change="(e) => handleCoverFile(e, true)" />
         </div>
-        <div class="form-group"><label>名称</label><el-input v-model="medicineForm.name" /></div>
-        <div class="form-group"><label>库存</label><div style="display:flex;gap:8px;"><el-input-number v-model="medicineForm.stock" :min="0" style="flex:2" /><el-select v-model="medicineForm.stockUnit" style="flex:1"><el-option v-for="u in stockUnitOptions" :key="u" :label="u" :value="u" /></el-select></div></div>
-        <div class="form-group"><label>效期</label><el-date-picker v-model="medicineForm.expireDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></div>
+        
+        <!-- 表单 -->
+        <div class="form-group"><label>💊 名称</label><el-input v-model="medicineForm.name" placeholder="药品名称" /></div>
+        <div class="form-group">
+          <label>📦 库存 <span class="req">*</span></label>
+          <div class="stock-input-wrap">
+            <el-input-number v-model="medicineForm.stock" :min="0" :step="1" controls-position="right" />
+            <el-select v-model="medicineForm.stockUnit" placeholder="单位">
+              <el-option v-for="u in stockUnitOptions" :key="u" :label="u" :value="u" />
+            </el-select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>🗓️ 效期 <span class="req">*</span></label>
+          <el-input v-model="medicineForm.expireDate" placeholder="如：2026-12-31" />
+        </div>
+        <p v-if="formError" class="form-error">{{ formError }}</p>
       </div>
       <template #footer>
-        <div style="display:flex;gap:12px;"><el-button style="flex:1" @click="cancelEdit">返回</el-button><el-button type="primary" style="flex:1" :loading="submitting" @click="submitEditMedicine">保存修改</el-button></div>
+        <div class="form-footer">
+          <el-button style="flex:1" @click="cancelEdit">返回</el-button>
+          <el-button type="primary" style="flex:1" :loading="submitting" @click="submitEditMedicine">保存修改</el-button>
+        </div>
       </template>
     </el-drawer>
 
@@ -857,6 +967,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
 }
 .stat-card.blue { background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-color: #e0f2fe; }
 .stat-card.orange { background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); border-color: #ffedd5; }
@@ -925,8 +1041,8 @@ onUnmounted(() => {
 }
 .tab-item.active { background: var(--primary); color: #fff; }
 .sm-tabs .tab-item { padding: 6px 14px; font-size: 0.85rem; }
-.sm-tabs .tab-item.text-orange.active { background: var(--warning); }
-.sm-tabs .tab-item.text-red.active { background: var(--danger); }
+.sm-tabs .tab-item.text-orange.active { background: #f97316; color: #fff; }
+.sm-tabs .tab-item.text-red.active { background: #dc2626; color: #fff; }
 
 /* === 折叠按钮 === */
 .btn-fold {
@@ -989,7 +1105,7 @@ onUnmounted(() => {
 
 
 /* ========================================= */
-/* 4. 药箱卡片：Grid 图片信息流 */
+/* 4. 药箱卡片：流式标签布局 */
 /* ========================================= */
 .header-tools { display: flex; align-items: center; gap: 12px; }
 .search-wrapper { display: flex; align-items: center; background: #f1f5f9; border-radius: 20px; padding: 6px 16px; border: 1px solid transparent; flex: 1; min-width: 150px; transition: 0.2s;}
@@ -997,28 +1113,48 @@ onUnmounted(() => {
 .search-icon { font-size: 0.9rem; margin-right: 8px; color: #94a3b8; }
 .search-input { flex: 1; border: none; background: transparent; font-size: 0.9rem; outline: none; padding: 4px 0; color: var(--text-dark); width: 100%;}
 
-.med-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.med-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .med-card {
-  display: flex; gap: 16px; padding: 16px; background: #fff;
-  border: 1px solid var(--border-line); border-radius: 16px; cursor: pointer; transition: 0.2s;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #5bb5b3;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
 }
-.med-card:hover { border-color: var(--primary); box-shadow: 0 4px 12px rgba(45,95,93,0.06); }
+.med-card:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(45,95,93,0.15); transform: translateY(-1px); }
+/* 库存紧张（<5）：橙色左边框 */
+.med-card.low { border-left-color: #f97316; }
+/* 即将过期（30天内）：红色左边框 */
+.med-card.expiring { border-left-color: #ef4444; }
+/* 已过期：深红色左边框 */
+.med-card.expired { border-left-color: #991b1b; }
 
-.med-cover {
-  width: 70px; height: 70px; background: #f8fafc; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center; overflow: hidden;
-  border: 1px solid #f1f5f9; flex-shrink: 0;
+.med-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.med-img { width: 32px; height: 32px; border-radius: 6px; overflow: hidden; flex-shrink: 0; border: 1px solid #f1f5f9; }
+.med-img img { width: 100%; height: 100%; object-fit: cover; }
+.med-fallback-icon { font-size: 1.2rem; }
+.med-name { font-size: 0.9rem; font-weight: 600; color: #1e293b; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.med-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.med-tag {
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
-.med-cover img { width: 100%; height: 100%; object-fit: cover; }
-.med-fallback-icon { font-size: 2rem; color: #cbd5e1; }
-
-.med-info { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.med-name { font-size: 1rem; font-weight: 600; color: var(--text-dark); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.med-spec { font-size: 0.8rem; color: var(--text-gray); margin: 0 0 10px 0; }
-.med-status { display: flex; justify-content: space-between; align-items: center; }
-.stock-tag { font-size: 0.8rem; color: #475569; font-weight: 600; padding: 2px 8px; background: #f1f5f9; border-radius: 6px; }
-.stock-tag.is-low { background: #fff7ed; color: var(--warning); }
-.expire-text { font-size: 0.75rem; color: #94a3b8; }
+.spec-tag { background: #f1f5f9; color: #64748b; }
+.stock-tag { background: #f0fdf4; color: #15803d; }
+.stock-tag.is-low { background: #fff7ed; color: #ea580c; }
+.stock-tag.is-expired { background: #fef2f2; color: #dc2626; }
+.expire-tag { background: #f8fafc; color: #94a3b8; }
+.expire-tag.is-expiring { background: #fef2f2; color: #dc2626; }
+.expire-tag.is-expired { background: #7f1d1d; color: #fecaca; }
 
 
 /* ========================================= */
@@ -1035,6 +1171,39 @@ onUnmounted(() => {
 .medicine-info-hint .hint-value { font-size: 0.85rem; color: #334155; }
 .req { color: var(--danger); margin-left: 2px; }
 .form-error { color: var(--danger); font-size: 0.85rem; background: #fef2f2; padding: 10px; border-radius: 8px; margin-top: -8px; }
+
+/* 药品详情抽屉样式 */
+.detail-wrapper { display: flex; flex-direction: column; gap: 16px; }
+.detail-header { display: flex; gap: 16px; align-items: center; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+.detail-cover { width: 72px; height: 72px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.detail-cover img { width: 100%; height: 100%; object-fit: cover; }
+.detail-fallback-icon { font-size: 2.2rem; }
+.detail-title { flex: 1; min-width: 0; }
+.detail-name { font-size: 1.1rem; font-weight: 600; color: #1e293b; margin: 0 0 4px 0; }
+.detail-spec { font-size: 0.85rem; color: #64748b; margin: 0; }
+
+.detail-info-card { background: #f8fafc; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.info-row { display: flex; flex-direction: column; gap: 4px; }
+.info-label { font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+.info-value { font-size: 0.9rem; color: #334155; line-height: 1.5; }
+.info-value.highlight { color: var(--primary); font-weight: 600; font-size: 1.1rem; }
+.info-value small { font-size: 0.8rem; font-weight: 400; margin-left: 4px; color: #64748b; }
+.info-row-row { display: flex; gap: 16px; border-top: 1px dashed #e2e8f0; padding-top: 12px; margin-top: 4px; }
+.info-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+.detail-footer { display: flex; justify-content: space-between; align-items: center; }
+.detail-actions { display: flex; gap: 8px; }
+
+/* 编辑药品抽屉样式 */
+.edit-form-wrapper { display: flex; flex-direction: column; gap: 14px; }
+.edit-cover-wrap { width: 100px; height: 100px; border-radius: 16px; margin: 0 auto 16px; background: #f8fafc; border: 2px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+.edit-cover-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.edit-cover-placeholder { font-size: 0.8rem; color: #94a3b8; text-align: center; }
+.stock-input-wrap { display: flex; gap: 8px; }
+.stock-input-wrap .el-input-number { flex: 1; }
+.stock-input-wrap .el-select { width: 80px; }
+.input-hint { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+.form-footer { display: flex; gap: 12px; }
 
 /* OCR 图片区 */
 .ocr-panel { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 16px; background: #f8fafc; position: relative; }
