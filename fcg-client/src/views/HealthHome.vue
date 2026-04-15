@@ -171,9 +171,18 @@ const loadReportList = async () => {
 }
 
 const handleGenerateReport = async () => {
+  if (!selectedMember.value) {
+    ElMessage.warning('请先选择成员')
+    return
+  }
+  const userId = Number(selectedMember.value)
+  if (isNaN(userId) || userId <= 0) {
+    ElMessage.warning('成员信息无效')
+    return
+  }
   reportLoading.value = true
   try {
-    await generateHealthReport(selectedMember.value)
+    await generateHealthReport(userId)
     await loadLatestReport()
     await loadReportList()
     ElMessage.success('周报生成成功')
@@ -682,21 +691,27 @@ onUnmounted(() => {
       <section class="today-vitals">
         <h2 class="section-title">今日体征</h2>
         <div class="vital-cards">
-          <div v-for="t in typeOptions" :key="t.value" class="vital-card" :style="{ borderBottomColor: getVitalBorderColor(t.value, todayVitals) }" @click="openAddDialog(t.value)">
-            <div class="card-icon">{{ t.icon }}</div>
-            <div class="card-value">
-              <template v-if="t.value === 2 && typeof getVitalValue(t.value, todayVitals) === 'object'">
-                <span>空腹{{ getVitalValue(t.value, todayVitals).fasting }}</span>
-                <br>
-                <span>餐后{{ getVitalValue(t.value, todayVitals).postMeal }}</span>
-              </template>
-              <template v-else>
-                {{ getVitalValue(t.value, todayVitals) }}
-              </template>
-            </div>
-            <div class="card-label">{{ t.label }}</div>
-            <div class="card-unit">
-              {{ t.value === 2 ? (todayVitals.some(v => v.type === 2) ? 'mmol/L' : '点击记录') : (todayVitals.some(v => v.type === t.value) ? t.unit : '点击记录') }}
+          <div v-for="t in typeOptions" :key="t.value" class="vital-card" @click="openAddDialog(t.value)">
+            <div class="vital-card-content">
+              <div class="vital-icon-wrap">
+                <span class="vital-icon">{{ t.icon }}</span>
+              </div>
+              <div class="vital-text">
+                <div class="vital-value">
+                  <template v-if="t.value === 2 && typeof getVitalValue(t.value, todayVitals) === 'object'">
+                    <span>空腹 {{ getVitalValue(t.value, todayVitals).fasting }}</span>
+                    <span class="vital-divider">/</span>
+                    <span>餐后 {{ getVitalValue(t.value, todayVitals).postMeal }}</span>
+                  </template>
+                  <template v-else>
+                    {{ getVitalValue(t.value, todayVitals) }}
+                  </template>
+                </div>
+                <div class="vital-unit">
+                  {{ t.value === 2 ? (todayVitals.some(v => v.type === 2) ? 'mmol/L' : '点击记录') : (todayVitals.some(v => v.type === t.value) ? t.unit : '点击记录') }}
+                </div>
+              </div>
+              <div class="vital-label">{{ t.label }}</div>
             </div>
           </div>
         </div>
@@ -861,49 +876,146 @@ onUnmounted(() => {
 .vital-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .vital-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .vital-card {
+    padding: 10px 8px;
+  }
+  .vital-icon-wrap {
+    width: 32px;
+    height: 32px;
+  }
+  .vital-icon { font-size: 1.1rem; }
+  .vital-value { font-size: 0.9rem; }
+  .vital-unit { font-size: 0.6rem; }
+  .vital-label { font-size: 0.65rem; padding: 2px 6px; }
 }
 
 .vital-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 16px;
-  text-align: center;
+  border-radius: 12px;
+  padding: 14px 12px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   position: relative;
+  border: 1px solid;
+  border-left: 4px solid #5bb5b3;
   overflow: hidden;
-  min-height: 100px;
-  border-bottom: 4px solid transparent;
+}
+
+.vital-card:nth-child(1) {
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+  border-color: #e0f2fe;
+}
+.vital-card:nth-child(2) {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  border-color: #ffedd5;
+}
+.vital-card:nth-child(3) {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  border-color: #dcfce7;
 }
 
 .vital-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: 0 4px 16px rgba(45, 95, 93, 0.15);
+  border-color: #2d5f5d;
 }
 
-.card-icon {
-  font-size: 1.5rem;
-  margin-bottom: 8px;
+.vital-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 16px rgba(45, 95, 93, 0.15);
+  border-color: #2d5f5d;
 }
 
-.card-value {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #2d5f5d;
+.vital-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
-.card-label {
-  font-size: 0.85rem;
-  color: #666;
-  margin-top: 4px;
+.vital-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
 }
 
-.card-unit {
-  font-size: 0.75rem;
-  color: #999;
+.vital-icon { font-size: 1.4rem; }
+
+.vital-text {
+  text-align: center;
+  width: 100%;
+}
+
+.vital-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.vital-divider { margin: 0 4px; color: #94a3b8; }
+
+.vital-unit {
+  font-size: 0.7rem;
+  color: #94a3b8;
   margin-top: 2px;
+}
+
+.vital-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  background: rgba(255,255,255,0.6);
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin-top: 6px;
+}
+
+.vital-icon { font-size: 1.5rem; }
+
+.vital-card-right { flex: 1; text-align: left; min-width: 0; }
+.vital-card-right > * { white-space: nowrap; }
+
+.vital-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.vital-divider { margin: 0 6px; color: #94a3b8; }
+
+.vital-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: nowrap;
+}
+
+.vital-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.vital-unit {
+  font-size: 0.7rem;
+  color: #94a3b8;
 }
 
 .trend-chart {
@@ -1026,6 +1138,40 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.report-section-header .section-title {
+  margin: 0;
+}
+
+.regen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #2d5f5d;
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  position: relative;
+  z-index: 2;
+}
+
+.regen-btn:hover:not(:disabled) {
+  background: #1e403f;
+  transform: translateY(-1px);
+}
+
+.regen-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .report-section-header .section-title {
