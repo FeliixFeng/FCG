@@ -1,8 +1,8 @@
 <script setup>
 import BaseLayout from '../components/common/BaseLayout.vue'
-import { onMounted, ref, reactive, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine } from '../utils/api'
+import { onMounted, onUnmounted, ref, reactive, computed } from 'vue'
+import { ElMessage, ElMessageBox, ElCheckbox } from 'element-plus'
+import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, deletePlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, fetchFamilyMembers } from '../utils/api'
 import { useUserStore } from '../stores/user'
 import { compressImage, fileToBase64 } from '../utils/image'
 
@@ -10,8 +10,29 @@ const userStore = useUserStore()
 
 const medicineList = ref([])
 const planList = ref([])
+const familyMembers = ref([]) // 家庭成员列表（管理员用）
 const loading = ref(false)
 const error = ref('')
+
+// 管理员切换查看的成员
+const selectedMemberId = ref(null)
+// 管理员创建计划时选择的成员（独立变量）
+const createPlanMemberId = ref(null)
+const selectedMember = computed(() => {
+  if (!userStore.isAdmin) return userStore.member
+  if (selectedMemberId.value) {
+    return familyMembers.value.find(m => m.userId === selectedMemberId.value) || userStore.member
+  }
+  return userStore.member
+})
+
+// 当前查看的成员名称
+const currentViewerName = computed(() => {
+  if (!userStore.isAdmin) return ''
+  if (selectedMemberId.value === userStore.member?.id) return ''
+  const member = familyMembers.value.find(m => m.userId === selectedMemberId.value)
+  return member?.nickname || ''
+})
 
 // === UI 抽屉状态控制 ===
 const showCreatePlan = ref(false)
@@ -28,25 +49,48 @@ const previewUrl = ref('')
 const coverUrl = ref('')
 
 // === 页面架构优化状态 ===
-const activeUserTab = ref('all') // 用药计划：成员切换
 const searchMedQuery = ref('') // 药箱：搜索关键词
 const activeMedFilter = ref('all') // 药箱：快捷筛选 (all, low, expiring)
 const isPlansExpanded = ref(false) // 计划是否展开全部
 const isMedsExpanded = ref(false) // 药箱是否展开全部
 
+// 检测移动端（使用 ref 便于响应式更新）
+const isMobile = ref(window.innerWidth < 768)
+
+// 抽屉方向：移动端从下往上，桌面端从右往左
+const drawerDirection = computed(() => isMobile.value ? 'btt' : 'rtl')
+const drawerSize = computed(() => isMobile.value ? '85%' : '400px')
+
+// 窗口 resize 事件处理
+const handleResize = () => {
+  isMobile.value = window.innerWidth < 768
+}
+
 const currentMemberId = computed(() => userStore.member?.id)
 const currentMemberName = computed(() => userStore.member?.nickname || userStore.member?.username || '我')
 
+// 加载数据
 const load = async () => {
   error.value = ''
   loading.value = true
   try {
+    // 获取药品和计划
     const [medRes, planRes] = await Promise.all([
       fetchMedicineList({ page: 1, size: 100 }),
       fetchPlanList({ page: 1, size: 100 })
     ])
     medicineList.value = medRes.data.records || []
     planList.value = planRes.data.records || []
+    
+    // 管理员：获取家庭成员列表（排除自己）
+    if (userStore.isAdmin) {
+      const membersRes = await fetchFamilyMembers()
+      familyMembers.value = (membersRes.data || []).filter(m => m.userId !== userStore.member?.id)
+      if (!selectedMemberId.value && userStore.member?.id) {
+        selectedMemberId.value = userStore.member.id
+        createPlanMemberId.value = userStore.member.id
+      }
+    }
   } catch (err) {
     error.value = err?.message || '加载失败'
   } finally {
@@ -54,24 +98,45 @@ const load = async () => {
   }
 }
 
-// 提取计划中的家庭成员
-const userTabs = computed(() => {
-  const tabs = [{ label: '全家提醒', value: 'all' }]
-  const userIds = [...new Set(planList.value.map(p => p.userId))]
-  userIds.forEach(id => {
-    tabs.push({ 
-      label: id == currentMemberId.value ? currentMemberName.value : `成员(${id})`, 
-      value: id 
-    })
-  })
-  return tabs
+// 切换成员（管理员）
+const handleMemberChange = (userId) => {
+  selectedMemberId.value = userId
+}
+
+// 根据角色显示用药计划
+const canCreatePlan = computed(() => userStore.isAdmin || userStore.member?.role === 1)
+
+// 当前选中的成员 ID（用于创建计划时绑定用户）
+const planUserId = computed(() => {
+  if (userStore.isAdmin) {
+    // 创建计划时使用独立的选择器
+    return createPlanMemberId.value || selectedMemberId.value || userStore.member?.id
+  }
+  return currentMemberId.value
+})
+
+// 当前选中成员的名称（用于创建计划时显示）
+const planUserName = computed(() => {
+  if (userStore.isAdmin && selectedMemberId.value) {
+    const member = familyMembers.value.find(m => m.userId === selectedMemberId.value)
+    if (member) return member.nickname
+    if (selectedMemberId.value === userStore.member?.id) return userStore.member?.nickname + '（我）'
+  }
+  return userStore.member?.nickname || userStore.member?.username || '我'
 })
 
 // 动态过滤用药计划 (带折叠截断)
 const displayPlans = computed(() => {
-  let list = activeUserTab.value === 'all' 
-    ? planList.value 
-    : planList.value.filter(p => p.userId === activeUserTab.value)
+  let list = planList.value
+  
+  // 管理员按选择的成员过滤，非管理员只看自己的
+  if (userStore.isAdmin) {
+    if (selectedMemberId.value) {
+      list = list.filter(p => p.userId === selectedMemberId.value)
+    }
+  } else {
+    list = list.filter(p => p.userId === currentMemberId.value)
+  }
   
   // 简易时间线排序
   list.sort((a, b) => {
@@ -82,7 +147,13 @@ const displayPlans = computed(() => {
   return isPlansExpanded.value ? list : list.slice(0, 3)
 })
 const totalFilteredPlansCount = computed(() => {
-  return activeUserTab.value === 'all' ? planList.value.length : planList.value.filter(p => p.userId === activeUserTab.value).length
+  let list = planList.value
+  if (userStore.isAdmin && selectedMemberId.value) {
+    list = list.filter(p => p.userId === selectedMemberId.value)
+  } else if (!userStore.isAdmin) {
+    list = list.filter(p => p.userId === currentMemberId.value)
+  }
+  return list.length
 })
 
 // 动态搜索过滤药箱 (带折叠截断)
@@ -139,8 +210,20 @@ const expiringCount = computed(() => {
 const medicineOptions = computed(() => {
   return medicineList.value.map(m => ({
     value: m.id,
-    label: m.name + (m.specification ? ` (${m.specification})` : '')
+    label: m.name + (m.specification ? ` (${m.specification})` : ''),
+    stockUnit: m.stockUnit
   }))
+})
+
+// 当前选中的药品单位
+const currentMedicineUnit = computed(() => {
+  const med = medicineList.value.find(m => m.id === planForm.medicineId)
+  return med?.stockUnit || ''
+})
+
+// 当前选中药品的详细信息（适应症、用法用量）
+const currentMedicineInfo = computed(() => {
+  return medicineList.value.find(m => m.id === planForm.medicineId)
 })
 
 const stockUnitOptions = ['片', '粒', 'ml', '支', '瓶', '盒', '袋']
@@ -160,6 +243,10 @@ const resetPlanForm = () => {
     medicineId: '', dosage: '', remindSlots: [], takeDays: [],
     startDate: new Date().toISOString().split('T')[0], endDate: '', planRemark: ''
   })
+  // 管理员：重置为当前查看的成员
+  if (userStore.isAdmin) {
+    createPlanMemberId.value = selectedMemberId.value || userStore.member?.id
+  }
   formError.value = ''
 }
 
@@ -195,6 +282,28 @@ const normalizeDate = (d) => {
 
 const slotOptions = [ { value: '早', label: '早' }, { value: '中', label: '中' }, { value: '晚', label: '晚' }, { value: '睡前', label: '睡前' } ]
 const dayOptions = [ { value: '1', label: '一' }, { value: '2', label: '二' }, { value: '3', label: '三' }, { value: '4', label: '四' }, { value: '5', label: '五' }, { value: '6', label: '六' }, { value: '7', label: '日' } ]
+
+// 全选/取消全选服药星期
+const toggleAllDays = (checked) => {
+  if (checked) {
+    planForm.takeDays = ['1', '2', '3', '4', '5', '6', '7']
+  } else {
+    planForm.takeDays = []
+  }
+}
+
+// 获取药品单位
+const getMedicineUnit = (medicineId) => {
+  const med = medicineList.value.find(m => m.id === medicineId)
+  return med?.stockUnit || ''
+}
+
+// 格式化服药时间显示（早中晚睡前顺序）
+const formatRemindSlots = (slots) => {
+  if (!slots) return ''
+  const order = { '早': 1, '中': 2, '晚': 3, '睡前': 4 }
+  return slots.split(',').sort((a, b) => (order[a] || 5) - (order[b] || 5)).join(',')
+}
 
 const ocrFiles = ref([])
 const ocrPreviews = ref([])
@@ -243,15 +352,16 @@ const startOcr = async () => {
 }
 
 const submitPlan = async () => {
-  if (!planForm.medicineId || !planForm.dosage || planForm.remindSlots.length === 0 || planForm.takeDays.length === 0) {
+  if (!planForm.medicineId || !planForm.dosage || planForm.remindSlots.length === 0) {
     formError.value = '请填写完整的必要信息'; return;
   }
   formError.value = ''
   submitting.value = true
   try {
     await createPlan({
-      medicineId: Number(planForm.medicineId), userId: Number(currentMemberId.value), dosage: planForm.dosage,
-      remindSlots: planForm.remindSlots.join(','), takeDays: planForm.takeDays.join(','),
+      medicineId: Number(planForm.medicineId), userId: Number(planUserId.value), dosage: planForm.dosage,
+      remindSlots: planForm.remindSlots.join(','), 
+      takeDays: planForm.takeDays.length > 0 ? planForm.takeDays.join(',') : '1,2,3,4,5,6,7',
       startDate: planForm.startDate, endDate: planForm.endDate || null, planRemark: planForm.planRemark || null
     })
     showCreatePlan.value = false
@@ -262,6 +372,24 @@ const submitPlan = async () => {
     ElMessage.error(err?.message || '创建失败')
   } finally {
     submitting.value = false
+  }
+}
+
+// 删除计划
+const handleDeletePlan = async (plan) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个用药计划吗？', '提示', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await deletePlan(plan.id)
+    ElMessage.success('计划已删除')
+    load()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(err?.message || '删除失败')
+    }
   }
 }
 
@@ -386,7 +514,14 @@ const deleteCurrentMedicine = async () => {
   } catch (e) {}
 }
 
-onMounted(() => load())
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+  load()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 </script>
 
 <template>
@@ -394,6 +529,7 @@ onMounted(() => load())
     <div class="medicine-page-container">
       
       <!-- 模块 1：顶部数据看板 (代替废话欢迎语，提供3个核心指标) -->
+      <div class="page-section-title">用药概览</div>
       <div class="stats-dashboard">
         <div class="stat-card blue">
           <div class="stat-icon">💊</div>
@@ -418,36 +554,47 @@ onMounted(() => load())
         </div>
       </div>
 
-      <!-- 模块 2：用药计划 (车票式排版 + 折叠功能) -->
-      <section class="content-module">
-        <div class="module-header">
-          <h2 class="module-title">提醒计划</h2>
+      <!-- 模块 2：用药计划 -->
+      <section class="med-section">
+        <h2 class="section-title">
+          提醒计划
+          <span v-if="currentViewerName" class="viewer-tag">查看：{{ currentViewerName }}</span>
+        </h2>
+        
+        <!-- 管理员：成员选择 + 新建按钮同一行 -->
+        <div v-if="userStore.isAdmin" class="plan-header-row">
+          <div class="member-switch">
+            <span class="switch-label">查看成员：</span>
+            <el-select 
+              v-model="selectedMemberId" 
+              placeholder="选择成员" 
+              size="default"
+              style="width: 140px;"
+            >
+              <el-option :value="userStore.member?.id" :label="userStore.member?.nickname + '（我）'" />
+              <el-option v-for="m in familyMembers" :key="m.userId" :value="m.userId" :label="m.nickname" />
+            </el-select>
+          </div>
+          <button v-if="canCreatePlan" class="btn-create" @click="showCreatePlan = true; resetPlanForm()">+ 新建计划</button>
+        </div>
+        
+        <!-- 非管理员：只显示新建按钮 -->
+        <div v-else-if="canCreatePlan" class="plan-header-row">
           <button class="btn-create" @click="showCreatePlan = true; resetPlanForm()">+ 新建计划</button>
         </div>
         
-        <div class="custom-tabs">
-          <button v-for="tab in userTabs" :key="tab.value" class="tab-item" :class="{ active: activeUserTab === tab.value }" @click="activeUserTab = tab.value">
-            {{ tab.label }}
-          </button>
-        </div>
-
         <div v-if="displayPlans.length > 0" class="plan-list mt-3">
-          <div v-for="plan in displayPlans" :key="plan.id" class="plan-ticket" :class="{ 'is-disabled': plan.status === 0 }">
-            <!-- 车票左侧：时间与周期 -->
-            <div class="ticket-left">
-              <span class="ticket-time">{{ plan.remindSlots }}</span>
-              <span class="ticket-day" :class="{ 'is-today': isToday(plan.takeDays) }">
-                {{ ['一','二','三','四','五','六','日'].map((d, i) => plan.takeDays?.includes(String(i+1)) ? d : '').filter(d=>d).join(',') || '规律' }}
-              </span>
+          <div v-for="plan in displayPlans" :key="plan.id" class="plan-card" :class="{ 'is-disabled': plan.status === 0 }">
+            <div class="plan-header">
+              <span v-if="userStore.isAdmin" class="plan-badge">{{ plan.userId == currentMemberId ? '我' : '家人' }}</span>
+              <h3 class="plan-name">{{ medicineOptions.find(m => m.value == plan.medicineId)?.label || '未知药品' }}</h3>
             </div>
-            <!-- 车票右侧：药品与剂量 -->
-            <div class="ticket-right">
-              <div class="ticket-head">
-                <span v-if="activeUserTab === 'all'" class="ticket-badge">{{ plan.userId == currentMemberId ? '我' : '家人' }}</span>
-                <h3 class="ticket-med-name">{{ medicineOptions.find(m => m.value == plan.medicineId)?.label || '未知药品' }}</h3>
-              </div>
-              <div class="ticket-dosage">每次 {{ plan.dosage }}</div>
+            <div class="plan-tags">
+              <span class="plan-tag time-tag">{{ formatRemindSlots(plan.remindSlots) }}</span>
+              <span class="plan-tag day-tag">{{ ['一','二','三','四','五','六','日'].map((d, i) => plan.takeDays?.includes(String(i+1)) ? d : '').filter(d=>d).join(',') || '每天' }}</span>
+              <span class="plan-tag dosage-tag">每次 {{ plan.dosage }}{{ getMedicineUnit(plan.medicineId) }}</span>
             </div>
+            <button class="btn-delete-plan" @click.stop="handleDeletePlan(plan)" title="删除">🗑️</button>
           </div>
           
           <!-- 折叠展开按钮 -->
@@ -461,17 +608,16 @@ onMounted(() => load())
         </div>
       </section>
 
-      <!-- 模块 3：家庭药箱 (Grid布局 + 搜索/筛选 + 折叠) -->
-      <section class="content-module">
-        <div class="module-header flex-wrap">
-          <h2 class="module-title">我的药箱 <span class="title-count">({{ medicineList.length }})</span></h2>
-          <div class="header-tools">
-            <div class="search-wrapper">
-              <span class="search-icon">🔍</span>
-              <input type="text" v-model="searchMedQuery" placeholder="搜索药名..." class="search-input" />
-            </div>
-            <button class="btn-solid" @click="showAddMedicine = true; resetMedicineForm()">+ 录入</button>
+      <!-- 模块 3：我的药箱 -->
+      <section class="med-section">
+        <h2 class="section-title">我的药箱 <span class="title-count">({{ medicineList.length }})</span></h2>
+        
+        <div class="plan-header-row">
+          <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" v-model="searchMedQuery" placeholder="搜索药名..." class="search-input" />
           </div>
+          <button class="btn-solid" @click="showAddMedicine = true; resetMedicineForm()">+ 录入</button>
         </div>
         
         <div class="custom-tabs sm-tabs mb-4">
@@ -513,15 +659,64 @@ onMounted(() => load())
 
     <!-- ================= 所有抽屉组件 (保持不变，仅更新内部类名确保不受影响) ================= -->
 
-    <el-drawer v-model="showCreatePlan" title="创建用药计划" direction="rtl" size="400px" :destroy-on-close="true" @closed="resetPlanForm" class="custom-drawer">
+    <el-drawer v-model="showCreatePlan" title="创建用药计划" :direction="drawerDirection" :size="drawerSize" :destroy-on-close="true" @closed="resetPlanForm" class="custom-drawer">
       <div class="form-wrapper">
-        <div class="form-group"><label>关联药品 <span class="req">*</span></label><el-select v-model="planForm.medicineId" placeholder="搜索药品" filterable style="width:100%"><el-option v-for="m in medicineOptions" :key="m.value" :label="m.label" :value="m.value" /></el-select></div>
-        <div class="form-group"><label>执行成员</label><el-input :model-value="currentMemberName" disabled /></div>
-        <div class="form-group"><label>单次服用剂量 <span class="req">*</span></label><el-input v-model="planForm.dosage" placeholder="如：1片、半粒" /></div>
-        <div class="form-group"><label>服药时段 <span class="req">*</span></label><el-checkbox-group v-model="planForm.remindSlots"><el-checkbox-button v-for="s in slotOptions" :key="s.value" :value="s.value">{{ s.label }}</el-checkbox-button></el-checkbox-group></div>
-        <div class="form-group"><label>服药星期 <span class="req">*</span></label><el-checkbox-group v-model="planForm.takeDays"><el-checkbox-button v-for="d in dayOptions" :key="d.value" :value="d.value">{{ d.label }}</el-checkbox-button></el-checkbox-group></div>
-        <div class="form-group"><label>起止日期</label><div style="display:flex;gap:8px;"><el-date-picker v-model="planForm.startDate" type="date" value-format="YYYY-MM-DD" style="flex:1" /><el-date-picker v-model="planForm.endDate" type="date" placeholder="结束(可选)" value-format="YYYY-MM-DD" style="flex:1" /></div></div>
-        <div class="form-group"><label>备注(可选)</label><el-input v-model="planForm.planRemark" placeholder="如：饭后服用" /></div>
+        <!-- 管理员：选择为谁创建计划 -->
+        <div v-if="userStore.isAdmin" class="form-group form-group-sm">
+          <label>👤 为谁创建</label>
+          <el-select v-model="createPlanMemberId" placeholder="选择成员" style="width:100%">
+            <el-option :value="userStore.member?.id" :label="userStore.member?.nickname + '（我）'" />
+            <el-option v-for="m in familyMembers" :key="m.userId" :value="m.userId" :label="m.nickname" />
+          </el-select>
+        </div>
+        <div class="form-group form-group-sm">
+          <label>💊 关联药品 <span class="req">*</span></label>
+          <el-select 
+            v-model="planForm.medicineId" 
+            placeholder="搜索药品" 
+            filterable 
+            style="width:100%"
+            popper-class="medicine-select-popper"
+          >
+            <el-option v-for="m in medicineOptions" :key="m.value" :label="m.label" :value="m.value" />
+          </el-select>
+        </div>
+        
+        <!-- 选中药品后显示参考信息 -->
+        <div v-if="currentMedicineInfo && planForm.medicineId" class="medicine-info-hint">
+          <div v-if="currentMedicineInfo.indication" class="hint-item">
+            <span class="hint-label">适应症：</span>
+            <span class="hint-value">{{ currentMedicineInfo.indication }}</span>
+          </div>
+          <div v-if="currentMedicineInfo.usageNotes" class="hint-item">
+            <span class="hint-label">用法用量：</span>
+            <span class="hint-value">{{ currentMedicineInfo.usageNotes }}</span>
+          </div>
+        </div>
+        <div class="form-group form-group-sm">
+          <label>💉 单次服用剂量 <span class="req">*</span></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <el-input-number v-model="planForm.dosage" :min="1" :step="1" style="width:120px" />
+            <span style="color:#64748b;font-size:0.9rem;">{{ currentMedicineUnit }}</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>⏰ 服药时段 <span class="req">*</span></label>
+          <el-checkbox-group v-model="planForm.remindSlots">
+            <el-checkbox-button v-for="s in slotOptions" :key="s.value" :value="s.value">{{ s.label }}</el-checkbox-button>
+          </el-checkbox-group>
+        </div>
+        <div class="form-group">
+          <label>📅 服药频率</label>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <el-checkbox :value="planForm.takeDays.length === 7" @change="toggleAllDays">全选</el-checkbox>
+          </div>
+          <el-checkbox-group v-model="planForm.takeDays">
+            <el-checkbox-button v-for="d in dayOptions" :key="d.value" :value="d.value">{{ d.label }}</el-checkbox-button>
+          </el-checkbox-group>
+        </div>
+        <div class="form-group"><label>📆 起止日期</label><div style="display:flex;gap:8px;"><el-date-picker v-model="planForm.startDate" type="date" value-format="YYYY-MM-DD" style="flex:1" /><el-date-picker v-model="planForm.endDate" type="date" placeholder="结束(可选)" value-format="YYYY-MM-DD" style="flex:1" /></div></div>
+        <div class="form-group"><label>📝 备注(可选)</label><el-input v-model="planForm.planRemark" placeholder="如：饭后服用" /></div>
         <p v-if="formError" class="form-error">{{ formError }}</p>
       </div>
       <template #footer>
@@ -529,7 +724,7 @@ onMounted(() => load())
       </template>
     </el-drawer>
 
-    <el-drawer v-model="showAddMedicine" title="新药入库" direction="rtl" size="400px" :destroy-on-close="true" @closed="resetMedicineForm" class="custom-drawer">
+    <el-drawer v-model="showAddMedicine" title="新药入库" :direction="drawerDirection" :size="drawerSize" :destroy-on-close="true" @closed="resetMedicineForm" class="custom-drawer">
       <div class="form-wrapper">
         <div class="ocr-panel">
           <div class="ocr-images">
@@ -553,14 +748,14 @@ onMounted(() => load())
     </el-drawer>
 
     <!-- 药品详情抽屉 -->
-    <el-drawer v-model="showEditMedicine" title="药品详情" direction="rtl" size="400px" class="custom-drawer" destroy-on-close>
+    <el-drawer v-model="showEditMedicine" title="药品详情" :direction="drawerDirection" :size="drawerSize" class="custom-drawer" destroy-on-close>
       <div v-if="editingMedicine" class="form-wrapper">
         <div style="display:flex; gap:16px; margin-bottom:16px; align-items:center;">
           <div style="width:80px;height:80px;border-radius:12px;background:#f8fafc;border:1px solid #eee;display:flex;align-items:center;justify-content:center;overflow:hidden;">
             <img v-if="editingMedicine.imageUrl" :src="editingMedicine.imageUrl" style="width:100%;height:100%;object-fit:cover;"/><span v-else style="font-size:2.5rem;">💊</span>
           </div>
           <div>
-            <h3 style="font-size:1.2rem;font-weight:bold;margin:0 0 4px 0;color:#333;">{{ editingMedicine.name }}</h3>
+            <h3 style="font-size:1.2rem;font-weight: 600;margin:0 0 4px 0;color:#333;">{{ editingMedicine.name }}</h3>
             <p style="color:#666;font-size:0.9rem;margin:0;">{{ editingMedicine.specification }}</p>
           </div>
         </div>
@@ -568,8 +763,8 @@ onMounted(() => load())
           <div style="margin-bottom:12px;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">适应症</span><span style="color:#333;">{{ editingMedicine.indication || '暂无说明' }}</span></div>
           <div style="margin-bottom:16px;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">建议用法</span><span style="color:#333;">{{ editingMedicine.usageNotes || '暂无说明' }}</span></div>
           <div style="display:flex; gap:16px; border-top:1px dashed #ddd; padding-top:16px;">
-            <div style="flex:1;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">剩余库存</span><span style="color:var(--primary);font-size:1.2rem;font-weight:bold;">{{ editingMedicine.stock ?? 0 }} <small style="font-size:0.9rem">{{ editingMedicine.stockUnit }}</small></span></div>
-            <div style="flex:1;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">有效期至</span><span style="color:#333;font-weight:bold;">{{ editingMedicine.expireDate || '-' }}</span></div>
+            <div style="flex:1;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">剩余库存</span><span style="color:var(--primary);font-size:1.2rem;font-weight: 600;">{{ editingMedicine.stock ?? 0 }} <small style="font-size:0.9rem">{{ editingMedicine.stockUnit }}</small></span></div>
+            <div style="flex:1;"><span style="display:block;font-size:0.8rem;color:#888;margin-bottom:4px;">有效期至</span><span style="color:#333;font-weight: 600;">{{ editingMedicine.expireDate || '-' }}</span></div>
           </div>
         </div>
       </div>
@@ -585,7 +780,7 @@ onMounted(() => load())
     </el-drawer>
 
     <!-- 编辑药品抽屉 -->
-    <el-drawer v-model="showEditMedicineForm" title="更新药品信息" direction="rtl" size="400px" :destroy-on-close="true" @closed="cancelEdit" class="custom-drawer">
+    <el-drawer v-model="showEditMedicineForm" title="更新药品信息" :direction="drawerDirection" :size="drawerSize" :destroy-on-close="true" @closed="cancelEdit" class="custom-drawer">
       <div class="form-wrapper">
         <div style="width:100px;height:100px;border-radius:16px;margin:0 auto 16px;background:#f8fafc;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;" @click="$refs.editFileInput.click()">
           <img v-if="coverUrl || editingMedicine?.imageUrl" :src="coverUrl || editingMedicine?.imageUrl" style="width:100%;height:100%;object-fit:cover;" />
@@ -632,59 +827,88 @@ onMounted(() => load())
 .medicine-page-container {
   background-color: var(--bg-main);
   min-height: 100vh;
-  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* === 顶部数据看板 === */
+/* 页面区块标题 */
+.page-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* 顶部数据看板 */
 .stats-dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(100px, 1fr));
+  gap: 12px;
 }
 .stat-card {
   background: var(--card-bg);
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  border: 1px solid #fff;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-  border: 1px solid #fff;
 }
 .stat-card.blue { background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-color: #e0f2fe; }
 .stat-card.orange { background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); border-color: #ffedd5; }
 .stat-card.red { background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%); border-color: #fee2e2; }
 
 .stat-icon {
-  font-size: 2rem;
-  background: rgba(255,255,255,0.7);
-  width: 50px; height: 50px;
-  border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem;
 }
 .stat-info { display: flex; flex-direction: column; }
-.stat-num { font-size: 1.8rem; font-weight: 800; color: var(--text-dark); line-height: 1; margin-bottom: 4px; }
+.stat-num { font-size: 1.5rem; font-weight: 600; color: var(--text-dark); line-height: 1; }
 .stat-card.blue .stat-num { color: #0284c7; }
 .stat-card.orange .stat-num { color: #ea580c; }
 .stat-card.red .stat-num { color: #dc2626; }
-.stat-desc { font-size: 0.85rem; color: var(--text-gray); font-weight: 500; }
+.stat-desc { font-size: 0.8rem; color: var(--text-gray); font-weight: 500; margin-top: 4px; }
 
-/* === 通用模块结构 === */
-.content-module {
-  background: var(--card-bg);
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-  border: 1px solid var(--border-line);
+/* === 模块结构 === */
+.med-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-line);
 }
-.module-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.module-title { font-size: 1.2rem; font-weight: 700; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 8px;}
+.med-section:last-child { border-bottom: none; }
+.section-title { 
+  font-size: 1.1rem; 
+  font-weight: 600; 
+  color: var(--text-dark); 
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+}
+.member-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.switch-label { font-size: 0.85rem; color: var(--text-gray); }
+.plan-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+.plan-header-row .search-wrapper { order: 2; flex: 1; min-width: 150px; }
+.plan-header-row .btn-solid { order: 3; }
+.viewer-tag {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #fff;
+  background: #2d5f5d;
+  padding: 4px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+}
 .title-count { font-size: 0.9rem; color: var(--text-gray); font-weight: normal; }
-.btn-create { background: none; border: none; color: var(--primary); font-weight: 600; font-size: 0.95rem; cursor: pointer; }
+.btn-create { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
 .btn-solid { background: var(--primary); color: #fff; border: none; padding: 6px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; cursor: pointer;}
 .mt-3 { margin-top: 12px; }
 .mb-4 { margin-bottom: 16px; }
@@ -706,12 +930,12 @@ onMounted(() => load())
 
 /* === 折叠按钮 === */
 .btn-fold {
-  width: 100%; padding: 12px; margin-top: 12px;
-  background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px;
-  color: var(--text-gray); font-size: 0.85rem; font-weight: 600;
-  cursor: pointer; transition: 0.2s;
+  width: 100%; padding: 10px; margin-top: 8px;
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px;
+  color: #64748b; font-size: 0.85rem; font-weight: 500;
+  cursor: pointer; transition: all 0.2s;
 }
-.btn-fold:hover { background: #f1f5f9; color: var(--primary); border-color: var(--primary); }
+.btn-fold:hover { background: #e0f2fe; color: var(--primary); border-color: var(--primary); }
 .fold-wrapper { grid-column: 1 / -1; }
 
 /* === 空状态 === */
@@ -724,52 +948,51 @@ onMounted(() => load())
 
 
 /* ========================================= */
-/* 3. 计划卡片：车票式布局 */
+/* 3. 计划卡片：流式标签布局 */
 /* ========================================= */
-.plan-list { display: flex; flex-direction: column; gap: 12px; }
-.plan-ticket {
-  display: flex;
+.plan-list { display: flex; flex-direction: column; gap: 10px; }
+.plan-card {
   background: #ffffff;
-  border: 1px solid var(--border-line);
-  border-radius: 14px;
-  overflow: hidden;
-  transition: box-shadow 0.2s;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #5bb5b3;
+  border-radius: 12px;
+  padding: 14px;
+  padding-right: 40px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  position: relative;
 }
-.plan-ticket:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.04); border-color: #cbd5e1; }
-.plan-ticket.is-disabled { opacity: 0.5; background: #f8fafc; }
+.plan-card:hover { box-shadow: 0 4px 16px rgba(45, 95, 93, 0.15); transform: translateY(-1px); }
+.plan-card.is-disabled { opacity: 0.5; background: #f8fafc; border-left-color: #94a3b8; }
 
-.ticket-left {
-  background: #f8fafc;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  border-right: 2px dashed var(--border-line);
-  min-width: 90px;
-}
-.ticket-time { font-size: 1rem; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
-.ticket-day { font-size: 0.75rem; color: var(--text-gray); text-align: center;}
-.ticket-day.is-today { color: var(--warning); font-weight: 700; }
+.plan-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.plan-badge { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; font-size: 0.7rem; padding: 3px 10px; border-radius: 12px; font-weight: 600; }
+.plan-name { font-size: 0.95rem; font-weight: 600; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 6px; }
+.plan-name::before { content: '💊'; font-size: 0.9rem; }
+.btn-delete-plan { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 0.9rem; opacity: 0.3; transition: 0.2s; }
+.btn-delete-plan:hover { opacity: 1; }
 
-.ticket-right {
-  padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.plan-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-tag {
+  font-size: 0.75rem;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+  display: flex; align-items: center; gap: 4px;
 }
-.ticket-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.ticket-badge { background: #e2e8f0; color: #334155; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
-.ticket-med-name { font-size: 1.05rem; font-weight: 700; color: var(--text-dark); margin: 0; }
-.ticket-dosage { font-size: 0.9rem; color: #475569; font-weight: 500; }
+.time-tag { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #b45309; }
+.time-tag::before { content: '⏰'; font-size: 0.7rem; }
+.day-tag { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #4338ca; }
+.day-tag::before { content: '📅'; font-size: 0.7rem; }
+.dosage-tag { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); color: #15803d; }
+.dosage-tag::before { content: '💉'; font-size: 0.7rem; }
 
 
 /* ========================================= */
 /* 4. 药箱卡片：Grid 图片信息流 */
 /* ========================================= */
 .header-tools { display: flex; align-items: center; gap: 12px; }
-.search-wrapper { display: flex; align-items: center; background: #f1f5f9; border-radius: 20px; padding: 6px 16px; border: 1px solid transparent; width: 200px; transition: 0.2s;}
+.search-wrapper { display: flex; align-items: center; background: #f1f5f9; border-radius: 20px; padding: 6px 16px; border: 1px solid transparent; flex: 1; min-width: 150px; transition: 0.2s;}
 .search-wrapper:focus-within { border-color: var(--primary); background: #fff; }
 .search-icon { font-size: 0.9rem; margin-right: 8px; color: #94a3b8; }
 .search-input { flex: 1; border: none; background: transparent; font-size: 0.9rem; outline: none; padding: 4px 0; color: var(--text-dark); width: 100%;}
@@ -790,10 +1013,10 @@ onMounted(() => load())
 .med-fallback-icon { font-size: 2rem; color: #cbd5e1; }
 
 .med-info { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.med-name { font-size: 1rem; font-weight: 700; color: var(--text-dark); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.med-name { font-size: 1rem; font-weight: 600; color: var(--text-dark); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .med-spec { font-size: 0.8rem; color: var(--text-gray); margin: 0 0 10px 0; }
 .med-status { display: flex; justify-content: space-between; align-items: center; }
-.stock-tag { font-size: 0.8rem; color: #475569; font-weight: 700; padding: 2px 8px; background: #f1f5f9; border-radius: 6px; }
+.stock-tag { font-size: 0.8rem; color: #475569; font-weight: 600; padding: 2px 8px; background: #f1f5f9; border-radius: 6px; }
 .stock-tag.is-low { background: #fff7ed; color: var(--warning); }
 .expire-text { font-size: 0.75rem; color: #94a3b8; }
 
@@ -801,9 +1024,15 @@ onMounted(() => load())
 /* ========================================= */
 /* 5. 抽屉表单与 OCR 内部样式 */
 /* ========================================= */
-.form-wrapper { display: flex; flex-direction: column; gap: 16px; padding-top: 8px;}
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: 0.9rem; font-weight: 600; color: var(--text-dark); }
+.form-wrapper { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;}
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group-sm { margin-bottom: 8px; }
+.form-group label { font-size: 0.85rem; font-weight: 600; color: var(--text-dark); }
+.medicine-info-hint { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+.medicine-info-hint .hint-item { margin-bottom: 6px; }
+.medicine-info-hint .hint-item:last-child { margin-bottom: 0; }
+.medicine-info-hint .hint-label { font-size: 0.8rem; font-weight: 600; color: #64748b; }
+.medicine-info-hint .hint-value { font-size: 0.85rem; color: #334155; }
 .req { color: var(--danger); margin-left: 2px; }
 .form-error { color: var(--danger); font-size: 0.85rem; background: #fef2f2; padding: 10px; border-radius: 8px; margin-top: -8px; }
 
@@ -817,26 +1046,48 @@ onMounted(() => load())
 .ai-btn { width: 100%; background: linear-gradient(135deg, var(--primary) 0%, #1e403f 100%); color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(45,95,93,0.2); }
 .ocr-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; backdrop-filter: blur(2px);}
 .loading-icon { font-size: 2rem; margin-bottom: 8px; animation: pulse 1s infinite;}
-.loading-txt { font-weight: 700; color: var(--primary); }
+.loading-txt { font-weight: 600; color: var(--primary); }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 
 
 /* ========================================= */
-/* 6. 移动端终极响应式适配 */
-/* ========================================= */
+/* 6. 移动端响应式适配 */
 @media (max-width: 768px) {
   .medicine-page-container { padding: 12px; gap: 16px; }
-  .stats-dashboard { grid-template-columns: 1fr; gap: 12px; }
-  .stat-card { padding: 16px; }
+  .stats-dashboard { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-card { padding: 12px; }
+  .stat-icon { font-size: 1.4rem; }
+  .stat-num { font-size: 1.2rem; }
+  .stat-desc { font-size: 0.7rem; }
   
-  .content-module { padding: 16px; border-radius: 16px; }
-  .module-header.flex-wrap { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .header-tools { width: 100%; justify-content: space-between; }
-  .search-wrapper { flex: 1; }
+  .med-section { margin-bottom: 16px; }
+  .plan-header-row { flex-direction: column; align-items: stretch; }
+  .plan-header-row .search-wrapper { order: 0; }
+  .plan-header-row .btn-solid { order: 1; }
   
   .med-grid { grid-template-columns: 1fr; gap: 12px; }
   
-  /* Drawer 侧滑抽屉变为全屏遮罩感 */
+  /* Drawer 侧滑抽屉样式优化 */
   :deep(.custom-drawer) { width: 92% !important; border-top-left-radius: 24px; border-bottom-left-radius: 24px; }
+  :deep(.custom-drawer .el-drawer__header) { margin-bottom: 8px; padding: 16px 20px 8px; }
+  :deep(.custom-drawer .el-drawer__title) { font-size: 1rem; font-weight: 600; }
+  
+  /* 移动端底部抽屉样式 */
+  @media (max-width: 768px) {
+    :deep(.custom-drawer) { 
+      width: 100% !important; 
+      border-radius: 24px 24px 0 0 !important;
+      border-top-left-radius: 24px;
+    }
+  }
+
+  /* 药品选择下拉框最大高度，超出可滚动 */
+  :deep(.medicine-select-popper) {
+    max-height: 240px !important;
+  }
+  :deep(.medicine-select-popper .el-select-dropdown__list) {
+    max-height: 240px !important;
+    overflow-y: auto;
+  }
 }
 </style>
