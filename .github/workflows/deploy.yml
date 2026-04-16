@@ -64,25 +64,14 @@ jobs:
           tags: |
             ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/fcg-client:latest
 
-      - name: Clean old frontend dist on server
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            mkdir -p /home/user/apps/fcg/fcg-client
-            rm -rf /home/user/apps/fcg/fcg-client/dist
-
-      - name: Copy files to server
+      - name: Copy docker-compose.yml to server
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "fcg-server/target/fcg-server-1.0.0.jar,fcg-server/Dockerfile,fcg-client/dist,fcg-client/nginx.conf,fcg-client/Dockerfile,docker-compose.yml"
+          source: "docker-compose.yml"
           target: "/home/user/apps/fcg"
           strip_components: 0
 
