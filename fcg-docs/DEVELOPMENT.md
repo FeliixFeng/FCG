@@ -1,66 +1,83 @@
 # 开发运维文档
 
-## SSH 连接
+## 本地开发
 
-### 服务器列表
-
-| 名称 | IP | 用户 | 用途 |
-|-----|-----|-----|------|
-| ali1 | 47.121.181.198 | root | 数据库服务器 |
-| ali2 | 8.148.25.67 | root | 应用服务器 |
-
-### 连接方式
+### 后端
 
 ```bash
-ssh ali1   # 连接数据库服务器
-ssh ali2   # 连接应用服务器
+cd fcg-server
+mvn spring-boot:run
 ```
 
-SSH 配置已保存在 `~/.ssh/config`，支持免密登录。
-
----
-
-## 数据库操作
-
-### 查看数据
+### 前端
 
 ```bash
-ssh ali1 "mysql -u root -p'你的密码' -e 'SELECT * FROM fcg_db.medicine;'"
+cd fcg-client
+npm install
+npm run dev
 ```
 
-### 删除数据（示例：删除药品表）
-
-```bash
-ssh ali1 "mysql -u root -p'你的密码' -e 'DELETE FROM fcg_db.medicine WHERE id=1;'"
-```
-
----
-
-## 本地启动
-
-### 方式一：命令行
+### 本地编译检查
 
 ```bash
 # 后端
-cd fcg-server && mvn spring-boot:run
+cd fcg-server && mvn -q compile
 
-# 前端（开新终端）
-cd fcg-client && npm run dev
+# 前端
+cd fcg-client && npm run build
 ```
 
-### 方式二：VSCode
+## 服务器与数据库
 
-- 按 `Ctrl+Shift+P` → "Tasks: Run Task" → 选择任务
-- 或按 `F5` 使用 Debug 配置
-
-### 方式三：一键启动
+### 常用 SSH
 
 ```bash
-./run.sh
+ssh ali1   # 数据库服务器
+ssh ali2   # 应用服务器
 ```
 
----
+### 数据库连通性快速检查
 
-## 云端部署
+```bash
+# 端口连通
+nc -vz <db_host> 3306
 
-项目已配置 GitHub Actions CI/CD，推送到 main 分支自动部署。
+# 从服务器侧执行 SQL
+ssh ali1 "mysql -uroot -p'***' -D fcg_db -e \"SELECT NOW();\""
+```
+
+## 首页打卡链路（当前实现）
+
+1. 药品页创建 `med_plan`
+2. 首页请求 `/api/medicine/plan/records?scheduledDate=...`
+3. 后端按计划生成当天任务，并叠加 `med_record` 状态
+4. 首页打卡/跳过：
+   - 有 `recordId` 则更新记录
+   - 无 `recordId` 则创建记录
+5. 打卡变“已服”时自动扣库存
+
+## 常见故障排查
+
+### 1) `Communications link failure`
+
+现象：后端日志出现 `CannotGetJdbcConnectionException`。  
+排查顺序：
+
+1. 确认数据库服务可连通（`nc`/`mysql`）
+2. 检查 `application-local.yml` 的数据库地址与账号
+3. 重启后端（使连接池参数生效）
+4. 观察连接池与数据库连接数
+
+### 2) 首页显示“暂无计划”但药品页有计划
+
+检查点：
+
+1. `scheduledDate` 是否为当天
+2. 计划状态是否启用
+3. `takeDays` 是否包含当天
+4. 计划起止日期是否覆盖当天
+
+## 部署说明
+
+- 推送到 `main` 可触发 GitHub Actions 部署流程（按仓库配置）。
+- `dev` 分支用于日常开发联调。

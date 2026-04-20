@@ -1,121 +1,83 @@
 # Family Care Guardian (FCG) - 家庭健康管理系统
 
-> 武汉纺织大学 计算机与人工智能学院 毕业设计项目
+> 武汉纺织大学毕业设计项目（Spring Boot 3 + Vue 3）
 
 ## 项目简介
 
-基于 Spring Boot 3 与 Vue 3 的家庭健康管理系统，深度立足于居家养老场景。针对高龄群体在慢性病管理中面临的药品繁杂、服药易忘、数字鸿沟等痛点，通过数字化手段实现高效的用药管理、家庭协同与智能咨询。
+FCG 面向家庭健康管理场景，围绕“谁在什么时候该吃什么药”构建完整链路：药品管理、用药计划、首页打卡、健康数据、周报查看。
 
-### 核心价值
-- **降低看护负担**：数字化管理复杂用药方案，闭环提醒降低安全风险。
-- **跨越数字鸿沟**：深度适老化设计，支持“标准/关怀”双模式一键切换。
-- **强化家庭协同**：子女远程掌握父母用药情况，打破数据孤岛。
-- **技术赋能安全**：集成 OCR 识别与 LLM 大模型，提供通俗易懂的用药建议。
+## 当前核心能力（2026-04-20）
 
-## 核心功能
+- 家庭账号 + 成员切换 + 角色权限（管理员/普通成员/受控成员）
+- 药品页：药箱管理、OCR 识别、创建用药计划
+- 首页：今日任务中心（主任务卡 + 待处理任务 + 今日已处理）
+- 打卡链路：
+  - 首页按“计划表 + 记录表”联表展示今日任务
+  - 当天未打卡任务可补打到 23:59
+  - 打卡状态变为“已服”时自动扣减库存
+- 健康页：体征录入、趋势图、周报查看
+- 管理员可切换查看家庭其他成员
 
-- **RBAC 家庭多级权限体系**
-  - 预设超级管理员、普通成员、受控成员（长辈）三种角色。
-  - 受控成员强制进入“关怀模式”，简化交互，防止误操作。
-- **智能药箱与 AI 咨询**
-  - **OCR 识别**：拍照自动采集药品信息，告别繁琐手动录入。
-  - **AI 助手**：利用大语言模型（LLM）转译晦涩说明书，提供用药禁忌预警。
-- **闭环服药提醒与打卡**
-  - 定时任务触发服药提醒，支持一键打卡反馈。
-  - 自动生成健康周报，同步至家庭成员。
-- **适老化双模式界面**
-  - **标准模式**：功能全面，适合子女/管理员使用。
-  - **关怀模式**：大字体、高对比度、扁平化路径，专为长辈设计。
+## 最新实现说明（重要）
 
-## 当前进度
+### 用药任务展示逻辑
 
-### 后端
-- ✅ 认证闭环（JWT + 拦截器 + CORS）
-- ✅ 用户与家庭模块（登录/注册、用户信息、关怀模式、家庭创建/加入/成员）
-- ✅ 药品模块基础 API（药品/计划/记录增删改查 + 计划记录联表）
-- ✅ 健康模块基础 API（体征/周报增删改查 + 近一周体征查询）
-- ✅ OCR + AI 一体化识别接口（药品图片识别并结构化提取）
-- ✅ OSS 上传接口（图片上传）
+- 首页不再只依赖 `med_record`。
+- `/api/medicine/plan/records` 在传入 `scheduledDate` 时会：
+  1. 从 `med_plan` 生成当天应执行任务；
+  2. 再叠加 `med_record` 的实际状态；
+  3. 无记录时返回 `待服`（可直接打卡/跳过）。
 
-### 前端
-- 🔄 基础脚手架已完成，页面与状态管理待完善
+### 打卡与库存
+
+- 首次打卡可直接创建记录（不要求先有 recordId）。
+- 状态从“非已服”变为“已服”时自动扣库存。
+- 扣减量按计划剂量（最少 1）计算。
+
+### 数据一致性
+
+- `med_record` 已增加唯一索引：
+  - `(user_id, plan_id, scheduled_date, slot_name)`
+- 防止同用户同计划同日期同时间段出现重复记录。
 
 ## 技术栈
 
-### 后端 (fcg-server)
-- **核心框架**：Java 17, Spring Boot 3.2.5
-- **持久层**：MyBatis-Plus 3.5.6, MySQL 8.0
-- **缓存/任务**：Redis (提醒任务加速), Spring Task
-- **安全认证**：JWT, RBAC 权限模型
-- **部署运维**：Docker, GitHub Actions (CI/CD)
-
-### 前端 (fcg-client)
-- **核心框架**：Vue 3.4.21 (Composition API)
-- **构建工具**：Vite 5.2.0
-- **状态管理**：Pinia
-- **UI 组件**：Element Plus (适老化定制)
-- **样式处理**：Tailwind CSS
-
-### 智能能力
-- **多模态AI识别**：智谱AI GLM-4.6V-FlashX 模型，拍照即可识别药品信息（名称、规格、有效期、用法用量等）
-- **AI 助手**：大语言模型 API，提供用药建议与禁忌分析
-
-## 关键接口
-
-- **药品图片识别**：`POST /api/medicine/ocr`（multipart/form-data，字段 `file`，返回结构化药品信息）
-- **OSS 上传**：`POST /api/oss/upload?dir=medicine`（multipart/form-data，字段 `file`）
+- 后端：Java 17, Spring Boot 3.2.5, MyBatis-Plus 3.5.6, MySQL 8.0
+- 前端：Vue 3.4, Vite 5, Pinia, Element Plus
+- 智能能力：GLM 多模态 OCR/解析（药品识别）
 
 ## 项目结构
 
-```
+```text
 fcg/
 ├── fcg-server/              # Spring Boot 后端
-│   ├── src/main/java/       # 业务逻辑
-│   └── src/main/resources/  # 配置文件
-├── fcg-client/              # Vue 3 前端
-│   ├── src/components/      # 公共组件
-│   └── src/views/           # 页面视图 (标准/关怀模式)
-└── docs/                    # 项目文档 (数据库设计等)
+├── fcg-client/              # Vue 前端
+└── fcg-docs/                # 项目文档
 ```
 
-## 快速开始
+## 本地启动
 
-### 后端启动
-1. 配置 `application-local.yml` 中的数据库与 Redis 连接。
-2. 运行 `mvn spring-boot:run` 或启动 `FcgApplication.java`。
+### 后端
 
-### 前端启动
-1. `cd fcg-client`
-2. `npm install`
-3. `npm run dev`
+```bash
+cd fcg-server
+mvn spring-boot:run
+```
 
-## 配置说明
+### 前端
 
-### 本地配置文件
-后端默认启用 `local` profile，请在 `fcg-server/src/main/resources/application-local.yml` 中配置数据库连接。
-示例见：`fcg-server/src/main/resources/application-local.yml.example`。
+```bash
+cd fcg-client
+npm install
+npm run dev
+```
 
-### OSS 配置
-`application-local.yml` 中配置：
-- `oss.endpoint`：`oss-cn-beijing.aliyuncs.com`
-- `oss.bucket`：`fcg-image`
-- `oss.domain`：`https://fcg-image.oss-cn-beijing.aliyuncs.com`
+## 文档导航（精简版）
 
-### 常用环境变量（可选）
-Spring Boot 支持用环境变量覆盖配置，常用项如下：
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `JWT_SECRET`
-- `JWT_EXPIRATION`
-- `SERVER_PORT`
+- 项目状态：`fcg-docs/PROJECT_STATUS.md`
+- 开发运维：`fcg-docs/DEVELOPMENT.md`
+- 数据库设计：`fcg-docs/DATABASE_DESIGN.md`
 
-## 作者与致谢
-- **作者**：管海峰 (2204240115)
-- **指导教师**：王帮超 (副教授)
-- **学校**：武汉纺织大学 计算机与人工智能学院
+## 作者
 
-## 开发备注
-最近一次本地测试：2026-02-23
-SSH key smoke test trigger: 2026-04-02
-# test
+- 管海峰（2204240115）
