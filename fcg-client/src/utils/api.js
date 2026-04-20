@@ -90,6 +90,9 @@ export const fetchTodayPlanRecords = (scheduledDate, userId) =>
 /** 更新服药记录状态（打卡/跳过） */
 export const updateMedicineRecord = (id, data) => http.put(`/api/medicine/record/${id}`, data)
 
+/** 新增服药记录（用于首次打卡/跳过） */
+export const createMedicineRecord = (data) => http.post('/api/medicine/record', data)
+
 export const createPlan = (data) => http.post('/api/medicine/plan', data)
 
 export const deletePlan = (id) => http.delete(`/api/medicine/plan/${id}`)

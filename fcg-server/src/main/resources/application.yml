@@ -6,6 +6,15 @@ spring:
     name: fcg-server
   profiles:
     active: local
+  datasource:
+    hikari:
+      connection-timeout: 10000
+      validation-timeout: 5000
+      max-lifetime: 1700000
+      idle-timeout: 600000
+      keepalive-time: 300000
+      maximum-pool-size: 10
+      minimum-idle: 2
   servlet:
     multipart:
       max-file-size: 10MB
