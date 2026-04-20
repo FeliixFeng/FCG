@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,7 +47,7 @@ public class MedicineRecordController {
     @Operation(summary = "新增服药记录")
     public Result<Long> create(@RequestBody @Valid MedicineRecordCreateDTO dto) {
         Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
+        requireFamilyId(currentUserId);
 
         MedicineRecord record = new MedicineRecord();
         record.setPlanId(dto.getPlanId());
@@ -59,6 +60,7 @@ public class MedicineRecordController {
         record.setRecordRemark(dto.getRecordRemark());
 
         recordService.save(record);
+        reduceStockIfTaken(null, record.getStatus(), record.getMedicineId(), record.getPlanId());
         return Result.success(record.getId());
     }
 
@@ -66,11 +68,13 @@ public class MedicineRecordController {
     @Operation(summary = "更新服药记录")
     public Result<Void> update(@PathVariable Long id, @RequestBody @Valid MedicineRecordUpdateDTO dto) {
         Long currentUserId = UserContext.get().getUserId();
-        Long familyId = requireFamilyId(currentUserId);
+        requireFamilyId(currentUserId);
 
         MedicineRecord record = getRecord(id);
+        Integer oldStatus = record.getStatus();
         applyRecordUpdate(record, dto);
         recordService.updateById(record);
+        reduceStockIfTaken(oldStatus, record.getStatus(), record.getMedicineId(), record.getPlanId());
         return Result.success();
     }
 
@@ -167,5 +171,42 @@ public class MedicineRecordController {
                 .recordRemark(record.getRecordRemark())
                 .createTime(record.getCreateTime())
                 .build();
+    }
+
+    private void reduceStockIfTaken(Integer oldStatus, Integer newStatus, Long medicineId, Long planId) {
+        boolean nowTaken = newStatus != null && newStatus.equals(MedicineRecord.STATUS_TAKEN);
+        boolean wasTaken = oldStatus != null && oldStatus.equals(MedicineRecord.STATUS_TAKEN);
+        if (!nowTaken || wasTaken || medicineId == null) {
+            return;
+        }
+
+        int deductCount = resolveDeductCount(planId);
+        if (deductCount <= 0) {
+            return;
+        }
+
+        Medicine medicine = medicineService.getById(medicineId);
+        if (medicine == null || medicine.getStock() == null || medicine.getStock() <= 0) {
+            return;
+        }
+
+        int remain = Math.max(medicine.getStock() - deductCount, 0);
+        medicine.setStock(remain);
+        medicineService.updateById(medicine);
+    }
+
+    private int resolveDeductCount(Long planId) {
+        if (planId == null) {
+            return 1;
+        }
+        MedicinePlan plan = planService.getById(planId);
+        if (plan == null || plan.getDosage() == null) {
+            return 1;
+        }
+        BigDecimal dosage = plan.getDosage();
+        if (dosage.compareTo(BigDecimal.ZERO) <= 0) {
+            return 1;
+        }
+        return Math.max(dosage.intValue(), 1);
     }
 }
