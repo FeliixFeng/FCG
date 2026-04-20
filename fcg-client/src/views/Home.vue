@@ -1,1345 +1,1485 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
-import { verifyAdmin, fetchTodayPlanRecords, updateMedicineRecord, fetchTodayVitals } from '../utils/api'
-import BaseLayout from '../components/common/BaseLayout.vue'
 import { ElMessage } from 'element-plus'
+import BaseLayout from '../components/common/BaseLayout.vue'
+import { useUserStore } from '../stores/user'
+import {
+  createMedicineRecord,
+  fetchFamilyMembers,
+  fetchLatestReport,
+  fetchTodayPlanRecords,
+  fetchTodayVitals,
+  updateMedicineRecord
+} from '../utils/api'
 
 const userStore = useUserStore()
 const router = useRouter()
 
-const isPreviewMode = ref(false)
-onMounted(() => {
-  isPreviewMode.value = sessionStorage.getItem('fcg_preview_care') === '1'
-})
+const loading = ref(false)
+const operatingTaskKey = ref('')
+const justChecked = ref(false)
+let dashboardRequestId = 0
 
-const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
+const familyMembers = ref([])
+const selectedMemberId = ref(null)
+const planRecords = ref([])
+const vitalRecorded = ref(false)
+const latestReport = ref(null)
 
-// ── 管理员验证弹窗 ──
-const showAdminModal = ref(false)
-const adminPassword = ref('')
-const adminError = ref('')
-const adminLoading = ref(false)
+const isAdmin = computed(() => userStore.member?.role === 0)
+const isCareMode = computed(() => userStore.isCareMode)
+const currentUserId = computed(() => userStore.member?.id || userStore.member?.userId || null)
+const selectedMember = computed(() => selectedMemberId.value || currentUserId.value || null)
 
-const confirmAdmin = async () => {
-  adminError.value = ''
-  if (!adminPassword.value) { adminError.value = '请输入密码'; return }
-  try {
-    adminLoading.value = true
-    await verifyAdmin(adminPassword.value)
-    showAdminModal.value = false
-    adminPassword.value = ''
-    router.push({ name: 'admin' })
-  } catch (err) {
-    adminError.value = err?.message || '密码错误'
-  } finally {
-    adminLoading.value = false
-  }
-}
-
-const closeAdminModal = () => {
-  showAdminModal.value = false
-  adminPassword.value = ''
-  adminError.value = ''
-}
-
-// ── 时间问候语 ──
 const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 6)  return '夜深了'
-  if (h < 11) return '早上好'
-  if (h < 14) return '中午好'
-  if (h < 18) return '下午好'
+  const hour = new Date().getHours()
+  if (hour < 6) return '夜深了'
+  if (hour < 11) return '早上好'
+  if (hour < 14) return '中午好'
+  if (hour < 18) return '下午好'
   return '晚上好'
 })
 
-// ── 今日日期 ──
-const todayStr = computed(() => {
+const todayText = computed(() => {
   const d = new Date()
-  return `${d.getMonth() + 1}月${d.getDate()}日 · 星期${['日','一','二','三','四','五','六'][d.getDay()]}`
+  return `${d.getMonth() + 1}月${d.getDate()}日 · 星期${['日', '一', '二', '三', '四', '五', '六'][d.getDay()]}`
 })
 
-const todayISO = computed(() => new Date().toISOString().slice(0, 10))
+const viewingMemberName = computed(() => {
+  if (!isAdmin.value || !selectedMember.value || selectedMember.value === currentUserId.value) return ''
+  const member = familyMembers.value.find(item => item.userId === selectedMember.value)
+  return member?.nickname || ''
+})
 
-// ── 今日用药数据 ──
-const planRecords = ref([])   // MedicinePlanRecordVO[]
-const loadingRecords = ref(false)
-const vitalRecorded = ref(false)  // 今日是否有体征
+const viewingMemberText = computed(() => {
+  if (!isAdmin.value) return ''
+  return viewingMemberName.value || `${userStore.member?.nickname || '我'}（我）`
+})
 
-async function loadTodayData() {
-  loadingRecords.value = true
-  try {
-    const memberId = userStore.member?.userId
-    const [recordsRes, vitalsRes] = await Promise.allSettled([
-      fetchTodayPlanRecords(todayISO.value, memberId),
-      fetchTodayVitals(memberId),
-    ])
-    if (recordsRes.status === 'fulfilled') {
-      planRecords.value = recordsRes.value?.data?.records ?? []
-    }
-    if (vitalsRes.status === 'fulfilled') {
-      vitalRecorded.value = (vitalsRes.value?.data?.total ?? 0) > 0
-    }
-  } finally {
-    loadingRecords.value = false
-  }
+const pendingRecords = computed(() => planRecords.value.filter(item => item.recordStatus === 0))
+const takenRecords = computed(() => planRecords.value.filter(item => item.recordStatus === 1))
+const skippedRecords = computed(() => planRecords.value.filter(item => item.recordStatus === 2))
+const processedRecords = computed(() => sortedRecords.value.filter(item => item.recordStatus !== 0))
+const pendingSortedRecords = computed(() => sortedRecords.value.filter(item => item.recordStatus === 0))
+const completionRate = computed(() => {
+  if (!planRecords.value.length) return 100
+  return Math.round((takenRecords.value.length / planRecords.value.length) * 100)
+})
+const hasLatestReport = computed(() => !!latestReport.value)
+
+const slotOrder = { '早': 1, '中': 2, '晚': 3, '睡前': 4 }
+const slotTimeMap = {
+  '早': { h: 8, m: 0 },
+  '中': { h: 12, m: 30 },
+  '晚': { h: 18, m: 30 },
+  '睡前': { h: 22, m: 0 }
 }
 
-const refreshData = async () => {
-  await loadTodayData()
-  ElMessage({ message: '刷新成功', type: 'success', duration: 1000 })
-}
+const sortedRecords = computed(() => {
+  return [...planRecords.value].sort((a, b) => {
+    const slotA = slotOrder[a.slotName] || 99
+    const slotB = slotOrder[b.slotName] || 99
+    if (slotA !== slotB) return slotA - slotB
+    return (a.recordId || 0) - (b.recordId || 0)
+  })
+})
 
-onMounted(loadTodayData)
-
-// ── 状态派生 ──
-const pendingRecords = computed(() => planRecords.value.filter(r => r.recordStatus === 0))
-const doneRecords    = computed(() => planRecords.value.filter(r => r.recordStatus === 1))
-
-// 检查是否超时（返回超时分钟数，0表示未超时）
-function getOverdueMinutes(scheduledTime) {
-  if (!scheduledTime) return 0
-  const now = new Date()
-  const [h, m] = scheduledTime.split(':').map(Number)
-  const scheduledMin = h * 60 + m
-  const nowMin = now.getHours() * 60 + now.getMinutes()
-  const diff = nowMin - scheduledMin
-  return diff > 0 ? diff : 0
-}
-
-// 下一条待打卡（按计划时间最近）
 const nextPending = computed(() => {
+  const list = [...pendingRecords.value].sort((a, b) => {
+    const slotA = slotOrder[a.slotName] || 99
+    const slotB = slotOrder[b.slotName] || 99
+    if (slotA !== slotB) return slotA - slotB
+    return (a.recordId || 0) - (b.recordId || 0)
+  })
+  return list[0] || null
+})
+
+const nextPendingOverdueMinutes = computed(() => {
+  if (!nextPending.value?.slotName) return 0
+  const base = slotTimeMap[nextPending.value.slotName]
+  if (!base) return 0
   const now = new Date()
-  const nowMin = now.getHours() * 60 + now.getMinutes()
-  // 优先选时间已到的
-  const passed = pendingRecords.value.filter(r => {
-    if (!r.scheduledTime) return true
-    const [h, m] = r.scheduledTime.split(':').map(Number)
-    return h * 60 + m <= nowMin
-  })
-  return (passed[0] ?? pendingRecords.value[0]) ?? null
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const plannedMinutes = base.h * 60 + base.m
+  return Math.max(currentMinutes - plannedMinutes, 0)
 })
 
-const nextPendingOverdueMin = computed(() => {
-  if (!nextPending.value?.scheduledTime) return 0
-  return getOverdueMinutes(nextPending.value.scheduledTime)
+const overduePendingCount = computed(() => {
+  const now = new Date()
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  return pendingRecords.value.filter((item) => {
+    const slot = slotTimeMap[item.slotName]
+    if (!slot) return false
+    const plannedMinutes = slot.h * 60 + slot.m
+    return currentMinutes > plannedMinutes
+  }).length
 })
 
-// ── 打卡 ──
-async function checkin(record) {
-  try {
-    const now = new Date()
-    const actualTime = now.toISOString().replace('T', ' ').slice(0, 19)
-    await updateMedicineRecord(record.recordId, { status: 1, actualTime })
-    ElMessage({ message: '打卡成功 ✓', type: 'success', duration: 1500 })
-    await loadTodayData()  // 刷新数据
-  } catch (e) {
-    ElMessage({ message: '打卡失败，请重试', type: 'error', duration: 2000 })
-  }
-}
-
-// ── 跳过 ──
-async function skipRecord(record) {
-  try {
-    await updateMedicineRecord(record.recordId, { status: 2 })
-    await loadTodayData()  // 刷新数据
-  } catch (e) {
-    ElMessage({ message: '操作失败', type: 'error', duration: 2000 })
-  }
-}
-
-// ── 时间线（从计划记录生成，最多5条） ──
-const timeline = computed(() => {
-  const sorted = [...planRecords.value].sort((a, b) => {
-    const ta = a.scheduledTime ?? '00:00'
-    const tb = b.scheduledTime ?? '00:00'
-    return ta.localeCompare(tb)
-  })
-  
-  // 关怀模式：只显示待服和已服，隐藏已跳过
-  const filtered = isCareMode.value 
-    ? sorted.filter(r => r.recordStatus !== 2)
-    : sorted
-  
-  return filtered.slice(0, 5).map(r => {
-    let status = 'upcoming'
-    let desc = r.scheduledTime ? `计划 ${r.scheduledTime.slice(0, 5)}` : '今日'
-    if (r.recordStatus === 1) { status = 'done'; desc = '已打卡' }
-    else if (r.recordStatus === 2) { status = 'skipped'; desc = '已跳过' }
-    else {
-      // 判断是否超时未服
-      const now = new Date()
-      const nowMin = now.getHours() * 60 + now.getMinutes()
-      if (r.scheduledTime) {
-        const [h, m] = r.scheduledTime.split(':').map(Number)
-        if (h * 60 + m <= nowMin) { status = 'pending'; desc = '待打卡' }
-      }
-    }
-    return {
-      time: r.scheduledTime ? r.scheduledTime.slice(0, 5) : '--:--',
-      label: r.medicineName ?? '用药',
-      status,
-      desc,
-    }
-  })
+const nextActionLabel = computed(() => {
+  return pendingRecords.value.length > 1 ? '打卡下一条' : '立即打卡'
 })
 
-// ── 模块卡 ──
-const moduleCards = [
-  {
-    key: 'medicine',
-    title: '药品',
-    icon: 'medicine',
-    color: '#2d5f5d',
-    items: ['药箱库存', '用药计划', '服药记录'],
-    action: () => router.push({ name: 'medicine' }),
-  },
-  {
-    key: 'health',
-    title: '健康',
-    icon: 'health',
-    color: '#3a7d6b',
-    items: ['体征录入', '近一周趋势', '健康周报'],
-    action: () => router.push({ name: 'health' }),
-  },
-  {
-    key: 'family',
-    title: '家庭',
-    icon: 'family',
-    color: '#5a7a9e',
-    items: ['成员列表', '关怀模式', '家庭设置'],
-    action: () => router.push({ name: 'family' }),
-  },
+const quickLinks = [
+  { key: 'medicine', title: '药品管理', subtitle: '药箱与用药计划', icon: '💊', route: 'medicine' },
+  { key: 'health', title: '健康中心', subtitle: '体征与健康周报', icon: '❤️', route: 'health' },
+  { key: 'ai', title: 'AI 助手', subtitle: '健康问答与建议', icon: '🤖', route: 'ai' },
+  { key: 'profile', title: '我的', subtitle: '成员与家庭信息', icon: '👤', route: 'profile' }
 ]
 
-// ── 状态标签 ──
+function toLocalDateISO() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function toLocalDateTimeISO() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hour = String(now.getHours()).padStart(2, '0')
+  const minute = String(now.getMinutes()).padStart(2, '0')
+  const second = String(now.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}`
+}
+
 function statusLabel(status) {
   if (status === 1) return '已服'
-  if (status === 2) return '跳过'
+  if (status === 2) return '已跳过'
   return '待服'
 }
+
 function statusClass(status) {
-  if (status === 1) return 'med-done'
-  if (status === 2) return 'med-skip'
-  return 'med-pending'
+  if (status === 1) return 'is-taken'
+  if (status === 2) return 'is-skipped'
+  return 'is-pending'
 }
+
+function slotLabel(slot) {
+  if (!slot) return '今日'
+  return `${slot}间`
+}
+
+function slotClock(slot) {
+  const base = slotTimeMap[slot]
+  if (!base) return '--:--'
+  return `${String(base.h).padStart(2, '0')}:${String(base.m).padStart(2, '0')}`
+}
+
+function isFutureSlot(slot) {
+  const base = slotTimeMap[slot]
+  if (!base) return false
+  const now = new Date()
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const plannedMinutes = base.h * 60 + base.m
+  return currentMinutes < plannedMinutes
+}
+
+function formatDosage(record) {
+  if (!record?.planDosage) return '剂量未填写'
+  const unit = record.medicineStockUnit || '次'
+  return `每次 ${record.planDosage}${unit}`
+}
+
+function getTaskKey(record) {
+  if (!record) return ''
+  if (record.recordId) return `r-${record.recordId}`
+  return `p-${record.planId}-${record.slotName || ''}`
+}
+
+async function loadMembers() {
+  if (!isAdmin.value) return
+  const res = await fetchFamilyMembers()
+  familyMembers.value = (res.data || []).filter(item => item.userId !== currentUserId.value)
+}
+
+async function loadDashboardData() {
+  const uid = selectedMember.value
+  if (!uid) return
+  const requestId = ++dashboardRequestId
+  loading.value = true
+  latestReport.value = null
+  try {
+    // 首页主卡只依赖记录和体征，先渲染，避免被周报接口拖慢
+    const [recordsRes, vitalsRes] = await Promise.allSettled([
+      fetchTodayPlanRecords(toLocalDateISO(), uid),
+      fetchTodayVitals(uid)
+    ])
+    if (requestId !== dashboardRequestId) return
+
+    if (recordsRes.status === 'fulfilled') {
+      planRecords.value = recordsRes.value?.data?.records || []
+    } else {
+      planRecords.value = []
+    }
+
+    if (vitalsRes.status === 'fulfilled') {
+      vitalRecorded.value = (vitalsRes.value?.data?.length || 0) > 0
+    } else {
+      vitalRecorded.value = false
+    }
+  } finally {
+    if (requestId === dashboardRequestId) {
+      loading.value = false
+    }
+  }
+
+  // 周报异步加载，不阻塞主卡片显示
+  fetchLatestReport(uid)
+    .then((res) => {
+      if (requestId !== dashboardRequestId) return
+      latestReport.value = res?.data || null
+    })
+    .catch(() => {
+      if (requestId !== dashboardRequestId) return
+      latestReport.value = null
+    })
+}
+
+async function checkin(record) {
+  try {
+    operatingTaskKey.value = getTaskKey(record)
+    const actualTime = toLocalDateTimeISO()
+    if (record.recordId) {
+      await updateMedicineRecord(record.recordId, { status: 1, actualTime })
+    } else {
+      await createMedicineRecord({
+        planId: record.planId,
+        userId: record.userId,
+        medicineId: record.medicineId,
+        scheduledDate: toLocalDateISO(),
+        slotName: record.slotName,
+        status: 1,
+        actualTime
+      })
+    }
+    justChecked.value = true
+    ElMessage.success('打卡成功')
+    await loadDashboardData()
+    setTimeout(() => {
+      justChecked.value = false
+    }, 1800)
+  } catch (err) {
+    ElMessage.error('打卡失败，请稍后重试')
+  } finally {
+    operatingTaskKey.value = ''
+  }
+}
+
+async function skipRecord(record) {
+  try {
+    operatingTaskKey.value = getTaskKey(record)
+    if (record.recordId) {
+      await updateMedicineRecord(record.recordId, { status: 2 })
+    } else {
+      await createMedicineRecord({
+        planId: record.planId,
+        userId: record.userId,
+        medicineId: record.medicineId,
+        scheduledDate: toLocalDateISO(),
+        slotName: record.slotName,
+        status: 2
+      })
+    }
+    ElMessage.success('已标记为跳过')
+    await loadDashboardData()
+  } catch (err) {
+    ElMessage.error('操作失败，请稍后重试')
+  } finally {
+    operatingTaskKey.value = ''
+  }
+}
+
+onMounted(async () => {
+  if (currentUserId.value) {
+    selectedMemberId.value = currentUserId.value
+  }
+  try {
+    await loadMembers()
+  } catch (err) {
+    ElMessage.error('加载家庭成员失败')
+  }
+  await loadDashboardData()
+})
+
+watch(selectedMemberId, (val, oldVal) => {
+  if (!val || val === oldVal) return
+  loadDashboardData()
+})
 </script>
 
 <template>
   <BaseLayout>
-    <!-- ── 装饰背景（与 SelectMember 同风格） ── -->
-    <div class="bg-layer bg-a" aria-hidden="true"></div>
-    <div class="bg-layer bg-b" aria-hidden="true"></div>
+    <section class="home-page" :class="{ 'care-mode': isCareMode }">
+      <header class="page-header card">
+        <div class="greeting-block">
+          <h1 class="title">{{ greeting }}，{{ userStore.member?.nickname || '朋友' }}</h1>
+          <div class="header-meta">
+            <span class="date-chip">{{ todayText }}</span>
+            <span class="meta-dot"></span>
+            <span class="meta-text">欢迎回来</span>
+          </div>
+        </div>
+        <div v-if="isAdmin && familyMembers.length" class="member-selector">
+          <div class="member-topline">
+            <span class="member-label">查看成员</span>
+            <span class="viewing-badge">当前：{{ viewingMemberText }}</span>
+          </div>
+          <el-select v-model="selectedMemberId" placeholder="选择成员" style="width: 188px">
+            <el-option :value="currentUserId" :label="`${userStore.member?.nickname || '我'}（我）`" />
+            <el-option
+              v-for="member in familyMembers"
+              :key="member.userId"
+              :value="member.userId"
+              :label="member.nickname"
+            />
+          </el-select>
+        </div>
+      </header>
 
-    <div class="dashboard" :class="{ 'care-mode': isCareMode }">
-      <!-- ══════════════════════════════════════════
-           左列
-      ═══════════════════════════════════════════ -->
-      <div class="col-main">
+      <section class="hero-grid">
+        <article class="hero card check-card">
+          <div v-if="loading" class="hero-loading">正在加载今日数据...</div>
+          <template v-else-if="nextPending">
+            <div class="check-layout">
+              <div class="check-main">
+                <div class="check-head">
+                  <p class="hero-kicker">待完成任务</p>
+                  <span class="task-status" :class="{ overdue: nextPendingOverdueMinutes > 0 }">
+                    {{ nextPendingOverdueMinutes > 0 ? '已超时' : '待打卡' }}
+                  </span>
+                </div>
+                <h2 class="hero-name">{{ nextPending.medicineName || '用药提醒' }}</h2>
+                <div class="check-meta-line">
+                  <span class="meta-item"><em>时段</em>{{ slotLabel(nextPending.slotName) }}</span>
+                  <span class="meta-item"><em>建议时间</em>{{ slotClock(nextPending.slotName) }}</span>
+                  <span class="meta-item"><em>剂量</em>{{ formatDosage(nextPending) }}</span>
+                </div>
+                <p v-if="nextPendingOverdueMinutes > 0" class="overdue-alert">
+                  <span class="alert-mark"></span>
+                  <span>已超时 {{ nextPendingOverdueMinutes }} 分钟，今天仍可补打</span>
+                </p>
+                <p v-else class="hero-meta">建议按时完成本次打卡</p>
+                <p v-if="justChecked" class="checked-tip">已完成上一项打卡</p>
+              </div>
 
-        <!-- ① 主任务卡 -->
-        <div class="card task-card">
-          <div class="task-header">
-            <div>
-              <div class="task-greeting">{{ greeting }}，{{ userStore.member?.nickname || '朋友' }} 👋</div>
-              <div class="task-date">{{ todayStr }}</div>
+              <div class="check-action-panel pending-panel">
+                <button
+                  class="btn-check-circle"
+                  @click="checkin(nextPending)"
+                  :disabled="operatingTaskKey === getTaskKey(nextPending)"
+                >
+                  <span class="circle-icon">{{ operatingTaskKey === getTaskKey(nextPending) ? '…' : '✓' }}</span>
+                  <span class="circle-text">{{ operatingTaskKey === getTaskKey(nextPending) ? '处理中' : nextActionLabel }}</span>
+                </button>
+                <button
+                  class="btn-check-skip"
+                  @click="skipRecord(nextPending)"
+                  :disabled="operatingTaskKey === getTaskKey(nextPending)"
+                >
+                  本次跳过
+                </button>
+                <p class="action-helper">剩余 {{ pendingRecords.length }} 项，可补打至今日 23:59</p>
+              </div>
             </div>
-            <div class="task-header-right">
-              <button 
-                class="refresh-btn" 
-                :class="{ 'refresh-loading': loadingRecords }" 
-                @click="refreshData"
-                :disabled="loadingRecords"
-                title="刷新数据"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <polyline points="1 20 1 14 7 14"></polyline>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-              </button>
-              <div v-if="pendingRecords.length > 0" class="task-badge">待完成 {{ pendingRecords.length }}</div>
-              <div v-else class="task-badge task-badge-done">全部完成 ✓</div>
+          </template>
+          <template v-else>
+            <div class="check-layout done-layout">
+              <div class="check-main done-main">
+                <p class="hero-kicker">今日状态</p>
+                <h2 class="hero-name">今日用药已全部打卡</h2>
+                <p class="hero-meta">继续保持健康作息，做得很好。</p>
+                <div class="done-tags">
+                  <span class="done-tag">待打卡 {{ pendingRecords.length }}</span>
+                  <span class="done-tag">已打卡 {{ takenRecords.length }}</span>
+                </div>
+              </div>
+              <div class="done-visual">
+                <div class="done-ring">
+                  <span class="done-ring-icon">✓</span>
+                  <span class="done-ring-text">已完成</span>
+                </div>
+                <button class="btn-done-link" @click="router.push({ name: 'medicine' })">
+                  去药品页查看
+                </button>
+              </div>
+            </div>
+          </template>
+        </article>
+
+        <article class="card summary-card">
+          <div class="summary-head">
+            <h3>今日完成度</h3>
+            <span>{{ takenRecords.length }}/{{ planRecords.length || 0 }}</span>
+          </div>
+          <div class="summary-main">
+            <div class="progress-ring" :style="{ '--rate': `${completionRate}%` }">
+              <div class="progress-inner">{{ completionRate }}%</div>
+            </div>
+            <div class="summary-list">
+              <div class="summary-item">
+                <span>待打卡</span>
+                <strong>{{ pendingRecords.length }}</strong>
+              </div>
+              <div class="summary-item">
+                <span>已打卡</span>
+                <strong>{{ takenRecords.length }}</strong>
+              </div>
+              <div class="summary-item">
+                <span>超时任务</span>
+                <strong :class="{ 'text-warn': overduePendingCount > 0 }">{{ overduePendingCount }}</strong>
+              </div>
+              <div class="summary-item">
+                <span>体征</span>
+                <strong>{{ vitalRecorded ? '已录入' : '未录入' }}</strong>
+              </div>
             </div>
           </div>
+          <div class="report-inline" :class="{ empty: !hasLatestReport }">
+            <template v-if="hasLatestReport">
+              <p class="report-title">最近周报：{{ latestReport.weekStart }} ~ {{ latestReport.weekEnd }}</p>
+              <p class="report-risk">
+                风险：
+                <span :class="`risk-${latestReport.riskLevel}`">
+                  {{ latestReport.riskLevel === 2 ? '高风险' : latestReport.riskLevel === 1 ? '中风险' : '低风险' }}
+                </span>
+              </p>
+              <button class="text-btn" @click="router.push({ name: 'health' })">前往健康页查看</button>
+            </template>
+            <template v-else>
+              <p class="report-title">最近周报：暂无数据</p>
+              <p class="report-risk">该成员还没有生成健康周报</p>
+              <button class="text-btn" @click="router.push({ name: 'health' })">去健康页生成周报</button>
+            </template>
+          </div>
+        </article>
+      </section>
 
-          <template v-if="nextPending">
-            <div class="task-body">
-              <div class="task-icon-wrap">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-                </svg>
+      <section class="card quick-section">
+        <div class="section-head">
+          <h3>快捷入口</h3>
+        </div>
+        <div class="quick-grid">
+          <button
+            v-for="item in quickLinks"
+            :key="item.key"
+            class="quick-card"
+            @click="router.push({ name: item.route })"
+          >
+            <span class="quick-icon">{{ item.icon }}</span>
+            <span class="quick-title">{{ item.title }}</span>
+            <span class="quick-sub">{{ item.subtitle }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="card records-section">
+        <div class="section-head">
+          <h3>待处理任务</h3>
+          <span class="count">{{ pendingSortedRecords.length }} 项</span>
+        </div>
+        <div v-if="!loading && pendingSortedRecords.length === 0" class="empty">
+          今日任务已全部处理完成
+        </div>
+        <ul v-else class="records-list">
+          <li
+            v-for="record in pendingSortedRecords"
+            :key="getTaskKey(record)"
+            class="record-item"
+            :class="statusClass(record.recordStatus)"
+          >
+            <div class="record-left">
+              <div class="slot">
+                <span>{{ record.slotName || '今日' }}</span>
+                <small class="slot-time">{{ slotClock(record.slotName) }}</small>
               </div>
               <div>
-                <div class="task-name">{{ nextPending.medicineName ?? '用药提醒' }}</div>
-                <div class="task-desc">
-                  {{ nextPending.scheduledTime ? nextPending.scheduledTime.slice(0, 5) + ' · ' : '' }}{{ nextPending.planDosage ?? '' }}
-                </div>
-                <div v-if="nextPendingOverdueMin > 0" class="task-overdue-tag">
-                  已超时 {{ nextPendingOverdueMin }} 分钟
-                </div>
+                <div class="medicine">{{ record.medicineName || '未命名药品' }}</div>
+                <div class="dosage">{{ formatDosage(record) }}</div>
               </div>
             </div>
-            <div class="task-actions">
-              <el-button type="primary" class="task-btn-primary" @click="checkin(nextPending)">立即打卡</el-button>
-              <el-button class="task-btn-ghost" @click="skipRecord(nextPending)">跳过</el-button>
+            <div class="record-right">
+              <template v-if="record.recordStatus === 0">
+                <span v-if="isFutureSlot(record.slotName)" class="time-pill">未到 {{ slotClock(record.slotName) }}</span>
+                <button class="btn-action btn-checkin" @click="checkin(record)" :disabled="operatingTaskKey === getTaskKey(record)">
+                  打卡
+                </button>
+                <button class="btn-action btn-skip" @click="skipRecord(record)" :disabled="operatingTaskKey === getTaskKey(record)">
+                  跳过
+                </button>
+              </template>
+              <span v-else class="badge">{{ statusLabel(record.recordStatus) }}</span>
             </div>
-          </template>
+          </li>
+        </ul>
+      </section>
 
-          <template v-else-if="!loadingRecords">
-            <div class="task-all-done">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2d5f5d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-              <span>今日用药全部完成，做得很好！</span>
-            </div>
-          </template>
-
-          <template v-else>
-            <div class="task-loading">加载中…</div>
-          </template>
+      <section class="card records-section handled-section">
+        <div class="section-head">
+          <h3>今日已处理</h3>
+          <span class="count">{{ processedRecords.length }} 项</span>
         </div>
-
-        <!-- ② 今日用药卡（替换原快捷操作） -->
-        <div class="card">
-          <div class="card-title-row">
-            <span class="card-title">今日用药</span>
-            <span class="card-count">{{ planRecords.length }} 条</span>
-          </div>
-
-          <div v-if="loadingRecords" class="med-loading">加载中…</div>
-
-          <div v-else-if="planRecords.length === 0" class="med-empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d0d0d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-            </svg>
-            <p class="empty-text">今日暂无用药计划</p>
-            <p class="empty-hint">休息一天，享受健康时光 😊</p>
-            <el-button class="empty-btn" @click="router.push({ name: 'medicine' })">
-              添加用药计划
-            </el-button>
-          </div>
-
-          <ul v-else class="med-list">
-            <li
-              v-for="r in planRecords"
-              :key="r.recordId"
-              class="med-item"
-              :class="[
-                statusClass(r.recordStatus),
-                { 'med-overdue': r.recordStatus === 0 && getOverdueMinutes(r.scheduledTime) > 0 }
-              ]"
-            >
-              <div class="med-left">
-                <!-- 状态圆点 -->
-                <span class="med-dot"></span>
-                <div class="med-info">
-                  <div class="med-name">{{ r.medicineName }}</div>
-                  <div class="med-meta">
-                    <span v-if="r.scheduledTime">{{ r.scheduledTime.slice(0, 5) }}</span>
-                    <span v-if="r.planDosage"> · {{ r.planDosage }}</span>
-                    <span 
-                      v-if="r.recordStatus === 0 && getOverdueMinutes(r.scheduledTime) > 0" 
-                      class="overdue-label"
-                    >
-                      · 超时 {{ getOverdueMinutes(r.scheduledTime) }} 分钟
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div class="med-right">
-                <span class="med-status-badge">{{ statusLabel(r.recordStatus) }}</span>
-                <button
-                  v-if="r.recordStatus === 0"
-                  class="med-checkin-btn"
-                  @click="checkin(r)"
-                >打卡</button>
-                <button
-                  v-if="r.recordStatus === 0"
-                  class="med-skip-btn"
-                  @click="skipRecord(r)"
-                >跳过</button>
-              </div>
-            </li>
-          </ul>
+        <div v-if="!loading && processedRecords.length === 0" class="empty">
+          还没有已处理记录，先完成第一条打卡吧
         </div>
-
-        <!-- ③ 模块分区卡 -->
-        <div v-if="!isCareMode" class="card">
-          <div class="card-title">功能模块</div>
-          <div class="module-grid">
-            <div
-              v-for="mod in moduleCards"
-              :key="mod.key"
-              class="module-card"
-              :style="{ '--m-color': mod.color }"
-              @click="mod.action"
-            >
-              <div class="module-header">
-                <span class="module-icon">
-                  <svg v-if="mod.icon === 'medicine'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-                  </svg>
-                  <svg v-else-if="mod.icon === 'health'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                  <svg v-else-if="mod.icon === 'family'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
-                </span>
-                <span class="module-title">{{ mod.title }}</span>
-                <svg class="module-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </div>
-              <ul class="module-items">
-                <li v-for="item in mod.items" :key="item">{{ item }}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ══════════════════════════════════════════
-           右列
-      ═══════════════════════════════════════════ -->
-      <div v-if="!isCareMode" class="col-side">
-
-        <!-- ④ 今日概览卡 -->
-        <div class="card">
-          <div class="card-title">今日概览</div>
-          <div class="overview-grid">
-            <div class="overview-item">
-              <div class="overview-val">{{ pendingRecords.length }}</div>
-              <div class="overview-key">待服药</div>
-            </div>
-            <div class="overview-item overview-done">
-              <div class="overview-val">{{ doneRecords.length }}</div>
-              <div class="overview-key">已打卡</div>
-            </div>
-            <div 
-              class="overview-item overview-vital overview-clickable" 
-              @click="router.push({ name: 'health' })"
-              title="点击跳转到健康页"
-            >
-              <div class="overview-val" :class="vitalRecorded ? '' : 'overview-val-no'">
-                {{ vitalRecorded ? '✓' : '—' }}
-              </div>
-              <div class="overview-key">体征已录</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ⑤ 时间线卡 -->
-        <div class="card timeline-card">
-          <div class="card-title">今日任务</div>
-          <div v-if="timeline.length === 0 && !loadingRecords" class="tl-empty">暂无任务</div>
-          <div class="timeline">
-            <div
-              v-for="(item, idx) in timeline"
-              :key="idx"
-              class="timeline-item"
-              :class="'tl-' + item.status"
-            >
-              <div class="tl-line">
-                <div class="tl-dot"></div>
-                <div v-if="idx < timeline.length - 1" class="tl-track"></div>
-              </div>
-              <div class="tl-content">
-                <div class="tl-top">
-                  <span class="tl-label">{{ item.label }}</span>
-                  <span class="tl-time">{{ item.time }}</span>
-                </div>
-                <div class="tl-desc">{{ item.desc }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ══════════════════════════════════════════
-           关怀模式时间线（单列，置于底部）
-      ═══════════════════════════════════════════ -->
-      <div v-if="isCareMode && timeline.length > 0" class="card timeline-card">
-        <div class="card-title">今日任务</div>
-        <div class="timeline">
-          <div
-            v-for="(item, idx) in timeline"
-            :key="idx"
-            class="timeline-item"
-            :class="'tl-' + item.status"
+        <ul v-else class="records-list handled-list">
+          <li
+            v-for="record in processedRecords"
+            :key="`done-${getTaskKey(record)}`"
+            class="record-item handled-item"
+            :class="statusClass(record.recordStatus)"
           >
-            <div class="tl-line">
-              <div class="tl-dot"></div>
-              <div v-if="idx < timeline.length - 1" class="tl-track"></div>
-            </div>
-            <div class="tl-content">
-              <div class="tl-top">
-                <span class="tl-label">{{ item.label }}</span>
-                <span class="tl-time">{{ item.time }}</span>
+            <div class="record-left">
+              <div class="slot">
+                <span>{{ record.slotName || '今日' }}</span>
+                <small class="slot-time">{{ slotClock(record.slotName) }}</small>
               </div>
-              <div class="tl-desc">{{ item.desc }}</div>
+              <div>
+                <div class="medicine">{{ record.medicineName || '未命名药品' }}</div>
+                <div class="dosage">{{ formatDosage(record) }}</div>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            <div class="record-right">
+              <span class="badge">{{ statusLabel(record.recordStatus) }}</span>
+            </div>
+          </li>
+        </ul>
+      </section>
 
-    <!-- ── 管理员密码验证弹窗 ── -->
-    <el-dialog
-      v-model="showAdminModal"
-      title="验证管理员身份"
-      width="360px"
-      :close-on-click-modal="true"
-      @close="closeAdminModal"
-    >
-      <p class="dialog-sub">请输入家庭账号密码</p>
-      <el-input
-        v-model="adminPassword"
-        type="password"
-        placeholder="家庭账号密码"
-        show-password
-        @keyup.enter="confirmAdmin"
-      />
-      <p v-if="adminError" class="dialog-error">{{ adminError }}</p>
-      <template #footer>
-        <el-button @click="closeAdminModal">取消</el-button>
-        <el-button type="primary" :loading="adminLoading" @click="confirmAdmin">确认</el-button>
-      </template>
-    </el-dialog>
+    </section>
   </BaseLayout>
 </template>
 
 <style scoped>
-/* ── 装饰背景层 ── */
-.bg-layer {
-  position: fixed;
-  z-index: 0;
-  pointer-events: none;
-}
-.bg-a {
-  width: min(44vw, 560px); height: min(30vw, 360px);
-  left: -12%; top: -8%;
-  clip-path: polygon(0 18%, 76% 0, 100% 44%, 60% 100%, 0 80%);
-  background: linear-gradient(138deg, rgba(45,95,93,0.07) 0%, rgba(255,255,255,0.10) 100%);
-  opacity: 0.8;
-}
-.bg-b {
-  width: min(48vw, 620px); height: min(36vw, 430px);
-  right: -16%; bottom: -18%;
-  clip-path: polygon(8% 0, 100% 24%, 92% 100%, 0 74%);
-  background: linear-gradient(142deg, rgba(45,95,93,0.08) 0%, rgba(246,228,201,0.18) 100%);
-  opacity: 0.6;
-}
-
-/* ── 主 Dashboard 布局（两列） ── */
-.dashboard {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 20px;
-  align-items: start;
-}
-
-.dashboard.care-mode {
-  grid-template-columns: 1fr;
-  max-width: 640px;
+.home-page {
+  --c-primary: #3f6f6b;
+  --c-primary-deep: #2f5552;
+  --c-ink: #253634;
+  --c-text: #566d6a;
+  --c-text-soft: #748886;
+  --c-line: rgba(63, 111, 107, 0.14);
+  --c-line-soft: rgba(63, 111, 107, 0.09);
+  --c-surface: rgba(255, 255, 255, 0.9);
+  --c-surface-soft: #f4faf8;
+  --c-surface-muted: #edf5f2;
+  --c-warn: #be5a4d;
+  --c-warn-soft: rgba(190, 90, 77, 0.12);
+  --c-success: #2f8a63;
+  --c-success-soft: rgba(47, 138, 99, 0.14);
+  width: 100%;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 0;
+  padding-bottom: 100px;
+  display: grid;
+  gap: 16px;
 }
 
-/* ── 卡片基础 ── */
 .card {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 20px;
-  padding: 22px 22px 20px;
-  box-shadow: 0 4px 24px rgba(45, 95, 93, 0.08), 0 1px 4px rgba(45, 95, 93, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-soft);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(34, 71, 68, 0.07);
 }
 
-.card-title {
+.page-header {
+  padding: 18px 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  background:
+    radial-gradient(240px 80px at 8% 0%, rgba(63, 111, 107, 0.1) 0%, transparent 75%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 252, 251, 0.92) 100%);
+}
+
+.greeting-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.56rem;
+  color: var(--c-ink);
+  letter-spacing: 0.01em;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--c-text);
+  background: rgba(63, 111, 107, 0.08);
+  border: 1px solid var(--c-line);
+}
+
+.meta-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(63, 111, 107, 0.33);
+}
+
+.meta-text {
   font-size: 0.82rem;
-  font-weight: 700;
-  color: #888;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 16px;
+  color: var(--c-text-soft);
 }
 
-.card-title-row {
+.viewer {
+  margin: 6px 0 0;
+  color: #2d5f5d;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.member-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.member-topline {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-}
-.card-title-row .card-title {
-  margin-bottom: 0;
-}
-.card-count {
-  font-size: 0.75rem;
-  color: #bbb;
+  gap: 8px;
 }
 
-/* ── 左列 ── */
-.col-main {
+.member-label {
+  font-size: 0.8rem;
+  color: #697978;
+}
+
+.viewing-badge {
+  font-size: 0.76rem;
+  color: var(--c-primary-deep);
+  font-weight: 600;
+  background: rgba(63, 111, 107, 0.08);
+  border: 1px solid rgba(63, 111, 107, 0.2);
+  border-radius: 999px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.hero {
+  padding: 22px;
+  background:
+    radial-gradient(120px 100px at 92% 18%, rgba(63, 111, 107, 0.12) 0%, transparent 80%),
+    linear-gradient(145deg, #f7fcfb 0%, #eff7f4 68%, #f9fcfb 100%);
+  color: var(--c-ink);
+  border-color: var(--c-line);
+}
+
+.check-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 0.9fr);
+  gap: 0;
+  align-items: stretch;
+  min-height: 206px;
+  height: 100%;
+}
+
+.done-layout {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+}
+
+.check-main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-/* ── 右列 ── */
-.col-side {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ── ① 主任务卡 ── */
-.task-card {
-  background: linear-gradient(145deg, rgba(45,95,93,0.06) 0%, rgba(255,255,255,0.94) 60%);
-  border-color: rgba(45, 95, 93, 0.15);
-}
-
-.task-header {
-  display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 18px;
+  gap: 8px;
+  padding: 2px 20px 2px 0;
 }
 
-.task-header-right {
+.check-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--c-primary-deep);
+  background: rgba(63, 111, 107, 0.1);
+  border: 1px solid var(--c-line);
+}
+
+.task-status.overdue {
+  color: var(--c-warn);
+  background: var(--c-warn-soft);
+  border-color: rgba(190, 90, 77, 0.22);
+}
+
+.hero-loading {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.hero-kicker {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.hero-name {
+  margin: 8px 0 0;
+  font-size: 1.45rem;
+  line-height: 1.25;
+}
+
+.hero-meta {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--c-text);
+}
+
+.check-meta-line {
+  margin-top: 2px;
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.9rem;
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+.meta-item em {
+  font-style: normal;
+  color: var(--c-text-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.overdue-alert {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0 3px 2px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  color: var(--c-warn);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.alert-mark {
+  width: 3px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--c-warn);
   flex-shrink: 0;
 }
 
-.refresh-btn {
-  width: 32px;
-  height: 32px;
-  border: 1.5px solid rgba(45, 95, 93, 0.15);
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 10px;
+.checked-tip {
+  margin: 0;
+  font-size: 0.8rem;
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--c-success);
+  background: var(--c-success-soft);
+  border: 1px solid rgba(47, 138, 99, 0.24);
+}
+
+.check-action-panel {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  padding: 14px 12px;
+  border-left: 1px solid var(--c-line);
+  background: transparent;
+}
+
+.pending-panel {
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.btn-check-circle {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid rgba(63, 111, 107, 0.24);
+  background: #f8fcfa;
+  color: var(--c-primary-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   cursor: pointer;
-  color: #2d5f5d;
-  transition: all 0.2s;
-  font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 3px 8px rgba(63, 111, 107, 0.1);
 }
 
-.refresh-btn:hover:not(:disabled) {
-  background: rgba(45, 95, 93, 0.08);
-  border-color: rgba(45, 95, 93, 0.3);
-  transform: translateY(-1px);
+.btn-check-circle:hover {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: 0 6px 12px rgba(63, 111, 107, 0.14);
 }
 
-.refresh-btn:disabled {
+.btn-check-circle:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.refresh-btn.refresh-loading svg {
-  animation: spin 0.8s linear infinite;
+.circle-icon {
+  font-size: 1.65rem;
+  line-height: 1;
+  font-weight: 700;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.circle-text {
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
-.task-greeting {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #1a1a1a;
-  letter-spacing: -0.01em;
-  margin-bottom: 4px;
+.action-helper {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--c-text);
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.35;
 }
 
-.task-date {
-  font-size: 0.8rem;
-  color: #999;
+.btn-check-skip {
+  border: 1px solid var(--c-line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--c-primary-deep);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-.task-badge {
+.btn-check-skip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.done-main {
+  justify-content: space-between;
+}
+
+.done-tags {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.done-tag {
+  display: inline-flex;
+  align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(245, 166, 35, 0.12);
-  color: #c87d00;
-  font-size: 0.75rem;
+  background: rgba(63, 111, 107, 0.08);
+  border: 1px solid var(--c-line);
+  color: var(--c-primary-deep);
+  font-size: 0.76rem;
   font-weight: 600;
-  flex-shrink: 0;
-}
-.task-badge-done {
-  background: rgba(45, 95, 93, 0.1);
-  color: #2d5f5d;
 }
 
-.task-body {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: rgba(45, 95, 93, 0.05);
-  border-radius: 14px;
-  margin-bottom: 16px;
-}
-
-.task-icon-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: rgba(45, 95, 93, 0.1);
-  display: grid;
-  place-items: center;
-  color: #2d5f5d;
-  flex-shrink: 0;
-}
-
-.task-name {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin-bottom: 4px;
-}
-
-.task-desc {
-  font-size: 0.82rem;
-  color: #888;
-}
-
-.task-overdue-tag {
-  margin-top: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.1);
-  padding: 3px 8px;
-  border-radius: 6px;
-  display: inline-block;
-}
-
-.task-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.task-btn-primary {
-  --el-button-bg-color: #2d5f5d !important;
-  --el-button-border-color: #2d5f5d !important;
-  --el-button-hover-bg-color: #3d7370 !important;
-  --el-button-hover-border-color: #3d7370 !important;
-  font-family: inherit !important;
-}
-
-.task-btn-ghost {
-  font-family: inherit !important;
-}
-
-.task-all-done {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgba(45, 95, 93, 0.05);
-  border-radius: 14px;
-  color: #2d5f5d;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.task-loading {
-  padding: 14px 0;
-  color: #bbb;
-  font-size: 0.85rem;
-}
-
-/* ── ② 今日用药 ── */
-.med-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #bbb;
-  font-size: 0.85rem;
-  padding: 8px 0 4px;
-}
-
-.med-empty-state {
+.done-visual {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
-  text-align: center;
+  gap: 12px;
 }
 
-.med-empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.6;
-}
-
-.empty-text {
-  margin: 0 0 6px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #999;
-}
-
-.empty-hint {
-  margin: 0 0 20px;
-  font-size: 0.8rem;
-  color: #bbb;
-}
-
-.empty-btn {
-  --el-button-bg-color: #2d5f5d !important;
-  --el-button-border-color: #2d5f5d !important;
-  --el-button-hover-bg-color: #3d7370 !important;
-  --el-button-hover-border-color: #3d7370 !important;
-  font-family: inherit !important;
-}
-
-.med-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.done-ring {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #f7fffb 0%, #e8f7ef 100%);
+  border: 2px solid rgba(39, 174, 96, 0.3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.med-item {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
-  border-radius: 13px;
-  background: rgba(45, 95, 93, 0.04);
-  border: 1.5px solid rgba(0, 0, 0, 0.05);
-  transition: border-color 0.15s;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 8px 18px rgba(39, 174, 96, 0.15);
 }
 
-.med-item.med-done {
-  background: rgba(45, 95, 93, 0.04);
-  opacity: 0.7;
-}
-.med-item.med-skip {
-  background: rgba(0, 0, 0, 0.02);
-  opacity: 0.55;
+.done-ring-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+  font-weight: 700;
+  color: #1f8f58;
 }
 
-.med-item.med-overdue {
-  border-color: rgba(231, 76, 60, 0.4);
-  background: rgba(231, 76, 60, 0.04);
+.done-ring-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1f8f58;
 }
 
-.med-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.med-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: #f5a623;
-}
-.med-done .med-dot { background: #2d5f5d; }
-.med-skip .med-dot { background: #ccc; }
-.med-overdue .med-dot { background: #e74c3c; }
-
-.med-info {
-  min-width: 0;
-}
-
-.med-name {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #1a1a1a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.med-done .med-name {
-  text-decoration: line-through;
-  color: #aaa;
-}
-.med-skip .med-name {
-  text-decoration: line-through;
-  color: #bbb;
-}
-
-.med-meta {
-  font-size: 0.75rem;
-  color: #aaa;
-  margin-top: 1px;
-}
-
-.overdue-label {
-  color: #e74c3c;
-  font-weight: 600;
-}
-
-.med-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.med-status-badge {
-  font-size: 0.72rem;
-  color: #aaa;
-  min-width: 28px;
-  text-align: right;
-}
-.med-pending .med-status-badge { color: #f5a623; }
-.med-done .med-status-badge    { color: #2d5f5d; }
-
-.med-checkin-btn,
-.med-skip-btn {
-  padding: 4px 10px;
-  border-radius: 8px;
+.btn-done-link {
+  border: none;
+  background: rgba(63, 111, 107, 0.12);
+  color: var(--c-primary-deep);
+  border-radius: 10px;
+  padding: 8px 12px;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  border: 1.5px solid;
-  font-family: inherit;
-  transition: background 0.12s, transform 0.1s;
-}
-.med-checkin-btn {
-  background: #2d5f5d;
-  color: #fff;
-  border-color: #2d5f5d;
-}
-.med-checkin-btn:hover {
-  background: #3d7370;
-  transform: translateY(-1px);
-}
-.med-skip-btn {
-  background: transparent;
-  color: #bbb;
-  border-color: #e0e0e0;
-}
-.med-skip-btn:hover {
-  border-color: #ccc;
-  color: #999;
 }
 
-/* ── ③ 模块卡 ── */
-.module-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+.summary-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  min-height: 206px;
 }
 
-.module-card {
-  border: 1.5px solid rgba(0, 0, 0, 0.06);
-  border-radius: 16px;
-  padding: 14px 14px 12px;
-  cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.module-card:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
-  border-color: var(--m-color);
-}
-
-.module-header {
+.summary-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 10px;
+  justify-content: space-between;
 }
 
-.module-icon {
+.summary-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--c-ink);
+}
+
+.summary-head span {
+  font-size: 0.82rem;
+  color: var(--c-text-soft);
+}
+
+.summary-main {
   display: flex;
   align-items: center;
-  color: var(--m-color);
+  gap: 14px;
 }
 
-.module-title {
+.progress-ring {
+  --rate: 100%;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--c-primary) var(--rate), #dde9e5 var(--rate));
+  flex-shrink: 0;
+}
+
+.progress-inner {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: var(--c-primary-deep);
   font-size: 0.9rem;
   font-weight: 700;
-  color: #1a1a1a;
+}
+
+.summary-list {
   flex: 1;
-}
-
-.module-arrow {
-  color: #ccc;
-  transition: color 0.15s;
-}
-
-.module-card:hover .module-arrow {
-  color: var(--m-color);
-}
-
-.module-items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.module-items li {
-  font-size: 0.75rem;
-  color: #999;
-  padding-left: 12px;
-  position: relative;
-}
-
-.module-items li::before {
-  content: '·';
-  position: absolute;
-  left: 3px;
-  color: var(--m-color);
-}
-
-/* ── ④ 今日概览 ── */
-.overview-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 7px;
 }
 
-.overview-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 14px 8px;
-  border-radius: 14px;
-  background: rgba(45, 95, 93, 0.06);
-}
-
-.overview-done {
-  background: rgba(58, 125, 107, 0.07);
-}
-
-.overview-vital {
-  background: rgba(90, 122, 158, 0.07);
-}
-
-.overview-clickable {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.overview-clickable:hover {
-  background: rgba(90, 122, 158, 0.12);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(90, 122, 158, 0.15);
-}
-
-.overview-val {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #2d5f5d;
-  line-height: 1;
-}
-.overview-val-no {
-  color: #ccc;
-}
-
-.overview-done .overview-val {
-  color: #3a7d6b;
-}
-
-.overview-vital .overview-val {
-  color: #5a7a9e;
-  font-size: 1.2rem;
-}
-
-.overview-key {
-  font-size: 0.72rem;
-  color: #999;
-  text-align: center;
-}
-
-/* ── ⑤ 时间线 ── */
-.timeline-card {
-  flex: 1;
-}
-
-.tl-empty {
-  font-size: 0.82rem;
-  color: #ccc;
-  padding: 4px 0;
-}
-
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.timeline-item {
-  display: flex;
-  gap: 12px;
-}
-
-.tl-line {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  width: 14px;
-}
-
-.tl-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #ccc;
-  flex-shrink: 0;
-  margin-top: 4px;
-  transition: background 0.15s;
-}
-
-.tl-done .tl-dot    { background: #2d5f5d; }
-.tl-pending .tl-dot { background: #f5a623; box-shadow: 0 0 0 3px rgba(245,166,35,0.2); }
-.tl-skipped .tl-dot { background: #ccc; }
-.tl-upcoming .tl-dot {
-  background: #ddd;
-  border: 2px solid #ccc;
-  width: 8px;
-  height: 8px;
-}
-
-.tl-track {
-  flex: 1;
-  width: 1.5px;
-  background: rgba(0, 0, 0, 0.08);
-  margin: 4px 0;
-  min-height: 16px;
-}
-
-.tl-content {
-  padding-bottom: 18px;
-  flex: 1;
-  min-width: 0;
-}
-
-.timeline-item:last-child .tl-content {
-  padding-bottom: 0;
-}
-
-.tl-top {
+.summary-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 2px;
+  background: var(--c-surface-soft);
+  border: 1px solid var(--c-line-soft);
+  border-radius: 8px;
+  padding: 6px 8px;
 }
 
-.tl-label {
-  font-size: 0.87rem;
-  font-weight: 600;
-  color: #1a1a1a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.summary-item span {
+  font-size: 0.8rem;
+  color: var(--c-text);
 }
 
-.tl-done .tl-label {
-  color: #888;
-  text-decoration: line-through;
-  text-decoration-color: #ccc;
-}
-.tl-skipped .tl-label {
-  color: #bbb;
-  text-decoration: line-through;
-  text-decoration-color: #ddd;
-}
-
-.tl-time {
-  font-size: 0.75rem;
-  color: #bbb;
-  flex-shrink: 0;
-}
-
-.tl-desc {
-  font-size: 0.75rem;
-  color: #bbb;
-}
-.tl-pending .tl-desc {
-  color: #f5a623;
-  font-weight: 500;
-}
-
-/* ── 弹窗辅助 ── */
-.dialog-sub {
-  margin: 0 0 14px;
-  color: #888;
-  font-size: 0.88rem;
-}
-
-.dialog-error {
-  margin: 10px 0 0;
-  color: #b42318;
+.summary-item strong {
   font-size: 0.85rem;
+  color: var(--c-ink);
 }
 
-/* ── 关怀模式放大样式 ── */
-.dashboard.care-mode .card {
-  padding: 28px 26px 26px;
-  border-radius: 24px;
+.summary-item strong.text-warn {
+  color: var(--c-warn);
 }
 
-.dashboard.care-mode .card-title {
-  font-size: 0.95rem;
-  margin-bottom: 18px;
+.report-inline {
+  border-top: 1px dashed rgba(63, 111, 107, 0.2);
+  padding-top: 10px;
+  height: 112px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  box-sizing: border-box;
 }
 
-.dashboard.care-mode .task-greeting {
-  font-size: 1.6rem;
+.report-inline.empty {
+  opacity: 0.82;
 }
 
-.dashboard.care-mode .task-date {
-  font-size: 1rem;
+.report-title {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--c-text-soft);
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  line-height: 1.25;
 }
 
-.dashboard.care-mode .task-badge {
-  font-size: 0.9rem;
-  padding: 6px 14px;
+.report-risk {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: #3c4d4b;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  line-height: 1.3;
 }
 
-.dashboard.care-mode .task-body {
-  padding: 20px 22px;
-  gap: 18px;
-  border-radius: 18px;
-  margin-bottom: 20px;
+.quick-section {
+  padding: 16px;
 }
 
-.dashboard.care-mode .task-icon-wrap {
-  width: 60px;
-  height: 60px;
-  border-radius: 18px;
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.dashboard.care-mode .task-icon-wrap svg {
-  width: 36px;
-  height: 36px;
+.section-head h3 {
+  margin: 0;
+  font-size: 1.02rem;
+  color: #213130;
 }
 
-.dashboard.care-mode .task-name {
-  font-size: 1.35rem;
-  margin-bottom: 6px;
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.dashboard.care-mode .task-desc {
-  font-size: 1.05rem;
-}
-
-.dashboard.care-mode .task-actions {
-  gap: 14px;
-}
-
-.dashboard.care-mode .task-btn-primary,
-.dashboard.care-mode .task-btn-ghost {
-  font-size: 1.1rem !important;
-  padding: 14px 24px !important;
-  height: auto !important;
-  border-radius: 14px !important;
-}
-
-.dashboard.care-mode .task-all-done {
-  padding: 20px 22px;
-  font-size: 1.15rem;
-  gap: 16px;
-}
-
-.dashboard.care-mode .task-all-done svg {
-  width: 40px;
-  height: 40px;
-}
-
-.dashboard.care-mode .med-item {
-  padding: 16px 20px;
-  border-radius: 16px;
-  border-width: 2px;
-}
-
-.dashboard.care-mode .med-dot {
-  width: 12px;
-  height: 12px;
-}
-
-.dashboard.care-mode .med-name {
-  font-size: 1.15rem;
-}
-
-.dashboard.care-mode .med-meta {
-  font-size: 0.95rem;
-  margin-top: 4px;
-}
-
-.dashboard.care-mode .med-status-badge {
-  font-size: 0.9rem;
-  min-width: 36px;
-}
-
-.dashboard.care-mode .med-checkin-btn,
-.dashboard.care-mode .med-skip-btn {
-  font-size: 1rem;
-  padding: 8px 16px;
+.quick-card {
+  border: 1px solid rgba(45, 95, 93, 0.12);
   border-radius: 12px;
-  border-width: 2px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fbfb 100%);
+  padding: 14px 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
 }
 
-/* ── 响应式 ── */
-@media (max-width: 960px) {
-  .module-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.quick-icon {
+  font-size: 1.2rem;
+}
+
+.quick-title {
+  color: #1f2a2a;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.quick-sub {
+  color: #70807f;
+  font-size: 0.78rem;
+}
+
+.records-section {
+  padding: 16px;
+}
+
+.count {
+  font-size: 0.8rem;
+  color: #7c8a89;
+}
+
+.empty {
+  text-align: center;
+  padding: 26px 12px;
+  color: #7c8a89;
+  background: #f8fbfa;
+  border-radius: 12px;
+}
+
+.records-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.record-item {
+  border: 1px solid rgba(45, 95, 93, 0.12);
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.record-item.is-pending {
+  border-left-color: #f39c12;
+}
+
+.record-item.is-taken {
+  border-left-color: #27ae60;
+}
+
+.record-item.is-skipped {
+  border-left-color: #95a5a6;
+}
+
+.record-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.slot {
+  min-width: 44px;
+  text-align: center;
+  background: #edf4f4;
+  color: #2d5f5d;
+  border-radius: 8px;
+  padding: 5px 7px 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+  gap: 2px;
+}
+
+.slot-time {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #6e8381;
+}
+
+.medicine {
+  color: #223130;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.dosage {
+  margin-top: 2px;
+  color: #7b8786;
+  font-size: 0.79rem;
+}
+
+.record-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.time-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #9b6730;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.26);
+}
+
+.btn-action {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-checkin {
+  background: #e7f4f2;
+  color: #2d5f5d;
+}
+
+.btn-skip {
+  background: #f1f3f3;
+  color: #5f6d6c;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef2f2;
+  color: #5f6d6c;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.report-section {
+  padding: 16px;
+}
+
+.text-btn {
+  border: none;
+  background: transparent;
+  color: var(--c-primary-deep);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-meta {
+  margin: 0;
+  color: #71807f;
+  font-size: 0.82rem;
+}
+
+.report-risk {
+  margin: 8px 0 0;
+  color: #394847;
+  font-size: 0.9rem;
+}
+
+.risk-0 {
+  color: #1f8f58;
+  font-weight: 700;
+}
+
+.risk-1 {
+  color: #d68910;
+  font-weight: 700;
+}
+
+.risk-2 {
+  color: #c0392b;
+  font-weight: 700;
 }
 
 @media (max-width: 767px) {
-  .dashboard {
+  .home-page {
+    padding: 0;
+    padding-bottom: 90px;
+    gap: 12px;
+  }
+
+  .page-header {
+    padding: 16px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .header-meta {
+    gap: 6px;
+  }
+
+  .date-chip {
+    font-size: 0.8rem;
+  }
+
+  .hero-grid {
     grid-template-columns: 1fr;
+    align-items: start;
   }
 
-  .col-side {
-    order: -1;
+  .check-layout,
+  .done-layout {
+    grid-template-columns: 1fr;
+    align-items: center;
+    min-height: 0;
+    height: auto;
   }
 
-  .overview-grid {
-    grid-template-columns: repeat(3, 1fr);
+  .check-action-panel {
+    padding: 12px 14px 14px;
+    align-items: stretch;
+    justify-content: center;
+    border-left: none;
+    border-top: 1px solid rgba(45, 95, 93, 0.12);
   }
 
-  .module-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .done-visual {
+    align-items: stretch;
+  }
+
+  .done-ring {
+    width: 94px;
+    height: 94px;
+    align-self: center;
+  }
+
+  .btn-done-link {
+    width: 100%;
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .check-head {
+    align-items: flex-start;
+  }
+
+  .check-meta-line {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .btn-check-circle {
+    width: 88px;
+    height: 88px;
+    align-self: center;
+  }
+
+  .circle-icon {
+    font-size: 1.2rem;
+  }
+
+  .circle-text {
+    font-size: 0.72rem;
+  }
+
+  .action-helper {
+    text-align: center;
+  }
+
+  .btn-check-skip {
+    width: auto;
+    align-self: center;
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .done-panel .btn-check-skip {
+    width: 100%;
+  }
+
+  .summary-main {
+    align-items: flex-start;
+  }
+
+  .summary-card {
+    min-height: 0;
+  }
+
+  .report-inline {
+    height: 108px;
+  }
+
+  .progress-ring {
+    width: 84px;
+    height: 84px;
+  }
+
+  .progress-inner {
+    width: 66px;
+    height: 66px;
+  }
+
+  .quick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .record-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .record-right {
+    width: 100%;
+  }
+
+  .btn-action {
+    flex: 1;
+  }
+
+  .viewing-badge {
+    max-width: 162px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
-@media (max-width: 480px) {
-  .card {
-    padding: 16px 16px 14px;
-    border-radius: 16px;
-  }
+.care-mode .title {
+  font-size: 1.9rem;
+}
 
-  .module-grid {
-    grid-template-columns: 1fr;
-  }
+.care-mode .hero-name {
+  font-size: 2rem;
+}
 
-  .task-greeting {
-    font-size: 1.05rem;
-  }
+.care-mode .summary-item span {
+  font-size: 0.9rem;
+}
+
+.care-mode .medicine {
+  font-size: 1.05rem;
+}
+
+.care-mode .btn-action {
+  font-size: 0.95rem;
+  padding: 10px 12px;
 }
 </style>
