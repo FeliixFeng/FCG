@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
@@ -17,6 +17,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const activeTab = ref(props.initialTab)
+const REMEMBER_LOGIN_KEY = 'fcg_remember_login'
 
 watch(() => props.initialTab, (v) => { activeTab.value = v })
 watch(() => props.modelValue, (v) => { if (v) activeTab.value = props.initialTab })
@@ -25,6 +26,7 @@ watch(() => props.modelValue, (v) => { if (v) activeTab.value = props.initialTab
 const loginFormRef = ref()
 const loginLoading = ref(false)
 const loginForm = reactive({ username: '', password: '' })
+const rememberPassword = ref(false)
 const loginRules = {
   username: [
     { required: true, message: '请输入家庭账号', trigger: 'blur' },
@@ -68,12 +70,38 @@ const registerRules = {
 const close = () => emit('update:modelValue', false)
 const switchTab = (tab) => { activeTab.value = tab }
 
+const loadRememberedLogin = () => {
+  try {
+    const raw = localStorage.getItem(REMEMBER_LOGIN_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (!saved || typeof saved !== 'object') return
+    loginForm.username = saved.username || ''
+    loginForm.password = saved.password || ''
+    rememberPassword.value = !!(saved.username && saved.password)
+  } catch {
+    localStorage.removeItem(REMEMBER_LOGIN_KEY)
+  }
+}
+
+onMounted(() => {
+  loadRememberedLogin()
+})
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   try { await loginFormRef.value.validate() } catch { return }
   try {
     loginLoading.value = true
     await userStore.login({ ...loginForm })
+    if (rememberPassword.value) {
+      localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({
+        username: loginForm.username,
+        password: loginForm.password
+      }))
+    } else {
+      localStorage.removeItem(REMEMBER_LOGIN_KEY)
+    }
     ElMessage.success('登录成功，请选择家庭成员')
     emit('success')
     close()
@@ -184,8 +212,13 @@ const handleRegister = async () => {
                   <template #prefix><el-icon><Lock /></el-icon></template>
                 </el-input>
               </el-form-item>
-              <div class="form-footer-tip">
-                还没有账号？<button type="button" class="link-btn" @click="switchTab('register')">免费注册</button>
+              <div class="login-extra-row">
+                <div class="form-footer-tip">
+                  还没有账号？<button type="button" class="link-btn" @click="switchTab('register')">免费注册</button>
+                </div>
+                <div class="remember-row">
+                  <el-checkbox v-model="rememberPassword">记住密码</el-checkbox>
+                </div>
               </div>
               <el-button type="primary" size="large" class="submit-btn" :loading="loginLoading" @click="handleLogin">
                 登录
@@ -464,10 +497,25 @@ const handleRegister = async () => {
   gap: 0 16px;
 }
 
+.login-extra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .form-footer-tip {
   font-size: 0.82rem;
   color: #aaa;
   margin-bottom: 12px;
+  white-space: nowrap;
+}
+
+.remember-row {
+  margin: 0 0 8px;
+  display: flex;
+  justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .link-btn {
@@ -537,6 +585,12 @@ const handleRegister = async () => {
 
   .auth-wrap {
     min-height: unset;
+  }
+
+  .login-extra-row {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px 12px;
   }
 }
 </style>
