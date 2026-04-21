@@ -44,6 +44,8 @@ watch(() => props.visible, (val) => {
 })
 
 const handleSubmit = async () => {
+  if (loading.value) return
+
   if (isBloodPressure.value) {
     if (!form.value.valueSystolic || !form.value.valueDiastolic) {
       ElMessage.warning('请填写收缩压和舒张压')
@@ -92,6 +94,11 @@ const handleSubmit = async () => {
     loading.value = false
   }
 }
+
+const handleInputEnter = (event) => {
+  event?.preventDefault?.()
+  handleSubmit()
+}
 </script>
 
 <template>
@@ -116,6 +123,7 @@ const handleSubmit = async () => {
               placeholder="120"
               min="60"
               max="250"
+              @keydown.enter.prevent="handleInputEnter"
             />
           </div>
           <span class="separator">/</span>
@@ -129,6 +137,7 @@ const handleSubmit = async () => {
               placeholder="80"
               min="40"
               max="150"
+              @keydown.enter.prevent="handleInputEnter"
             />
           </div>
         </div>
@@ -150,6 +159,7 @@ const handleSubmit = async () => {
               min="0"
               max="100"
               step="0.1"
+              @keydown.enter.prevent="handleInputEnter"
             />
             <span class="unit">{{ currentType?.unit }}</span>
           </div>
@@ -166,6 +176,7 @@ const handleSubmit = async () => {
             min="0"
             max="300"
             step="0.1"
+            @keydown.enter.prevent="handleInputEnter"
           />
           <span class="unit">{{ currentType?.unit }}</span>
         </div>

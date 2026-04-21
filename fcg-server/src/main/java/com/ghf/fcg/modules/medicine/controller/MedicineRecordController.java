@@ -49,12 +49,36 @@ public class MedicineRecordController {
     @Transactional(rollbackFor = Exception.class)
     public Result<Long> create(@RequestBody @Valid MedicineRecordCreateDTO dto) {
         Long currentUserId = UserContext.get().getUserId();
-        requireFamilyId(currentUserId);
+        User currentUser = userService.getById(currentUserId);
+        Long familyId = requireFamilyId(currentUserId);
+        boolean isAdmin = currentUser != null && currentUser.getRole() != null && currentUser.getRole() == 0;
+
+        Long targetUserId = dto.getUserId();
+        if (!isAdmin && !currentUserId.equals(targetUserId)) {
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
+        }
+        validateFamilyUser(familyId, targetUserId);
+
+        MedicinePlan plan = planService.getById(dto.getPlanId());
+        if (plan == null) {
+            throw new BusinessException(MessageConstant.PLAN_NOT_EXIST);
+        }
+        if (!targetUserId.equals(plan.getUserId())) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
+
+        Medicine medicine = medicineService.getById(dto.getMedicineId());
+        if (medicine == null || !familyId.equals(medicine.getFamilyId())) {
+            throw new BusinessException(MessageConstant.MEDICINE_FAMILY_MISMATCH);
+        }
+        if (!dto.getMedicineId().equals(plan.getMedicineId())) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
 
         MedicineRecord record = new MedicineRecord();
         record.setPlanId(dto.getPlanId());
-        record.setUserId(dto.getUserId());
-        record.setMedicineId(dto.getMedicineId());
+        record.setUserId(targetUserId);
+        record.setMedicineId(plan.getMedicineId());
         record.setScheduledDate(dto.getScheduledDate());
         record.setSlotName(dto.getSlotName());
         record.setActualTime(dto.getActualTime());
@@ -73,7 +97,7 @@ public class MedicineRecordController {
         Long currentUserId = UserContext.get().getUserId();
         requireFamilyId(currentUserId);
 
-        MedicineRecord record = getRecord(id);
+        MedicineRecord record = getRecord(currentUserId, id);
         Integer oldStatus = record.getStatus();
         applyRecordUpdate(record, dto);
         validateAndDeductStockIfTaken(oldStatus, record.getStatus(), record.getMedicineId(), record.getPlanId());
@@ -84,7 +108,8 @@ public class MedicineRecordController {
     @DeleteMapping("/{id}")
     @Operation(summary = "删除服药记录")
     public Result<Void> delete(@PathVariable Long id) {
-        MedicineRecord record = getRecord(id);
+        Long currentUserId = UserContext.get().getUserId();
+        MedicineRecord record = getRecord(currentUserId, id);
         recordService.removeById(record.getId());
         return Result.success();
     }
@@ -92,7 +117,8 @@ public class MedicineRecordController {
     @GetMapping("/{id}")
     @Operation(summary = "服药记录详情")
     public Result<MedicineRecordVO> get(@PathVariable Long id) {
-        MedicineRecord record = getRecord(id);
+        Long currentUserId = UserContext.get().getUserId();
+        MedicineRecord record = getRecord(currentUserId, id);
         return Result.success(toRecordVO(record));
     }
 
@@ -152,11 +178,21 @@ public class MedicineRecordController {
         return user.getFamilyId();
     }
 
-    private MedicineRecord getRecord(Long id) {
+    private MedicineRecord getRecord(Long currentUserId, Long id) {
         MedicineRecord record = recordService.getById(id);
         if (record == null) {
             throw new BusinessException(MessageConstant.RECORD_NOT_EXIST);
         }
+
+        Long familyId = requireFamilyId(currentUserId);
+        validateFamilyUser(familyId, record.getUserId());
+
+        User currentUser = userService.getById(currentUserId);
+        boolean isAdmin = currentUser != null && currentUser.getRole() != null && currentUser.getRole() == 0;
+        if (!isAdmin && !currentUserId.equals(record.getUserId())) {
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
+        }
+
         return record;
     }
 

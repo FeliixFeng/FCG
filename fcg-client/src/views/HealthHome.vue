@@ -236,8 +236,36 @@ const handleGenerateReport = async () => {
         confirmButtonText: '知道了',
         type: 'warning'
       })
+    } else if (msg.includes('API Key') || msg.includes('认证失败') || msg.includes('无效') || msg.includes('过期')) {
+      ElMessageBox.alert(
+        'AI 服务认证失败，可能是 API Key 已过期或配置错误。\n请联系管理员检查后端 AI 配置。',
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'error' }
+      )
+    } else if (msg.includes('额度') || msg.includes('受限') || msg.includes('429') || msg.includes('rate limit')) {
+      ElMessageBox.alert(
+        'AI 服务当前调用受限（可能是额度不足或请求过于频繁），请稍后重试。',
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'warning' }
+      )
+    } else if (msg.includes('超时') || msg.includes('timeout') || msg.includes('timed out')) {
+      ElMessageBox.alert(
+        'AI 服务请求超时，请检查网络后重试。',
+        '周报生成失败',
+        { confirmButtonText: '重试', type: 'warning' }
+      )
+    } else if (msg.includes('网络') || msg.includes('连接') || msg.includes('connect') || msg.includes('refused')) {
+      ElMessageBox.alert(
+        '无法连接到 AI 服务，请检查网络或稍后重试。',
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'error' }
+      )
     } else {
-      ElMessage.error('生成失败，请重试')
+      ElMessageBox.alert(
+        `周报生成失败：${msg || '未知错误'}\n请稍后重试，若持续失败请检查 AI 服务配置。`,
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'error' }
+      )
     }
   } finally {
     reportLoading.value = false
@@ -476,8 +504,8 @@ const getVitalValue = (type, todayData) => {
     const postMeal = todayData.find(v => v.type === 2 && v.measurePoint === 2)
     const fastingVal = fasting?.value != null ? fasting.value : null
     const postMealVal = postMeal?.value != null ? postMeal.value : null
-    if (!fastingVal && !postMealVal) return '--'
-    if (fastingVal && postMealVal) {
+    if (fastingVal == null && postMealVal == null) return '--'
+    if (fastingVal != null && postMealVal != null) {
       return { fasting: fastingVal, postMeal: postMealVal }
     }
     return fastingVal != null ? `空腹${fastingVal}` : `餐后${postMealVal}`

@@ -2,7 +2,7 @@
 import BaseLayout from '../components/common/BaseLayout.vue'
 import { onMounted, onUnmounted, ref, reactive, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElCheckbox } from 'element-plus'
-import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, deletePlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, fetchFamilyMembers } from '../utils/api'
+import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, deletePlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, fetchFamilyMembers, fetchTodayPlanRecords } from '../utils/api'
 import { useUserStore } from '../stores/user'
 import { useRoute, useRouter } from 'vue-router'
 import { compressImage, fileToBase64 } from '../utils/image'
@@ -16,6 +16,7 @@ const planList = ref([])
 const familyMembers = ref([]) // 家庭成员列表（管理员用）
 const loading = ref(false)
 const error = ref('')
+const todayPendingCount = ref(0)
 
 // 管理员切换查看的成员
 const selectedMemberId = ref(null)
@@ -72,6 +73,36 @@ const handleResize = () => {
 const currentMemberId = computed(() => userStore.member?.id)
 const currentMemberName = computed(() => userStore.member?.nickname || userStore.member?.username || '我')
 
+const getViewingUserId = () => {
+  if (userStore.isAdmin) {
+    return selectedMemberId.value || userStore.member?.id || null
+  }
+  return currentMemberId.value || null
+}
+
+const toLocalDateISO = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const loadTodayPendingCount = async () => {
+  const uid = getViewingUserId()
+  if (!uid) {
+    todayPendingCount.value = 0
+    return
+  }
+  try {
+    const res = await fetchTodayPlanRecords(toLocalDateISO(), uid)
+    const records = res?.data?.records || []
+    todayPendingCount.value = records.filter(item => item.recordStatus === 0).length
+  } catch (_) {
+    todayPendingCount.value = 0
+  }
+}
+
 // 加载数据
 const load = async () => {
   error.value = ''
@@ -94,6 +125,8 @@ const load = async () => {
         createPlanMemberId.value = userStore.member.id
       }
     }
+
+    await loadTodayPendingCount()
   } catch (err) {
     error.value = err?.message || '加载失败'
   } finally {
@@ -264,10 +297,6 @@ const totalFilteredMedsCount = computed(() => {
 })
 
 // 看板统计数据
-const todayPlans = computed(() => {
-  const today = new Date().getDay() || 7
-  return planList.value.filter(p => p.status !== 0 && (p.takeDays?.split(',') || []).includes(String(today)))
-})
 const lowStockCount = computed(() => medicineList.value.filter(m => m.stock != null && m.stock < 5).length)
 const expiringCount = computed(() => {
   const now = new Date().getTime()
@@ -414,6 +443,16 @@ const formatRemindSlots = (slots) => {
 
 const ocrFiles = ref([])
 const ocrPreviews = ref([])
+const ocrFileInputRef = ref(null)
+const ocrCameraInputRef = ref(null)
+
+const openOcrAlbumPicker = () => {
+  ocrFileInputRef.value?.click()
+}
+
+const openOcrCameraPicker = () => {
+  ocrCameraInputRef.value?.click()
+}
 
 const handleMedicineFile = async (e) => {
   const files = Array.from(e.target.files || [])
@@ -635,11 +674,15 @@ const deleteCurrentMedicine = async () => {
     await ElMessageBox.confirm(`确定要删除药品【${editingMedicine.value.name}】吗？此操作不可恢复。`, '删除警告', {
       confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning', confirmButtonClass: 'el-button--danger'
     })
-    // await deleteMedicine(editingMedicine.value.id)
+    await deleteMedicine(editingMedicine.value.id)
     ElMessage.success('删除成功')
     showEditMedicine.value = false
-    load()
-  } catch (e) {}
+    await load()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error(e?.message || '删除失败')
+    }
+  }
 }
 
 onMounted(async () => {
@@ -660,6 +703,14 @@ watch(
     await handleQuickAction()
   }
 )
+
+watch(
+  () => selectedMemberId.value,
+  async (val, oldVal) => {
+    if (!val || val === oldVal) return
+    await loadTodayPendingCount()
+  }
+)
 </script>
 
 <template>
@@ -672,7 +723,7 @@ watch(
         <div class="stat-card blue" @click="scrollToSection('plans')" style="cursor: pointer;">
           <div class="stat-icon">💊</div>
           <div class="stat-info">
-            <span class="stat-num">{{ todayPlans.length }}</span>
+            <span class="stat-num">{{ todayPendingCount }}</span>
             <span class="stat-desc">今日待服(次)</span>
           </div>
         </div>
@@ -867,7 +918,17 @@ watch(
         <div class="ocr-panel">
           <div class="ocr-images">
             <div v-for="(url, idx) in ocrPreviews" :key="idx" class="img-preview"><img :src="url" /><span class="img-close" @click.stop="removeOcrImage(idx)">×</span></div>
-            <div v-if="ocrPreviews.length < 4" class="img-add-btn" @click="$refs.fileInput.click()"><input ref="fileInput" type="file" accept="image/*" hidden @change="handleMedicineFile" /><span class="icon">📷</span><span class="txt">拍药盒</span></div>
+            <div v-if="ocrPreviews.length < 4" class="img-add-actions">
+              <input ref="ocrFileInputRef" type="file" accept="image/*" hidden @change="handleMedicineFile" />
+              <input ref="ocrCameraInputRef" type="file" accept="image/*" capture="environment" hidden @change="handleMedicineFile" />
+              <button v-if="isMobile" type="button" class="img-add-btn" @click="openOcrCameraPicker">
+                <span class="icon">📸</span><span class="txt">拍照</span>
+              </button>
+              <button type="button" class="img-add-btn" @click="openOcrAlbumPicker">
+                <span class="icon">{{ isMobile ? '🖼️' : '📷' }}</span>
+                <span class="txt">{{ isMobile ? '相册' : '上传图片' }}</span>
+              </button>
+            </div>
           </div>
           <button v-if="ocrPreviews.length > 0 && !ocrLoading" class="ai-btn" @click.stop="startOcr">✨ AI 智能解析</button>
           <div v-if="ocrLoading" class="ocr-loading-overlay">
@@ -1276,7 +1337,9 @@ watch(
 .img-preview { position: relative; width: 70px; height: 70px; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
 .img-preview img { width: 100%; height: 100%; object-fit: cover; }
 .img-close { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; }
-.img-add-btn { width: 70px; height: 70px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--primary);}
+.img-add-actions { display: flex; gap: 8px; }
+.img-add-btn { width: 70px; height: 70px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--primary); font: inherit; }
+.img-add-btn .txt { font-size: 0.72rem; }
 .ai-btn { width: 100%; background: linear-gradient(135deg, var(--primary) 0%, #1e403f 100%); color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(45,95,93,0.2); }
 .ocr-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; backdrop-filter: blur(2px);}
 .loading-icon { font-size: 2rem; margin-bottom: 8px; animation: pulse 1s infinite;}

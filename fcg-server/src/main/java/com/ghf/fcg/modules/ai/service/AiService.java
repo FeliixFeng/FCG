@@ -203,19 +203,28 @@ public String recognizeMedicineImage(List<String> imageBase64List) {
 
     public String generateHealthReportSummary(String vitalData, String medicineData) {
         String userPrompt = """
-            体征数据：%s
-            用药数据：%s
-            
-            请分析以上数据，生成一份健康周报总结，包括：
-            1. 本周健康状况概述
-            2. 需要注意的健康风险
-            3. 用药依从性评估
-            4. 具体的健康建议
-            
-            请用通俗易懂的语言回答。
+            你将基于“结构化健康数据”生成家庭健康周报。
+            请严格基于下面数据，不要编造不存在的指标：
+
+            体征数据：
+            %s
+
+            用药数据：
+            %s
+
+            请按以下 Markdown 模板输出（每节 2-4 条要点，语言简洁）：
+            ## 本周概况
+            ## 需要关注的异常信号
+            ## 用药依从性解读
+            ## 下周建议（可执行）
+
+            要求：
+            1. 优先引用“最新值、均值、异常次数”来支撑结论
+            2. 建议要具体，避免空泛表述
+            3. 如数据不足，请明确写出“数据不足项”
             """.formatted(vitalData, medicineData);
 
-        return chat("你是一个专业的健康顾问，请给出科学、合理的健康建议。", userPrompt);
+        return chat("你是专业家庭健康管理顾问，擅长把结构化指标转成清晰可执行的周报。", userPrompt);
     }
 
     private String chatWithImageList(String systemPrompt, String userPrompt, List<String> imageBase64List) {
