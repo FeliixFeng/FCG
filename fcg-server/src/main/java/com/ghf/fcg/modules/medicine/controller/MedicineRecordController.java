@@ -25,6 +25,7 @@ import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -45,43 +46,70 @@ public class MedicineRecordController {
 
     @PostMapping
     @Operation(summary = "新增服药记录")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Long> create(@RequestBody @Valid MedicineRecordCreateDTO dto) {
         Long currentUserId = UserContext.get().getUserId();
-        requireFamilyId(currentUserId);
+        User currentUser = userService.getById(currentUserId);
+        Long familyId = requireFamilyId(currentUserId);
+        boolean isAdmin = currentUser != null && currentUser.getRole() != null && currentUser.getRole() == 0;
+
+        Long targetUserId = dto.getUserId();
+        if (!isAdmin && !currentUserId.equals(targetUserId)) {
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
+        }
+        validateFamilyUser(familyId, targetUserId);
+
+        MedicinePlan plan = planService.getById(dto.getPlanId());
+        if (plan == null) {
+            throw new BusinessException(MessageConstant.PLAN_NOT_EXIST);
+        }
+        if (!targetUserId.equals(plan.getUserId())) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
+
+        Medicine medicine = medicineService.getById(dto.getMedicineId());
+        if (medicine == null || !familyId.equals(medicine.getFamilyId())) {
+            throw new BusinessException(MessageConstant.MEDICINE_FAMILY_MISMATCH);
+        }
+        if (!dto.getMedicineId().equals(plan.getMedicineId())) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
 
         MedicineRecord record = new MedicineRecord();
         record.setPlanId(dto.getPlanId());
-        record.setUserId(dto.getUserId());
-        record.setMedicineId(dto.getMedicineId());
+        record.setUserId(targetUserId);
+        record.setMedicineId(plan.getMedicineId());
         record.setScheduledDate(dto.getScheduledDate());
         record.setSlotName(dto.getSlotName());
         record.setActualTime(dto.getActualTime());
         record.setStatus(dto.getStatus() == null ? MedicineRecord.STATUS_PENDING : dto.getStatus());
         record.setRecordRemark(dto.getRecordRemark());
 
+        validateAndDeductStockIfTaken(null, record.getStatus(), record.getMedicineId(), record.getPlanId());
         recordService.save(record);
-        reduceStockIfTaken(null, record.getStatus(), record.getMedicineId(), record.getPlanId());
         return Result.success(record.getId());
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "更新服药记录")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> update(@PathVariable Long id, @RequestBody @Valid MedicineRecordUpdateDTO dto) {
         Long currentUserId = UserContext.get().getUserId();
         requireFamilyId(currentUserId);
 
-        MedicineRecord record = getRecord(id);
+        MedicineRecord record = getRecord(currentUserId, id);
         Integer oldStatus = record.getStatus();
         applyRecordUpdate(record, dto);
+        validateAndDeductStockIfTaken(oldStatus, record.getStatus(), record.getMedicineId(), record.getPlanId());
         recordService.updateById(record);
-        reduceStockIfTaken(oldStatus, record.getStatus(), record.getMedicineId(), record.getPlanId());
         return Result.success();
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除服药记录")
     public Result<Void> delete(@PathVariable Long id) {
-        MedicineRecord record = getRecord(id);
+        Long currentUserId = UserContext.get().getUserId();
+        MedicineRecord record = getRecord(currentUserId, id);
         recordService.removeById(record.getId());
         return Result.success();
     }
@@ -89,7 +117,8 @@ public class MedicineRecordController {
     @GetMapping("/{id}")
     @Operation(summary = "服药记录详情")
     public Result<MedicineRecordVO> get(@PathVariable Long id) {
-        MedicineRecord record = getRecord(id);
+        Long currentUserId = UserContext.get().getUserId();
+        MedicineRecord record = getRecord(currentUserId, id);
         return Result.success(toRecordVO(record));
     }
 
@@ -102,12 +131,22 @@ public class MedicineRecordController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduledDate,
             @ParameterObject PageQuery query) {
         Long currentUserId = UserContext.get().getUserId();
+        Long familyId = requireFamilyId(currentUserId);
+        User currentUser = userService.getById(currentUserId);
+        boolean isAdmin = currentUser != null && currentUser.getRole() != null && currentUser.getRole() == 0;
+        Long targetUserId = currentUserId;
+
+        if (userId != null) {
+            if (isAdmin) {
+                validateFamilyUser(familyId, userId);
+                targetUserId = userId;
+            } else {
+                targetUserId = currentUserId;
+            }
+        }
 
         LambdaQueryWrapper<MedicineRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MedicineRecord::getUserId, currentUserId);
-        if (userId != null) {
-            wrapper.eq(MedicineRecord::getUserId, userId);
-        }
+        wrapper.eq(MedicineRecord::getUserId, targetUserId);
         if (planId != null) {
             wrapper.eq(MedicineRecord::getPlanId, planId);
         }
@@ -124,6 +163,13 @@ public class MedicineRecordController {
                 pageResult.getRecords().stream().map(this::toRecordVO).collect(Collectors.toList())));
     }
 
+    private void validateFamilyUser(Long familyId, Long targetUserId) {
+        User user = userService.getById(targetUserId);
+        if (user == null || !familyId.equals(user.getFamilyId())) {
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
+        }
+    }
+
     private Long requireFamilyId(Long userId) {
         User user = userService.getById(userId);
         if (user == null || user.getFamilyId() == null) {
@@ -132,11 +178,21 @@ public class MedicineRecordController {
         return user.getFamilyId();
     }
 
-    private MedicineRecord getRecord(Long id) {
+    private MedicineRecord getRecord(Long currentUserId, Long id) {
         MedicineRecord record = recordService.getById(id);
         if (record == null) {
             throw new BusinessException(MessageConstant.RECORD_NOT_EXIST);
         }
+
+        Long familyId = requireFamilyId(currentUserId);
+        validateFamilyUser(familyId, record.getUserId());
+
+        User currentUser = userService.getById(currentUserId);
+        boolean isAdmin = currentUser != null && currentUser.getRole() != null && currentUser.getRole() == 0;
+        if (!isAdmin && !currentUserId.equals(record.getUserId())) {
+            throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
+        }
+
         return record;
     }
 
@@ -173,7 +229,7 @@ public class MedicineRecordController {
                 .build();
     }
 
-    private void reduceStockIfTaken(Integer oldStatus, Integer newStatus, Long medicineId, Long planId) {
+    private void validateAndDeductStockIfTaken(Integer oldStatus, Integer newStatus, Long medicineId, Long planId) {
         boolean nowTaken = newStatus != null && newStatus.equals(MedicineRecord.STATUS_TAKEN);
         boolean wasTaken = oldStatus != null && oldStatus.equals(MedicineRecord.STATUS_TAKEN);
         if (!nowTaken || wasTaken || medicineId == null) {
@@ -186,11 +242,17 @@ public class MedicineRecordController {
         }
 
         Medicine medicine = medicineService.getById(medicineId);
-        if (medicine == null || medicine.getStock() == null || medicine.getStock() <= 0) {
+        if (medicine == null) {
+            throw new BusinessException(MessageConstant.MEDICINE_NOT_EXIST);
+        }
+
+        int stock = medicine.getStock() == null ? 0 : medicine.getStock();
+        // 库存不足时允许先打卡，不做库存扣减
+        if (stock < deductCount) {
             return;
         }
 
-        int remain = Math.max(medicine.getStock() - deductCount, 0);
+        int remain = stock - deductCount;
         medicine.setStock(remain);
         medicineService.updateById(medicine);
     }

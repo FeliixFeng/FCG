@@ -9,10 +9,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -27,7 +36,7 @@ public class AiService {
      * 文本补全（对话）
      */
     public String chat(String prompt) {
-        return chat(prompt, null);
+        return chat(null, prompt);
     }
 
     /**
@@ -201,21 +210,140 @@ public String recognizeMedicineImage(List<String> imageBase64List) {
         return aiProperties.getModel();
     }
 
+    /**
+     * 流式文本对话（逐段回调 delta）
+     */
+    public String streamChat(String systemPrompt, String userPrompt, Consumer<String> deltaConsumer) {
+        StringBuilder full = new StringBuilder();
+        long startMs = System.currentTimeMillis();
+        long firstDeltaMs = -1L;
+        int upstreamDeltaCount = 0;
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", aiProperties.getModel());
+        requestBody.put("stream", true);
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            Map<String, Object> systemMsg = new HashMap<>();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", systemPrompt);
+            messages.add(systemMsg);
+        }
+
+        Map<String, Object> userMsg = new HashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", userPrompt);
+        messages.add(userMsg);
+        requestBody.put("messages", messages);
+
+        try {
+            String body = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofMillis(Optional.ofNullable(aiProperties.getTimeout()).orElse(30000)))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(aiProperties.getBaseUrl() + "/chat/completions"))
+                    .timeout(Duration.ofMillis(Optional.ofNullable(aiProperties.getTimeout()).orElse(30000)))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "text/event-stream")
+                    .header("Accept-Encoding", "identity")
+                    .header("Authorization", "Bearer " + aiProperties.getApiKey())
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                    .build();
+
+            HttpResponse<java.io.InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("AI服务调用失败，HTTP状态码: " + response.statusCode());
+            }
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank() || !line.startsWith("data:")) {
+                        continue;
+                    }
+
+                    String payload = line.substring(5).trim();
+                    if (payload.isEmpty()) {
+                        continue;
+                    }
+                    if ("[DONE]".equals(payload)) {
+                        break;
+                    }
+
+                    try {
+                        Map<String, Object> chunk = objectMapper.readValue(payload, Map.class);
+                        Object err = chunk.get("error");
+                        if (err != null) {
+                            throw new RuntimeException(String.valueOf(err));
+                        }
+
+                        List<Map<String, Object>> choices = (List<Map<String, Object>>) chunk.get("choices");
+                        if (choices == null || choices.isEmpty()) {
+                            continue;
+                        }
+
+                        Map<String, Object> choice = choices.get(0);
+                        String delta = extractDeltaContent(choice);
+                        if (delta == null || delta.isEmpty()) {
+                            continue;
+                        }
+                        upstreamDeltaCount += 1;
+                        if (firstDeltaMs < 0) {
+                            firstDeltaMs = System.currentTimeMillis() - startMs;
+                            log.info("AI upstream first delta arrived at {}ms", firstDeltaMs);
+                        }
+                        full.append(delta);
+                        if (upstreamDeltaCount % 40 == 0) {
+                            log.debug("AI upstream progress: chunks={}, totalLen={}", upstreamDeltaCount, full.length());
+                        }
+                        deltaConsumer.accept(delta);
+                    } catch (Exception parseEx) {
+                        log.warn("AI流式分片解析失败，已跳过该分片: {}", parseEx.getMessage());
+                    }
+                }
+            }
+
+            log.info("AI upstream stream done: firstDelta={}ms, upstreamChunks={}, totalLen={}",
+                    firstDeltaMs, upstreamDeltaCount, full.length());
+
+            return full.toString();
+        } catch (Exception e) {
+            String msg = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+            if (msg.contains("closed")) {
+                log.warn("AI stream closed early, return partial content length={}", full.length());
+                return full.toString();
+            }
+            log.error("AI stream chat failed: {}", e.getMessage(), e);
+            throw new RuntimeException("AI服务流式调用失败: " + e.getMessage(), e);
+        }
+    }
+
     public String generateHealthReportSummary(String vitalData, String medicineData) {
         String userPrompt = """
-            体征数据：%s
-            用药数据：%s
-            
-            请分析以上数据，生成一份健康周报总结，包括：
-            1. 本周健康状况概述
-            2. 需要注意的健康风险
-            3. 用药依从性评估
-            4. 具体的健康建议
-            
-            请用通俗易懂的语言回答。
+            你将基于“结构化健康数据”生成家庭健康周报。
+            请严格基于下面数据，不要编造不存在的指标：
+
+            体征数据：
+            %s
+
+            用药数据：
+            %s
+
+            请按以下 Markdown 模板输出（每节 2-4 条要点，语言简洁）：
+            ## 本周概况
+            ## 需要关注的异常信号
+            ## 用药依从性解读
+            ## 下周建议（可执行）
+
+            要求：
+            1. 优先引用“最新值、均值、异常次数”来支撑结论
+            2. 建议要具体，避免空泛表述
+            3. 如数据不足，请明确写出“数据不足项”
             """.formatted(vitalData, medicineData);
 
-        return chat("你是一个专业的健康顾问，请给出科学、合理的健康建议。", userPrompt);
+        return chat("你是专业家庭健康管理顾问，擅长把结构化指标转成清晰可执行的周报。", userPrompt);
     }
 
     private String chatWithImageList(String systemPrompt, String userPrompt, List<String> imageBase64List) {
@@ -280,5 +408,25 @@ public String recognizeMedicineImage(List<String> imageBase64List) {
             log.error("AI Vision API 调用失败", e);
             throw new RuntimeException("AI图像识别失败: " + e.getMessage(), e);
         }
+    }
+
+    private String extractDeltaContent(Map<String, Object> choice) {
+        if (choice == null) {
+            return null;
+        }
+
+        Object deltaObj = choice.get("delta");
+        if (deltaObj instanceof Map<?, ?> deltaMap) {
+            Object content = deltaMap.get("content");
+            return content == null ? null : String.valueOf(content);
+        }
+
+        Object messageObj = choice.get("message");
+        if (messageObj instanceof Map<?, ?> msgMap) {
+            Object content = msgMap.get("content");
+            return content == null ? null : String.valueOf(content);
+        }
+
+        return null;
     }
 }

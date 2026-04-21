@@ -22,6 +22,7 @@ public class MessageConstant {
     // 药品
     public static final String MEDICINE_NOT_EXIST = "药品不存在";
     public static final String MEDICINE_FAMILY_MISMATCH = "药品不存在或不属于当前家庭";
+    public static final String MEDICINE_STOCK_NOT_ENOUGH = "库存不足，请先补充药品";
 
     // 用药计划
     public static final String PLAN_NOT_EXIST = "用药计划不存在";

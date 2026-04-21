@@ -256,7 +256,7 @@ onMounted(() => {
       <div class="header-row">
         <div>
           <h2>成员管理</h2>
-          <p class="page-desc">管理家庭成员信息，包括添加、查看、修改角色等操作。</p>
+          <p class="page-desc">这里负责全员资料与权限管理；成员自己的头像和昵称建议在“我的”页面自助修改。</p>
         </div>
         <button class="btn-add" @click="showAddForm = !showAddForm">
           {{ showAddForm ? '取消' : '+ 添加成员' }}

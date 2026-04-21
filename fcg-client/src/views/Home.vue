@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import BaseLayout from '../components/common/BaseLayout.vue'
 import { useUserStore } from '../stores/user'
 import {
@@ -19,6 +19,7 @@ const router = useRouter()
 const loading = ref(false)
 const operatingTaskKey = ref('')
 const justChecked = ref(false)
+const taskCursor = ref(0)
 let dashboardRequestId = 0
 
 const familyMembers = ref([])
@@ -26,6 +27,9 @@ const selectedMemberId = ref(null)
 const planRecords = ref([])
 const vitalRecorded = ref(false)
 const latestReport = ref(null)
+const previewVisible = ref(false)
+const previewImageUrl = ref('')
+const previewImageTitle = ref('')
 
 const isAdmin = computed(() => userStore.member?.role === 0)
 const isCareMode = computed(() => userStore.isCareMode)
@@ -69,11 +73,11 @@ const completionRate = computed(() => {
 const hasLatestReport = computed(() => !!latestReport.value)
 
 const slotOrder = { '早': 1, '中': 2, '晚': 3, '睡前': 4 }
-const slotTimeMap = {
-  '早': { h: 8, m: 0 },
-  '中': { h: 12, m: 30 },
-  '晚': { h: 18, m: 30 },
-  '睡前': { h: 22, m: 0 }
+const slotWindowMap = {
+  '早': { start: 6 * 60, end: 10 * 60 },
+  '中': { start: 10 * 60, end: 14 * 60 },
+  '晚': { start: 17 * 60, end: 21 * 60 },
+  '睡前': { start: 21 * 60, end: 24 * 60 }
 }
 
 const sortedRecords = computed(() => {
@@ -85,46 +89,39 @@ const sortedRecords = computed(() => {
   })
 })
 
-const nextPending = computed(() => {
-  const list = [...pendingRecords.value].sort((a, b) => {
-    const slotA = slotOrder[a.slotName] || 99
-    const slotB = slotOrder[b.slotName] || 99
-    if (slotA !== slotB) return slotA - slotB
-    return (a.recordId || 0) - (b.recordId || 0)
-  })
-  return list[0] || null
+const taskOrderedRecords = computed(() => sortedRecords.value)
+
+const currentTask = computed(() => {
+  const list = taskOrderedRecords.value
+  if (!list.length) return null
+  const idx = Math.min(Math.max(taskCursor.value, 0), list.length - 1)
+  return list[idx] || null
 })
 
-const nextPendingOverdueMinutes = computed(() => {
-  if (!nextPending.value?.slotName) return 0
-  const base = slotTimeMap[nextPending.value.slotName]
+const currentTaskOverdueMinutes = computed(() => {
+  if (!currentTask.value?.slotName || currentTask.value.recordStatus !== 0) return 0
+  const base = slotWindowMap[currentTask.value.slotName]
   if (!base) return 0
   const now = new Date()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  const plannedMinutes = base.h * 60 + base.m
-  return Math.max(currentMinutes - plannedMinutes, 0)
+  return Math.max(currentMinutes - base.end, 0)
 })
 
 const overduePendingCount = computed(() => {
   const now = new Date()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   return pendingRecords.value.filter((item) => {
-    const slot = slotTimeMap[item.slotName]
+    const slot = slotWindowMap[item.slotName]
     if (!slot) return false
-    const plannedMinutes = slot.h * 60 + slot.m
-    return currentMinutes > plannedMinutes
+    return currentMinutes > slot.end
   }).length
 })
 
-const nextActionLabel = computed(() => {
-  return pendingRecords.value.length > 1 ? '打卡下一条' : '立即打卡'
-})
-
 const quickLinks = [
-  { key: 'medicine', title: '药品管理', subtitle: '药箱与用药计划', icon: '💊', route: 'medicine' },
-  { key: 'health', title: '健康中心', subtitle: '体征与健康周报', icon: '❤️', route: 'health' },
-  { key: 'ai', title: 'AI 助手', subtitle: '健康问答与建议', icon: '🤖', route: 'ai' },
-  { key: 'profile', title: '我的', subtitle: '成员与家庭信息', icon: '👤', route: 'profile' }
+  { key: 'create-plan', title: '新建计划', subtitle: '直接打开计划创建', icon: '🗓️', route: { name: 'medicine', query: { action: 'create-plan' } } },
+  { key: 'low-stock', title: '去补货', subtitle: '查看库存紧张药品', icon: '📦', route: { name: 'medicine', query: { action: 'view-low-stock' } } },
+  { key: 'record-vital', title: '录入体征', subtitle: '直接打开体征录入', icon: '🩺', route: { name: 'health', query: { action: 'record-vital', type: '1' } } },
+  { key: 'health-report', title: '查看周报', subtitle: '跳转健康周报区域', icon: '📊', route: { name: 'health', query: { action: 'view-report' } } }
 ]
 
 function toLocalDateISO() {
@@ -164,18 +161,43 @@ function slotLabel(slot) {
 }
 
 function slotClock(slot) {
-  const base = slotTimeMap[slot]
+  const base = slotWindowMap[slot]
   if (!base) return '--:--'
-  return `${String(base.h).padStart(2, '0')}:${String(base.m).padStart(2, '0')}`
+  return `${String(Math.floor(base.start / 60)).padStart(2, '0')}:${String(base.start % 60).padStart(2, '0')}`
+}
+
+function slotRange(slot) {
+  const base = slotWindowMap[slot]
+  if (!base) return '--:--'
+  const start = `${String(Math.floor(base.start / 60)).padStart(2, '0')}:${String(base.start % 60).padStart(2, '0')}`
+  const endMinute = base.end >= 24 * 60 ? 23 * 60 + 59 : base.end
+  const end = `${String(Math.floor(endMinute / 60)).padStart(2, '0')}:${String(endMinute % 60).padStart(2, '0')}`
+  return `${start}-${end}`
 }
 
 function isFutureSlot(slot) {
-  const base = slotTimeMap[slot]
+  const base = slotWindowMap[slot]
   if (!base) return false
   const now = new Date()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  const plannedMinutes = base.h * 60 + base.m
-  return currentMinutes < plannedMinutes
+  return currentMinutes < base.start
+}
+
+function getSlotPhase(slot) {
+  const base = slotWindowMap[slot]
+  if (!base) return 'active'
+  const now = new Date()
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  if (currentMinutes < base.start) return 'future'
+  if (currentMinutes > base.end) return 'overdue'
+  return 'active'
+}
+
+function getSlotPhaseText(slot) {
+  const phase = getSlotPhase(slot)
+  if (phase === 'future') return `未到 ${slotClock(slot)} 开始`
+  if (phase === 'overdue') return '已过建议时段'
+  return '当前时段'
 }
 
 function formatDosage(record) {
@@ -188,6 +210,126 @@ function getTaskKey(record) {
   if (!record) return ''
   if (record.recordId) return `r-${record.recordId}`
   return `p-${record.planId}-${record.slotName || ''}`
+}
+
+function goQuickLink(item) {
+  if (!item?.route) return
+  router.push(item.route)
+}
+
+function goPrevPending() {
+  if (taskCursor.value <= 0) return
+  taskCursor.value -= 1
+}
+
+function goNextPending() {
+  const max = taskOrderedRecords.value.length - 1
+  if (taskCursor.value >= max) return
+  taskCursor.value += 1
+}
+
+function getMainActionLabel(record) {
+  if (!record) return '打卡'
+  if (record.recordStatus === 1) return '已打卡'
+  if (record.recordStatus === 2) return '已跳过'
+  return '打卡'
+}
+
+function isMainActionDisabled(record) {
+  if (!record) return true
+  if (record.recordStatus !== 0) return true
+  return operatingTaskKey.value === getTaskKey(record)
+}
+
+function resolvePreferredTaskIndex(records) {
+  if (!records?.length) return 0
+
+  const activeIndex = records.findIndex(
+    (item) => item.recordStatus === 0 && getSlotPhase(item.slotName) === 'active'
+  )
+  if (activeIndex >= 0) return activeIndex
+
+  const overdueIndex = records.findIndex(
+    (item) => item.recordStatus === 0 && getSlotPhase(item.slotName) === 'overdue'
+  )
+  if (overdueIndex >= 0) return overdueIndex
+
+  const pendingIndex = records.findIndex((item) => item.recordStatus === 0)
+  if (pendingIndex >= 0) return pendingIndex
+
+  return 0
+}
+
+function onTaskImageError(event) {
+  const img = event?.target
+  if (!img) return
+  img.style.display = 'none'
+  const wrapper = img.parentElement
+  if (wrapper) {
+    wrapper.classList.add('is-broken')
+  }
+}
+
+function openImagePreview(record) {
+  if (!record?.medicineImageUrl) return
+  previewImageUrl.value = record.medicineImageUrl
+  previewImageTitle.value = record.medicineName || '药品图片'
+  previewVisible.value = true
+}
+
+function getProcessedTag(record) {
+  if (!record) return ''
+  if (record.recordStatus === 2) return '跳过'
+  if (record.recordStatus !== 1) return ''
+
+  if (!record.actualTime) return '按时'
+  const base = slotWindowMap[record.slotName]
+  if (!base) return '按时'
+
+  const actual = new Date(record.actualTime)
+  if (Number.isNaN(actual.getTime())) return '按时'
+  const actualMinutes = actual.getHours() * 60 + actual.getMinutes()
+  return actualMinutes > base.end ? '补卡' : '按时'
+}
+
+function getProcessedTagClass(record) {
+  const tag = getProcessedTag(record)
+  if (tag === '补卡') return 'is-makeup'
+  if (tag === '跳过') return 'is-skip'
+  return 'is-ontime'
+}
+
+function resolveRequiredStock(record) {
+  const dosage = Number(record?.planDosage || 0)
+  if (!Number.isFinite(dosage) || dosage <= 0) return 1
+  return Math.max(Math.floor(dosage), 1)
+}
+
+function isStockInsufficient(record) {
+  if (!record) return false
+  if (record.medicineStock === null || record.medicineStock === undefined) return false
+  return Number(record.medicineStock) < resolveRequiredStock(record)
+}
+
+async function confirmCheckinWhenStockLow(record) {
+  if (!isStockInsufficient(record)) return true
+  try {
+    await ElMessageBox.confirm(
+      '当前库存不足，本次打卡将不会扣减库存。确认继续打卡吗？',
+      '库存不足',
+      {
+        confirmButtonText: '仍要打卡',
+        cancelButtonText: '去补货',
+        type: 'warning'
+      }
+    )
+    return true
+  } catch (action) {
+    if (action === 'cancel') {
+      router.push({ name: 'medicine' })
+    }
+    return false
+  }
 }
 
 async function loadMembers() {
@@ -203,29 +345,35 @@ async function loadDashboardData() {
   loading.value = true
   latestReport.value = null
   try {
-    // 首页主卡只依赖记录和体征，先渲染，避免被周报接口拖慢
-    const [recordsRes, vitalsRes] = await Promise.allSettled([
-      fetchTodayPlanRecords(toLocalDateISO(), uid),
-      fetchTodayVitals(uid)
-    ])
+    // 先加载主任务数据，尽快结束“今日数据加载中”
+    const recordsRes = await fetchTodayPlanRecords(toLocalDateISO(), uid)
     if (requestId !== dashboardRequestId) return
 
-    if (recordsRes.status === 'fulfilled') {
-      planRecords.value = recordsRes.value?.data?.records || []
+    planRecords.value = recordsRes?.data?.records || []
+    if (!planRecords.value.length) {
+      taskCursor.value = 0
     } else {
-      planRecords.value = []
+      taskCursor.value = resolvePreferredTaskIndex(taskOrderedRecords.value)
     }
-
-    if (vitalsRes.status === 'fulfilled') {
-      vitalRecorded.value = (vitalsRes.value?.data?.length || 0) > 0
-    } else {
-      vitalRecorded.value = false
-    }
+  } catch (err) {
+    if (requestId !== dashboardRequestId) return
+    planRecords.value = []
   } finally {
     if (requestId === dashboardRequestId) {
       loading.value = false
     }
   }
+
+  // 体征异步加载，不阻塞主卡片显示
+  fetchTodayVitals(uid)
+    .then((res) => {
+      if (requestId !== dashboardRequestId) return
+      vitalRecorded.value = (res?.data?.length || 0) > 0
+    })
+    .catch(() => {
+      if (requestId !== dashboardRequestId) return
+      vitalRecorded.value = false
+    })
 
   // 周报异步加载，不阻塞主卡片显示
   fetchLatestReport(uid)
@@ -240,6 +388,8 @@ async function loadDashboardData() {
 }
 
 async function checkin(record) {
+  const canContinue = await confirmCheckinWhenStockLow(record)
+  if (!canContinue) return
   try {
     operatingTaskKey.value = getTaskKey(record)
     const actualTime = toLocalDateTimeISO()
@@ -293,6 +443,23 @@ async function skipRecord(record) {
   }
 }
 
+async function confirmSkipRecord(record) {
+  try {
+    await ElMessageBox.confirm(
+      '确认跳过这次打卡吗？你今天仍可补打。',
+      '跳过确认',
+      {
+        confirmButtonText: '确认跳过',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    await skipRecord(record)
+  } catch (_) {
+    // 取消时不处理
+  }
+}
+
 onMounted(async () => {
   if (currentUserId.value) {
     selectedMemberId.value = currentUserId.value
@@ -307,6 +474,7 @@ onMounted(async () => {
 
 watch(selectedMemberId, (val, oldVal) => {
   if (!val || val === oldVal) return
+  taskCursor.value = 0
   loadDashboardData()
 })
 </script>
@@ -343,46 +511,83 @@ watch(selectedMemberId, (val, oldVal) => {
       <section class="hero-grid">
         <article class="hero card check-card">
           <div v-if="loading" class="hero-loading">正在加载今日数据...</div>
-          <template v-else-if="nextPending">
+          <template v-else-if="currentTask">
             <div class="check-layout">
               <div class="check-main">
                 <div class="check-head">
                   <p class="hero-kicker">待完成任务</p>
-                  <span class="task-status" :class="{ overdue: nextPendingOverdueMinutes > 0 }">
-                    {{ nextPendingOverdueMinutes > 0 ? '已超时' : '待打卡' }}
+                  <span class="task-status" :class="{ overdue: currentTaskOverdueMinutes > 0 }">
+                    {{
+                      currentTask.recordStatus === 1
+                        ? '已打卡'
+                        : currentTask.recordStatus === 2
+                          ? '已跳过'
+                          : currentTaskOverdueMinutes > 0
+                            ? '已超时'
+                            : '待打卡'
+                    }}
                   </span>
                 </div>
-                <h2 class="hero-name">{{ nextPending.medicineName || '用药提醒' }}</h2>
-                <div class="check-meta-line">
-                  <span class="meta-item"><em>时段</em>{{ slotLabel(nextPending.slotName) }}</span>
-                  <span class="meta-item"><em>建议时间</em>{{ slotClock(nextPending.slotName) }}</span>
-                  <span class="meta-item"><em>剂量</em>{{ formatDosage(nextPending) }}</span>
+                <div class="hero-name-row">
+                  <span
+                    class="hero-thumb"
+                    :class="{ 'has-image': !!currentTask.medicineImageUrl, clickable: !!currentTask.medicineImageUrl }"
+                    @click="openImagePreview(currentTask)"
+                  >
+                    <img
+                      v-if="currentTask.medicineImageUrl"
+                      :src="currentTask.medicineImageUrl"
+                      :alt="currentTask.medicineName || '药品图片'"
+                      @error="onTaskImageError"
+                    />
+                  </span>
+                  <h2 class="hero-name">{{ currentTask.medicineName || '用药提醒' }}</h2>
                 </div>
-                <p v-if="nextPendingOverdueMinutes > 0" class="overdue-alert">
+                <div class="check-meta-line">
+                  <span class="meta-item"><em>时段</em>{{ slotLabel(currentTask.slotName) }}</span>
+                  <span class="meta-item"><em>建议时段</em>{{ slotRange(currentTask.slotName) }}</span>
+                  <span class="meta-item"><em>剂量</em>{{ formatDosage(currentTask) }}</span>
+                </div>
+                <p v-if="currentTaskOverdueMinutes > 0" class="overdue-alert">
                   <span class="alert-mark"></span>
-                  <span>已超时 {{ nextPendingOverdueMinutes }} 分钟，今天仍可补打</span>
+                  <span>已超时 {{ currentTaskOverdueMinutes }} 分钟，今天仍可补打</span>
                 </p>
-                <p v-else class="hero-meta">建议按时完成本次打卡</p>
+                <p v-else-if="currentTask.recordStatus === 1" class="hero-meta">本条任务已完成打卡</p>
+                <p v-else-if="currentTask.recordStatus === 2" class="hero-meta">本条任务已标记跳过</p>
+                <p v-else-if="isFutureSlot(currentTask.slotName)" class="hero-meta">未到建议时段，时间到了再打卡更好</p>
+                <p v-else class="hero-meta">当前处于建议时段，按时完成本次打卡</p>
                 <p v-if="justChecked" class="checked-tip">已完成上一项打卡</p>
               </div>
 
               <div class="check-action-panel pending-panel">
                 <button
                   class="btn-check-circle"
-                  @click="checkin(nextPending)"
-                  :disabled="operatingTaskKey === getTaskKey(nextPending)"
+                  @click="checkin(currentTask)"
+                  :disabled="isMainActionDisabled(currentTask)"
                 >
-                  <span class="circle-icon">{{ operatingTaskKey === getTaskKey(nextPending) ? '…' : '✓' }}</span>
-                  <span class="circle-text">{{ operatingTaskKey === getTaskKey(nextPending) ? '处理中' : nextActionLabel }}</span>
+                  <span class="circle-icon">{{ operatingTaskKey === getTaskKey(currentTask) ? '…' : '✓' }}</span>
+                  <span class="circle-text">{{ operatingTaskKey === getTaskKey(currentTask) ? '处理中' : getMainActionLabel(currentTask) }}</span>
                 </button>
+                <div v-if="taskOrderedRecords.length > 1" class="switch-row">
+                  <button class="switch-btn" @click="goPrevPending" :disabled="taskCursor <= 0">上一条</button>
+                  <span class="switch-index">{{ taskCursor + 1 }} / {{ taskOrderedRecords.length }}</span>
+                  <button
+                    class="switch-btn"
+                    @click="goNextPending"
+                    :disabled="taskCursor >= taskOrderedRecords.length - 1"
+                  >
+                    下一条
+                  </button>
+                </div>
                 <button
                   class="btn-check-skip"
-                  @click="skipRecord(nextPending)"
-                  :disabled="operatingTaskKey === getTaskKey(nextPending)"
+                  :class="{ 'is-hidden': currentTask.recordStatus !== 0 }"
+                  @click="confirmSkipRecord(currentTask)"
+                  :disabled="currentTask.recordStatus !== 0 || operatingTaskKey === getTaskKey(currentTask)"
                 >
                   本次跳过
                 </button>
-                <p class="action-helper">剩余 {{ pendingRecords.length }} 项，可补打至今日 23:59</p>
+                <p class="action-helper action-helper-right">剩余 {{ pendingRecords.length }} 项，可补打至今日 23:59</p>
               </div>
             </div>
           </template>
@@ -467,7 +672,7 @@ watch(selectedMemberId, (val, oldVal) => {
             v-for="item in quickLinks"
             :key="item.key"
             class="quick-card"
-            @click="router.push({ name: item.route })"
+            @click="goQuickLink(item)"
           >
             <span class="quick-icon">{{ item.icon }}</span>
             <span class="quick-title">{{ item.title }}</span>
@@ -494,7 +699,7 @@ watch(selectedMemberId, (val, oldVal) => {
             <div class="record-left">
               <div class="slot">
                 <span>{{ record.slotName || '今日' }}</span>
-                <small class="slot-time">{{ slotClock(record.slotName) }}</small>
+                <small class="slot-time">{{ slotRange(record.slotName) }}</small>
               </div>
               <div>
                 <div class="medicine">{{ record.medicineName || '未命名药品' }}</div>
@@ -503,7 +708,12 @@ watch(selectedMemberId, (val, oldVal) => {
             </div>
             <div class="record-right">
               <template v-if="record.recordStatus === 0">
-                <span v-if="isFutureSlot(record.slotName)" class="time-pill">未到 {{ slotClock(record.slotName) }}</span>
+                <span
+                  class="phase-pill"
+                  :class="`phase-${getSlotPhase(record.slotName)}`"
+                >
+                  {{ getSlotPhaseText(record.slotName) }}
+                </span>
                 <button class="btn-action btn-checkin" @click="checkin(record)" :disabled="operatingTaskKey === getTaskKey(record)">
                   打卡
                 </button>
@@ -535,7 +745,7 @@ watch(selectedMemberId, (val, oldVal) => {
             <div class="record-left">
               <div class="slot">
                 <span>{{ record.slotName || '今日' }}</span>
-                <small class="slot-time">{{ slotClock(record.slotName) }}</small>
+                <small class="slot-time">{{ slotRange(record.slotName) }}</small>
               </div>
               <div>
                 <div class="medicine">{{ record.medicineName || '未命名药品' }}</div>
@@ -543,11 +753,24 @@ watch(selectedMemberId, (val, oldVal) => {
               </div>
             </div>
             <div class="record-right">
-              <span class="badge">{{ statusLabel(record.recordStatus) }}</span>
+              <span class="handled-tag" :class="getProcessedTagClass(record)">
+                {{ getProcessedTag(record) }}
+              </span>
             </div>
           </li>
         </ul>
       </section>
+
+      <el-dialog
+        v-model="previewVisible"
+        :title="previewImageTitle || '药品图片'"
+        width="420px"
+        align-center
+      >
+        <div class="preview-image-wrap">
+          <img :src="previewImageUrl" :alt="previewImageTitle || '药品图片'" />
+        </div>
+      </el-dialog>
 
     </section>
   </BaseLayout>
@@ -749,13 +972,59 @@ watch(selectedMemberId, (val, oldVal) => {
 }
 
 .hero-name {
-  margin: 8px 0 0;
+  margin: 0;
   font-size: 1.45rem;
   line-height: 1.25;
 }
 
+.hero-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hero-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(63, 111, 107, 0.2);
+  background: #f3f8f6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hero-thumb.clickable {
+  cursor: zoom-in;
+}
+
+.hero-thumb::before {
+  content: '💊';
+  font-size: 1.2rem;
+  opacity: 0.68;
+}
+
+.hero-thumb.has-image::before {
+  content: '';
+}
+
+.hero-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.hero-thumb.is-broken::before {
+  content: '💊';
+}
+
 .hero-meta {
-  margin: 0;
+  margin: 2px 0 0;
   font-size: 0.92rem;
   color: var(--c-text);
 }
@@ -832,7 +1101,7 @@ watch(selectedMemberId, (val, oldVal) => {
   min-height: 0;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 14px;
 }
 
 .btn-check-circle {
@@ -880,17 +1149,66 @@ watch(selectedMemberId, (val, oldVal) => {
   letter-spacing: 0.02em;
   text-align: center;
   line-height: 1.35;
+  margin-top: 2px;
+}
+
+.action-helper-right {
+  width: 100%;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.switch-btn {
+  border: none;
+  background: rgba(63, 111, 107, 0.08);
+  color: var(--c-primary-deep);
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+.switch-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.switch-index {
+  font-size: 0.72rem;
+  color: var(--c-text-soft);
+  min-width: 44px;
+  text-align: center;
 }
 
 .btn-check-skip {
-  border: 1px solid var(--c-line);
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--c-primary-deep);
-  font-size: 0.78rem;
+  border: none;
+  background: transparent;
+  color: var(--c-text-soft);
+  font-size: 0.74rem;
   font-weight: 600;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 4px 8px;
   cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  margin-top: -2px;
+}
+
+.btn-check-skip:hover {
+  color: #8f4d44;
+  background: rgba(190, 90, 77, 0.08);
+}
+
+.btn-check-skip.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .btn-check-skip:disabled {
@@ -1231,20 +1549,36 @@ watch(selectedMemberId, (val, oldVal) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
 }
 
-.time-pill {
+.phase-pill {
   display: inline-flex;
   align-items: center;
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 0.74rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.phase-pill.phase-future {
   color: #9b6730;
   background: rgba(245, 166, 35, 0.12);
   border: 1px solid rgba(245, 166, 35, 0.26);
+}
+
+.phase-pill.phase-active {
+  color: #2f7e5c;
+  background: rgba(47, 138, 99, 0.12);
+  border: 1px solid rgba(47, 138, 99, 0.24);
+}
+
+.phase-pill.phase-overdue {
+  color: #a34f45;
+  background: rgba(190, 90, 77, 0.12);
+  border: 1px solid rgba(190, 90, 77, 0.24);
 }
 
 .btn-action {
@@ -1278,6 +1612,49 @@ watch(selectedMemberId, (val, oldVal) => {
   color: #5f6d6c;
   font-size: 0.76rem;
   font-weight: 600;
+}
+
+.handled-tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.handled-tag.is-ontime {
+  color: #2f7e5c;
+  background: rgba(47, 138, 99, 0.12);
+  border-color: rgba(47, 138, 99, 0.24);
+}
+
+.handled-tag.is-makeup {
+  color: #a34f45;
+  background: rgba(190, 90, 77, 0.12);
+  border-color: rgba(190, 90, 77, 0.24);
+}
+
+.handled-tag.is-skip {
+  color: #6a7473;
+  background: rgba(149, 165, 166, 0.14);
+  border-color: rgba(149, 165, 166, 0.28);
+}
+
+.preview-image-wrap {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-image-wrap img {
+  width: 320px;
+  height: 320px;
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid rgba(63, 111, 107, 0.14);
+  background: #f6faf8;
 }
 
 .report-section {
@@ -1328,17 +1705,53 @@ watch(selectedMemberId, (val, oldVal) => {
   }
 
   .page-header {
-    padding: 16px;
+    padding: 14px;
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+  }
+
+  .greeting-block {
+    gap: 6px;
+    width: 100%;
+  }
+
+  .title {
+    font-size: 1.28rem;
+    line-height: 1.25;
   }
 
   .header-meta {
     gap: 6px;
+    flex-wrap: wrap;
   }
 
   .date-chip {
     font-size: 0.8rem;
+  }
+
+  .member-selector {
+    width: 100%;
+    gap: 4px;
+  }
+
+  .member-topline {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .member-label {
+    display: none;
+  }
+
+  .viewing-badge {
+    font-size: 0.74rem;
+    padding: 2px 8px;
+    max-width: none;
+  }
+
+  .member-selector :deep(.el-select) {
+    width: 100% !important;
   }
 
   .hero-grid {
@@ -1349,17 +1762,22 @@ watch(selectedMemberId, (val, oldVal) => {
   .check-layout,
   .done-layout {
     grid-template-columns: 1fr;
-    align-items: center;
+    align-items: stretch;
     min-height: 0;
     height: auto;
   }
 
   .check-action-panel {
-    padding: 12px 14px 14px;
-    align-items: stretch;
-    justify-content: center;
+    padding: 10px 12px 12px;
+    align-items: center;
+    justify-content: flex-start;
     border-left: none;
     border-top: 1px solid rgba(45, 95, 93, 0.12);
+  }
+
+  .check-main {
+    padding-right: 0;
+    gap: 10px;
   }
 
   .done-visual {
@@ -1388,8 +1806,8 @@ watch(selectedMemberId, (val, oldVal) => {
   }
 
   .btn-check-circle {
-    width: 88px;
-    height: 88px;
+    width: 84px;
+    height: 84px;
     align-self: center;
   }
 
@@ -1403,13 +1821,30 @@ watch(selectedMemberId, (val, oldVal) => {
 
   .action-helper {
     text-align: center;
+    margin-top: 0;
+    font-size: 0.68rem;
+    line-height: 1.25;
+  }
+
+  .pending-panel {
+    gap: 8px;
+  }
+
+  .switch-row {
+    margin-top: 0;
+    gap: 6px;
+  }
+
+  .switch-btn {
+    padding: 3px 8px;
   }
 
   .btn-check-skip {
     width: auto;
     align-self: center;
-    border-radius: 12px;
-    padding: 10px;
+    border-radius: 999px;
+    padding: 3px 8px;
+    margin-top: 0;
   }
 
   .done-panel .btn-check-skip {
@@ -1443,20 +1878,27 @@ watch(selectedMemberId, (val, oldVal) => {
   }
 
   .record-item {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .record-left {
+    flex: 1;
+    min-width: 0;
   }
 
   .record-right {
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
+    justify-content: flex-end;
   }
 
   .btn-action {
-    flex: 1;
+    padding: 7px 9px;
+    font-size: 0.78rem;
   }
 
   .viewing-badge {
-    max-width: 162px;
     overflow: hidden;
     text-overflow: ellipsis;
   }

@@ -16,6 +16,8 @@ public class MedicinePlanRecordVO {
     private Long userId;
     private Long medicineId;
     private String medicineName;
+    private String medicineImageUrl;
+    private Integer medicineStock;
     private String medicineStockUnit;
     private LocalDate scheduledDate;
     private String slotName;

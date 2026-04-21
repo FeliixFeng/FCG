@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useUserStore } from '../stores/user'
 import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../utils/api'
 import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
@@ -8,8 +8,11 @@ import * as echarts from 'echarts'
 import { Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
+import { useRoute, useRouter } from 'vue-router'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 
 const todayVitals = ref([])
 const weeklyData = ref([])
@@ -47,6 +50,35 @@ const currentViewerName = computed(() => {
   return member?.nickname || ''
 })
 
+const clearQuickActionQuery = async () => {
+  if (!route.query?.action) return
+  const nextQuery = { ...route.query }
+  delete nextQuery.action
+  delete nextQuery.type
+  await router.replace({ name: route.name, query: nextQuery })
+}
+
+const handleQuickAction = async () => {
+  const action = route.query?.action
+  if (!action) return
+
+  if (action === 'record-vital') {
+    const type = Number(route.query?.type || 1)
+    openAddDialog([1, 2, 3].includes(type) ? type : 1)
+    await clearQuickActionQuery()
+    return
+  }
+
+  if (action === 'view-report') {
+    await nextTick()
+    const reportSection = document.getElementById('section-health-report')
+    if (reportSection) {
+      reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    await clearQuickActionQuery()
+  }
+}
+
 onMounted(async () => {
   try {
     if (isAdmin.value) {
@@ -59,6 +91,8 @@ onMounted(async () => {
     loadLatestReport()
     loadReportList()
     setTimeout(initChart, 100)
+    await nextTick()
+    await handleQuickAction()
   } catch (e) {
     console.error('页面初始化失败', e)
   }
@@ -106,6 +140,14 @@ watch(selectedMember, (newVal, oldVal) => {
     setTimeout(initChart, 100)
   }
 })
+
+watch(
+  () => route.query.action,
+  async (val, oldVal) => {
+    if (!val || val === oldVal) return
+    await handleQuickAction()
+  }
+)
 
 const loadTodayVitals = async () => {
   if (!selectedMember.value) return
@@ -194,8 +236,36 @@ const handleGenerateReport = async () => {
         confirmButtonText: '知道了',
         type: 'warning'
       })
+    } else if (msg.includes('API Key') || msg.includes('认证失败') || msg.includes('无效') || msg.includes('过期')) {
+      ElMessageBox.alert(
+        'AI 服务认证失败，可能是 API Key 已过期或配置错误。\n请联系管理员检查后端 AI 配置。',
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'error' }
+      )
+    } else if (msg.includes('额度') || msg.includes('受限') || msg.includes('429') || msg.includes('rate limit')) {
+      ElMessageBox.alert(
+        'AI 服务当前调用受限（可能是额度不足或请求过于频繁），请稍后重试。',
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'warning' }
+      )
+    } else if (msg.includes('超时') || msg.includes('timeout') || msg.includes('timed out')) {
+      ElMessageBox.alert(
+        'AI 服务请求超时，请检查网络后重试。',
+        '周报生成失败',
+        { confirmButtonText: '重试', type: 'warning' }
+      )
+    } else if (msg.includes('网络') || msg.includes('连接') || msg.includes('connect') || msg.includes('refused')) {
+      ElMessageBox.alert(
+        '无法连接到 AI 服务，请检查网络或稍后重试。',
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'error' }
+      )
     } else {
-      ElMessage.error('生成失败，请重试')
+      ElMessageBox.alert(
+        `周报生成失败：${msg || '未知错误'}\n请稍后重试，若持续失败请检查 AI 服务配置。`,
+        '周报生成失败',
+        { confirmButtonText: '知道了', type: 'error' }
+      )
     }
   } finally {
     reportLoading.value = false
@@ -434,8 +504,8 @@ const getVitalValue = (type, todayData) => {
     const postMeal = todayData.find(v => v.type === 2 && v.measurePoint === 2)
     const fastingVal = fasting?.value != null ? fasting.value : null
     const postMealVal = postMeal?.value != null ? postMeal.value : null
-    if (!fastingVal && !postMealVal) return '--'
-    if (fastingVal && postMealVal) {
+    if (fastingVal == null && postMealVal == null) return '--'
+    if (fastingVal != null && postMealVal != null) {
       return { fasting: fastingVal, postMeal: postMealVal }
     }
     return fastingVal != null ? `空腹${fastingVal}` : `餐后${postMealVal}`
@@ -738,7 +808,7 @@ onUnmounted(() => {
         <div ref="chartRef" class="chart-container"></div>
       </section>
 
-      <section class="health-report">
+      <section id="section-health-report" class="health-report">
         <div class="report-section-header">
           <h2 class="section-title">健康周报</h2>
           <button class="regen-btn" @click="handleGenerateReport" :disabled="reportLoading">

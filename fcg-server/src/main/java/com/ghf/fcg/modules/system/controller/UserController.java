@@ -5,6 +5,7 @@ import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.system.dto.MemberUpdateDTO;
+import com.ghf.fcg.modules.system.dto.UserProfileUpdateDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.entity.UserProfile;
 import com.ghf.fcg.modules.system.service.IUserProfileService;
@@ -61,14 +62,14 @@ public class UserController {
     }
 
     /** 获取成员详情（管理员） */
-    @GetMapping("/{userId}")
+    @GetMapping("/{userId:\\d+}")
     @Operation(summary = "获取成员详情")
     public Result<UserVO> getMemberDetail(@PathVariable Long userId) {
         return Result.success(userService.getMemberDetail(userId));
     }
 
     /** 更新成员信息（管理员） */
-    @PutMapping("/{userId}")
+    @PutMapping("/{userId:\\d+}")
     @Operation(summary = "更新成员信息")
     public Result<Void> updateMember(@PathVariable Long userId, @RequestBody MemberUpdateDTO updateDTO) {
         userService.updateMember(userId, updateDTO);
@@ -76,7 +77,7 @@ public class UserController {
     }
 
     /** 删除成员（管理员） */
-    @DeleteMapping("/{userId}")
+    @DeleteMapping("/{userId:\\d+}")
     @Operation(summary = "删除成员")
     public Result<Void> deleteMember(@PathVariable Long userId) {
         userService.deleteMember(userId);
@@ -84,7 +85,7 @@ public class UserController {
     }
 
     /** 修改成员角色（管理员） */
-    @PutMapping("/{userId}/role")
+    @PutMapping("/{userId:\\d+}/role")
     @Operation(summary = "修改成员角色")
     public Result<Void> updateMemberRole(@PathVariable Long userId, @RequestParam Integer role) {
         userService.updateMemberRole(userId, role);
@@ -104,5 +105,28 @@ public class UserController {
         }
         UserProfile profile = userProfileService.getByUserId(targetUserId);
         return Result.success(profile);
+    }
+
+    /** 更新当前成员健康档案 */
+    @PutMapping("/profile")
+    @Operation(summary = "更新当前成员健康档案")
+    public Result<Void> updateMyProfile(@RequestBody UserProfileUpdateDTO dto) {
+        Long memberId = UserContext.get().getMemberId();
+        if (memberId == null) {
+            throw new BusinessException(MessageConstant.NEED_MEMBER_TOKEN);
+        }
+        UserProfile profile = userProfileService.getByUserId(memberId);
+        if (profile == null) {
+            profile = new UserProfile();
+            profile.setUserId(memberId);
+        }
+        profile.setBirthday(dto.getBirthday());
+        profile.setHeight(dto.getHeight());
+        profile.setWeight(dto.getWeight());
+        profile.setDisease(dto.getDisease());
+        profile.setAllergy(dto.getAllergy());
+        profile.setRemark(dto.getRemark());
+        userProfileService.saveOrUpdate(memberId, profile);
+        return Result.success();
     }
 }

@@ -27,7 +27,10 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -224,40 +227,38 @@ public class VitalController {
 
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         LocalDateTime todayEnd = LocalDateTime.now();
+        LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Vital::getFamilyId, familyId)
+                .eq(Vital::getUserId, targetUserId)
+                .ge(Vital::getMeasureTime, todayStart)
+                .le(Vital::getMeasureTime, todayEnd)
+                .orderByDesc(Vital::getMeasureTime);
 
-        List<VitalVO> result = new java.util.ArrayList<>();
-
-        for (int type = 1; type <= 3; type++) {
-            if (type == 2) {
-                LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(Vital::getFamilyId, familyId)
-                        .eq(Vital::getUserId, targetUserId)
-                        .eq(Vital::getType, type)
-                        .ge(Vital::getMeasureTime, todayStart)
-                        .le(Vital::getMeasureTime, todayEnd)
-                        .orderByDesc(Vital::getMeasureTime);
-                List<Vital> vitals = vitalService.list(wrapper);
-                for (Vital vital : vitals) {
-                    result.add(toVitalVO(vital));
-                }
-            } else {
-                // 其他类型只返回最新一条
-                LambdaQueryWrapper<Vital> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(Vital::getFamilyId, familyId)
-                        .eq(Vital::getUserId, targetUserId)
-                        .eq(Vital::getType, type)
-                        .ge(Vital::getMeasureTime, todayStart)
-                        .le(Vital::getMeasureTime, todayEnd)
-                        .orderByDesc(Vital::getMeasureTime)
-                        .last("LIMIT 1");
-
-                Vital vital = vitalService.getOne(wrapper);
-                if (vital != null) {
-                    result.add(toVitalVO(vital));
-                }
-            }
+        List<Vital> todayVitals = vitalService.list(wrapper);
+        if (todayVitals.isEmpty()) {
+            return Result.success(List.of());
         }
 
+        List<VitalVO> result = new java.util.ArrayList<>();
+        Set<Integer> capturedType = new HashSet<>();
+        for (Vital vital : todayVitals) {
+            // 血糖(type=2)保留当天所有记录；其余类型只保留最新一条
+            if (vital.getType() != null && vital.getType() == Vital.TYPE_BLOOD_SUGAR) {
+                result.add(toVitalVO(vital));
+                continue;
+            }
+            Integer type = vital.getType();
+            if (type != null && capturedType.contains(type)) {
+                continue;
+            }
+            if (type != null) {
+                capturedType.add(type);
+            }
+            result.add(toVitalVO(vital));
+        }
+
+        // 统一按测量时间倒序，前端渲染更稳定
+        result.sort(Comparator.comparing(VitalVO::getMeasureTime).reversed());
         return Result.success(result);
     }
 

@@ -139,7 +139,7 @@
 | id | BIGINT | 主键 |
 | user_id | BIGINT | 用户ID |
 | family_id | BIGINT | 家庭ID |
-| type | TINYINT | 类型（1-血压 2-血糖 3-心率 4-体温 5-体重） |
+| type | TINYINT | 类型（1-血压 2-血糖 3-体重） |
 | value_systolic/value_diastolic | DECIMAL(5,1) | 血压值 |
 | value | DECIMAL(6,2) | 通用数值 |
 | unit | VARCHAR(20) | 单位 |

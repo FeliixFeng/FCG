@@ -123,6 +123,9 @@ export const deleteVital = (id) => http.delete(`/api/health/vital/${id}`)
 export const fetchUserProfile = (userId) => 
   http.get('/api/user/profile', { params: { userId } })
 
+/** 更新当前成员健康档案 */
+export const updateUserProfile = (data) => http.put('/api/user/profile', data)
+
 /** 健康周报列表 */
 export const fetchHealthReports = (params) => http.get('/api/health/report/list', { params })
 
@@ -133,3 +136,11 @@ export const generateHealthReport = (userId) =>
 /** 获取最新周报 */
 export const fetchLatestReport = (userId) => 
   http.get('/api/health/report/latest', { params: { userId } })
+
+// ========== AI 模块 ==========
+
+/** AI 对话上下文聚合 */
+export const fetchAiContext = (params) => http.get('/api/ai/context', { params })
+
+/** AI 普通对话（非流式兜底） */
+export const chatWithAi = (data) => http.post('/api/ai/chat', data)
