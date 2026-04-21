@@ -1,12 +1,15 @@
 <script setup>
 import BaseLayout from '../components/common/BaseLayout.vue'
-import { onMounted, onUnmounted, ref, reactive, computed } from 'vue'
+import { onMounted, onUnmounted, ref, reactive, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElCheckbox } from 'element-plus'
 import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, deletePlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, fetchFamilyMembers } from '../utils/api'
 import { useUserStore } from '../stores/user'
+import { useRoute, useRouter } from 'vue-router'
 import { compressImage, fileToBase64 } from '../utils/image'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 
 const medicineList = ref([])
 const planList = ref([])
@@ -111,6 +114,58 @@ const scrollToSection = (section, filter = null) => {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
+  }
+}
+
+const clearQuickActionQuery = async () => {
+  if (!route.query?.action) return
+  const nextQuery = { ...route.query }
+  delete nextQuery.action
+  delete nextQuery.filter
+  delete nextQuery.type
+  await router.replace({ name: route.name, query: nextQuery })
+}
+
+const handleQuickAction = async () => {
+  const action = route.query?.action
+  if (!action) return
+
+  if (action === 'create-plan') {
+    if (canCreatePlan.value) {
+      resetPlanForm()
+      showCreatePlan.value = true
+    }
+    await clearQuickActionQuery()
+    return
+  }
+
+  if (action === 'add-medicine') {
+    resetMedicineForm()
+    showAddMedicine.value = true
+    await clearQuickActionQuery()
+    return
+  }
+
+  if (action === 'view-low-stock') {
+    activeMedFilter.value = 'low'
+    await nextTick()
+    scrollToSection('meds', 'low')
+    await clearQuickActionQuery()
+    return
+  }
+
+  if (action === 'view-expiring') {
+    activeMedFilter.value = 'expiring'
+    await nextTick()
+    scrollToSection('meds', 'expiring')
+    await clearQuickActionQuery()
+    return
+  }
+
+  if (action === 'view-plans') {
+    await nextTick()
+    scrollToSection('plans')
+    await clearQuickActionQuery()
   }
 }
 
@@ -587,14 +642,24 @@ const deleteCurrentMedicine = async () => {
   } catch (e) {}
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', handleResize)
-  load()
+  await load()
+  await nextTick()
+  await handleQuickAction()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
+
+watch(
+  () => route.query.action,
+  async (val, oldVal) => {
+    if (!val || val === oldVal) return
+    await handleQuickAction()
+  }
+)
 </script>
 
 <template>

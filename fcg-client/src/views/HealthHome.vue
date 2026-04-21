@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useUserStore } from '../stores/user'
 import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../utils/api'
 import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
@@ -8,8 +8,11 @@ import * as echarts from 'echarts'
 import { Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
+import { useRoute, useRouter } from 'vue-router'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 
 const todayVitals = ref([])
 const weeklyData = ref([])
@@ -47,6 +50,35 @@ const currentViewerName = computed(() => {
   return member?.nickname || ''
 })
 
+const clearQuickActionQuery = async () => {
+  if (!route.query?.action) return
+  const nextQuery = { ...route.query }
+  delete nextQuery.action
+  delete nextQuery.type
+  await router.replace({ name: route.name, query: nextQuery })
+}
+
+const handleQuickAction = async () => {
+  const action = route.query?.action
+  if (!action) return
+
+  if (action === 'record-vital') {
+    const type = Number(route.query?.type || 1)
+    openAddDialog([1, 2, 3].includes(type) ? type : 1)
+    await clearQuickActionQuery()
+    return
+  }
+
+  if (action === 'view-report') {
+    await nextTick()
+    const reportSection = document.getElementById('section-health-report')
+    if (reportSection) {
+      reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    await clearQuickActionQuery()
+  }
+}
+
 onMounted(async () => {
   try {
     if (isAdmin.value) {
@@ -59,6 +91,8 @@ onMounted(async () => {
     loadLatestReport()
     loadReportList()
     setTimeout(initChart, 100)
+    await nextTick()
+    await handleQuickAction()
   } catch (e) {
     console.error('页面初始化失败', e)
   }
@@ -106,6 +140,14 @@ watch(selectedMember, (newVal, oldVal) => {
     setTimeout(initChart, 100)
   }
 })
+
+watch(
+  () => route.query.action,
+  async (val, oldVal) => {
+    if (!val || val === oldVal) return
+    await handleQuickAction()
+  }
+)
 
 const loadTodayVitals = async () => {
   if (!selectedMember.value) return
@@ -738,7 +780,7 @@ onUnmounted(() => {
         <div ref="chartRef" class="chart-container"></div>
       </section>
 
-      <section class="health-report">
+      <section id="section-health-report" class="health-report">
         <div class="report-section-header">
           <h2 class="section-title">健康周报</h2>
           <button class="regen-btn" @click="handleGenerateReport" :disabled="reportLoading">
