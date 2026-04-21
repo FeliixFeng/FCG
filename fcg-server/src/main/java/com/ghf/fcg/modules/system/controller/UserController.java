@@ -5,6 +5,7 @@ import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.system.dto.MemberUpdateDTO;
+import com.ghf.fcg.modules.system.dto.UserProfileUpdateDTO;
 import com.ghf.fcg.modules.system.dto.UserUpdateDTO;
 import com.ghf.fcg.modules.system.entity.UserProfile;
 import com.ghf.fcg.modules.system.service.IUserProfileService;
@@ -104,5 +105,28 @@ public class UserController {
         }
         UserProfile profile = userProfileService.getByUserId(targetUserId);
         return Result.success(profile);
+    }
+
+    /** 更新当前成员健康档案 */
+    @PutMapping("/profile")
+    @Operation(summary = "更新当前成员健康档案")
+    public Result<Void> updateMyProfile(@RequestBody UserProfileUpdateDTO dto) {
+        Long memberId = UserContext.get().getMemberId();
+        if (memberId == null) {
+            throw new BusinessException(MessageConstant.NEED_MEMBER_TOKEN);
+        }
+        UserProfile profile = userProfileService.getByUserId(memberId);
+        if (profile == null) {
+            profile = new UserProfile();
+            profile.setUserId(memberId);
+        }
+        profile.setBirthday(dto.getBirthday());
+        profile.setHeight(dto.getHeight());
+        profile.setWeight(dto.getWeight());
+        profile.setDisease(dto.getDisease());
+        profile.setAllergy(dto.getAllergy());
+        profile.setRemark(dto.getRemark());
+        userProfileService.saveOrUpdate(memberId, profile);
+        return Result.success();
     }
 }

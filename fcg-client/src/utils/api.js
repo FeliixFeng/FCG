@@ -123,6 +123,9 @@ export const deleteVital = (id) => http.delete(`/api/health/vital/${id}`)
 export const fetchUserProfile = (userId) => 
   http.get('/api/user/profile', { params: { userId } })
 
+/** 更新当前成员健康档案 */
+export const updateUserProfile = (data) => http.put('/api/user/profile', data)
+
 /** 健康周报列表 */
 export const fetchHealthReports = (params) => http.get('/api/health/report/list', { params })
 
