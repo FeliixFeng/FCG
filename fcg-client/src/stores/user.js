@@ -2,6 +2,16 @@ import { defineStore } from 'pinia'
 import { getToken, getFamilyToken, setFamilyToken, getMemberToken, setMemberToken, clearToken } from '../utils/storage'
 import http from '../utils/http'
 
+const normalizeMember = (raw) => {
+  if (!raw) return null
+  const id = raw.id ?? raw.userId ?? null
+  return {
+    ...raw,
+    id,
+    userId: id
+  }
+}
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     // 家庭级 token（登录后）
@@ -28,6 +38,16 @@ export const useUserStore = defineStore('user', {
   },
 
   actions: {
+    clearAiChatCache() {
+      const prefix = 'fcg_ai_chat_'
+      for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+        const key = sessionStorage.key(i)
+        if (key && key.startsWith(prefix)) {
+          sessionStorage.removeItem(key)
+        }
+      }
+    },
+
     /** 家庭账号登录，获取家庭级 token */
     async login(payload) {
       const res = await http.post('/api/family/login', payload)
@@ -41,7 +61,7 @@ export const useUserStore = defineStore('user', {
     async switchMember(memberId) {
       const res = await http.post(`/api/family/switch-member/${memberId}`)
       this.memberToken = res.data.token
-      this.member = res.data
+      this.member = normalizeMember(res.data)
       setMemberToken(res.data.token)
       return res.data
     },
@@ -55,7 +75,7 @@ export const useUserStore = defineStore('user', {
     /** 获取当前成员信息 */
     async fetchProfile() {
       const res = await http.get('/api/user/info')
-      this.member = res.data
+      this.member = normalizeMember(res.data)
       return res.data
     },
 
@@ -73,6 +93,7 @@ export const useUserStore = defineStore('user', {
       this.family = null
       this.member = null
       clearToken()
+      this.clearAiChatCache()
       // 清除可能残留的关怀模式预览状态
       sessionStorage.removeItem('fcg_preview_care')
     },

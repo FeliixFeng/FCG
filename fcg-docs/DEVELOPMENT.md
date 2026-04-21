@@ -73,6 +73,19 @@ ssh ali1 "mysql -uroot -p'***' -D fcg_db -e \"SELECT NOW();\""
 4. 调用 AI 生成 Markdown 周报
 5. 同周覆盖写入（每周每人保留一条）
 
+## AI 助手链路（当前实现）
+
+1. 前端发送问题到 `/api/ai/chat/stream`（SSE）
+2. 发送前先请求 `/api/ai/context` 获取聚合上下文（支持短缓存）
+3. 后端聚合数据：
+  - 成员健康档案（`sys_user_profile`）
+  - 今日用药任务（计划+记录叠加）
+  - 今日体征
+  - 近 7 天体征趋势
+  - 最新健康周报
+4. 后端将聚合文本与用户问题一起传入大模型，流式回传
+5. 前端逐步渲染流式内容，完成后按 Markdown 展示
+
 ## 常见故障排查
 
 ### 1) `Communications link failure`
