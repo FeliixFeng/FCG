@@ -90,6 +90,10 @@ function getStatusText(type) {
   return isTypeRecordedToday(type) ? '今日已录入' : '今日未录入'
 }
 
+function getStatusIcon(type) {
+  return isTypeRecordedToday(type) ? '✅' : '⏳'
+}
+
 function openRecordDialog(type) {
   dialogType.value = type
   dialogVisible.value = true
@@ -484,7 +488,7 @@ watch(
     <div class="care-health-page" v-loading="loading">
       <section class="hero-card">
         <p class="hero-badge">关怀模式 · 健康</p>
-        <h2 class="hero-title">{{ memberName }}，今天的体征记录</h2>
+        <h2 class="hero-title"><span class="mini-icon">🩺</span>{{ memberName }}，今天的体征记录</h2>
       </section>
 
       <div class="status-grid">
@@ -496,7 +500,7 @@ watch(
         >
           <p class="status-name">{{ item.icon }} {{ item.label }}</p>
           <p class="status-value">{{ formatVitalValue(todayMap[item.type]) }}</p>
-          <p class="status-tip">{{ getStatusText(item.type) }}</p>
+          <p class="status-tip"><span class="mini-icon">{{ getStatusIcon(item.type) }}</span>{{ getStatusText(item.type) }}</p>
           <button class="record-btn" @click="openRecordDialog(item.type)">
             录入{{ item.label }}
           </button>
@@ -505,8 +509,8 @@ watch(
 
       <section class="trend-card">
         <div class="section-head">
-          <h3>最近趋势</h3>
-          <span>{{ typeLabel(currentType) }}</span>
+          <h3><span class="mini-icon">📈</span>最近趋势</h3>
+          <span><span class="mini-icon">🔎</span>{{ typeLabel(currentType) }}</span>
         </div>
         <p class="trend-summary" :class="`is-${trendSummary.tone}`">{{ trendSummary.text }}</p>
         <div class="trend-switch">
@@ -573,6 +577,9 @@ watch(
   margin: 0;
   font-size: 1.54rem;
   color: #1f4341;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .status-grid {
@@ -700,6 +707,9 @@ watch(
   font-size: 0.96rem;
   color: #607d7a;
   padding-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .section-head {
@@ -713,11 +723,24 @@ watch(
   margin: 0;
   font-size: 1.4rem;
   color: #234846;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .section-head span {
   font-size: 0.92rem;
   color: #6b8583;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .trend-card {

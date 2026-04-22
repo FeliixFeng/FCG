@@ -338,13 +338,13 @@ function goQuickRecord(type) {
                   <button class="switch-btn" @click="goNext">下一条</button>
                 </div>
 
-                <p class="action-helper-bottom">剩余 {{ pendingCount }} 项，可补打至今日 23:59</p>
+                <p class="action-helper-bottom"><span class="mini-icon">🧾</span>剩余 {{ pendingCount }} 项，可补打至今日 23:59</p>
               </div>
             </div>
           </article>
 
           <article class="task-side-card">
-            <p class="side-title">任务进度</p>
+            <p class="side-title"><span class="mini-icon">📊</span>任务进度</p>
             <div class="side-progress-wrap">
               <div class="side-progress-circle" :style="progressCircleStyle">
                 <span class="side-progress-percent">{{ completionPercent }}%</span>
@@ -353,16 +353,16 @@ function goQuickRecord(type) {
             </div>
             <div class="side-grid">
               <div class="side-item">
-                <span class="side-label">待完成</span>
+                <span class="side-label"><span class="mini-icon">🕒</span>待完成</span>
                 <span class="side-value">{{ pendingCount }}</span>
               </div>
               <div class="side-item">
-                <span class="side-label">已完成</span>
+                <span class="side-label"><span class="mini-icon">✅</span>已完成</span>
                 <span class="side-value">{{ completedCount }}</span>
               </div>
             </div>
 
-            <p class="side-tip">支持补打，避免漏服</p>
+            <p class="side-tip"><span class="mini-icon">💬</span>支持补打，避免漏服</p>
           </article>
         </template>
 
@@ -373,9 +373,9 @@ function goQuickRecord(type) {
       </section>
 
       <section class="quick-card">
-        <p class="quick-title">快捷录入</p>
+        <p class="quick-title"><span class="mini-icon">⚡</span>快捷录入</p>
         <div class="quick-grid">
-          <button class="quick-btn" @click="goQuickRecord(1)">🩺 血压</button>
+          <button class="quick-btn" @click="goQuickRecord(1)">❤️ 血压</button>
           <button class="quick-btn" @click="goQuickRecord(2)">🩸 血糖</button>
           <button class="quick-btn" @click="goQuickRecord(3)">⚖️ 体重</button>
         </div>
@@ -723,6 +723,9 @@ function goQuickRecord(type) {
   letter-spacing: 0.01em;
   padding-bottom: 8px;
   border-bottom: 1px dashed rgba(45, 95, 93, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .side-progress-wrap {
@@ -798,6 +801,10 @@ function goQuickRecord(type) {
 .side-label {
   font-size: 0.78rem;
   color: #6b8583;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 }
 
 .side-value {
@@ -814,6 +821,10 @@ function goQuickRecord(type) {
   font-weight: 600;
   padding-top: 8px;
   border-top: 1px dashed rgba(45, 95, 93, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .check-circle-btn:not(:disabled):hover {
@@ -907,6 +918,10 @@ function goQuickRecord(type) {
   line-height: 1.35;
   font-weight: 600;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .task-hint {
@@ -966,6 +981,16 @@ function goQuickRecord(type) {
   color: #2f5f5d;
   font-size: 1.02rem;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .quick-grid {
