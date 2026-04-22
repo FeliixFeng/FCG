@@ -49,6 +49,17 @@ const completionPercent = computed(() => {
   if (!totalCount.value) return 0
   return Math.round((completedCount.value / totalCount.value) * 100)
 })
+const progressCircleStyle = computed(() => {
+  const percent = Math.max(0, Math.min(completionPercent.value, 100))
+  if (percent >= 100) {
+    return {
+      '--progress-bg': '#2f8f75'
+    }
+  }
+  return {
+    '--progress-bg': `conic-gradient(#2f8f75 0 ${percent}%, #d2dfdc ${percent}% 100%)`
+  }
+})
 const currentTaskOverdueMinutes = computed(() => {
   if (!currentTask.value?.slotName || currentTask.value.recordStatus !== 0) return 0
   const base = slotWindowMap[currentTask.value.slotName]
@@ -60,7 +71,6 @@ const currentTaskOverdueMinutes = computed(() => {
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
-  if (hour < 6) return '夜深了'
   if (hour < 11) return '早上好'
   if (hour < 14) return '中午好'
   if (hour < 18) return '下午好'
@@ -222,11 +232,11 @@ const mainActionLabel = computed(() => {
 
 const actionTopText = computed(() => {
   const task = currentTask.value
-  if (!task) return '请核对药名后再打卡'
+  if (!task) return '确认药品无误后，点击打卡'
   if (task.recordStatus === 1) return '本条已完成，可切换下一条'
   if (task.recordStatus === 2) return '本条已跳过，今天仍可补打'
   if (currentTaskOverdueMinutes.value > 0) return '当前已超时，今天仍可补打'
-  return '请核对药名后再打卡'
+  return '确认药品无误后，点击打卡'
 })
 
 function goQuickRecord(type) {
@@ -336,7 +346,7 @@ function goQuickRecord(type) {
           <article class="task-side-card">
             <p class="side-title">任务进度</p>
             <div class="side-progress-wrap">
-              <div class="side-progress-circle">
+              <div class="side-progress-circle" :style="progressCircleStyle">
                 <span class="side-progress-percent">{{ completionPercent }}%</span>
                 <span class="side-progress-text">已完成</span>
               </div>
@@ -722,18 +732,31 @@ function goQuickRecord(type) {
 }
 
 .side-progress-circle {
+  --progress-bg: conic-gradient(#2f8f75 0 0%, #d2dfdc 0% 100%);
   width: 148px;
   height: 148px;
   border-radius: 999px;
-  border: 11px solid #d2dfdc;
-  border-top-color: #2f8f75;
-  border-right-color: rgba(47, 143, 117, 0.62);
-  background: radial-gradient(circle at 42% 32%, #ffffff, #f4faf8);
+  position: relative;
+  background: var(--progress-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 1px 8px rgba(45, 95, 93, 0.08), 0 8px 18px rgba(63, 111, 107, 0.1);
+  box-shadow: 0 8px 18px rgba(63, 111, 107, 0.1);
+}
+
+.side-progress-circle::before {
+  content: '';
+  position: absolute;
+  inset: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 32%, #ffffff, #f4faf8);
+  box-shadow: inset 0 1px 8px rgba(45, 95, 93, 0.08);
+}
+
+.side-progress-circle > span {
+  position: relative;
+  z-index: 1;
 }
 
 .side-progress-percent {
