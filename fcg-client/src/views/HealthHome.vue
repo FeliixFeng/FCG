@@ -980,16 +980,19 @@ onUnmounted(() => {
 }
 
 .vital-card:nth-child(1) {
-  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
-  border-color: #e0f2fe;
+  background: linear-gradient(135deg, #fff4f3 0%, #ffffff 100%);
+  border-color: #f8d9d5;
+  border-left-color: #e58c82;
 }
 .vital-card:nth-child(2) {
   background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
   border-color: #ffedd5;
+  border-left-color: #f0b26d;
 }
 .vital-card:nth-child(3) {
   background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
   border-color: #dcfce7;
+  border-left-color: #7fbf99;
 }
 
 .vital-card:hover {

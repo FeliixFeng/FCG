@@ -415,7 +415,7 @@ function goQuickRecord(type) {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(244, 251, 248, 0.95));
   border: 1px solid rgba(45, 95, 93, 0.15);
   border-radius: 18px;
-  padding: 18px 20px;
+  padding: 12px 16px;
   box-shadow: 0 10px 24px rgba(45, 95, 93, 0.08);
   display: flex;
   align-items: center;
@@ -548,24 +548,24 @@ function goQuickRecord(type) {
 
 .care-badge {
   display: inline-block;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: #2d5f5d;
   background: rgba(45, 95, 93, 0.1);
   border-radius: 999px;
-  padding: 6px 12px;
-  margin: 0 0 10px;
+  padding: 5px 10px;
+  margin: 0 0 6px;
 }
 
 .care-title {
-  margin: 0 0 8px;
-  font-size: 1.9rem;
+  margin: 0 0 4px;
+  font-size: 1.58rem;
   color: #1f3f3e;
   line-height: 1.2;
 }
 
 .care-desc {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.04rem;
   color: #385e5d;
 }
 
@@ -1013,10 +1013,6 @@ function goQuickRecord(type) {
 }
 
 @media (min-width: 1024px) {
-  .care-page {
-    min-height: calc(100vh - 62px - 28px - 40px);
-  }
-
   .task-main-card,
   .task-side-card {
     min-height: 420px;
