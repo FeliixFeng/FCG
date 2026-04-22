@@ -52,7 +52,7 @@ const goHome = () => {
 
 // 退出管理界面，回到用户首页
 const exitAdmin = () => {
-  router.push({ name: 'dashboard' })
+  router.push({ name: 'home' })
 }
 </script>
 

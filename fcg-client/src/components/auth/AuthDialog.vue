@@ -516,6 +516,7 @@ const handleRegister = async () => {
   display: flex;
   justify-content: flex-end;
   white-space: nowrap;
+  margin-left: auto;
 }
 
 .link-btn {
@@ -588,9 +589,17 @@ const handleRegister = async () => {
   }
 
   .login-extra-row {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
+    justify-content: space-between;
     gap: 6px 12px;
+  }
+
+  .login-extra-row .form-footer-tip {
+    margin-bottom: 0;
+  }
+
+  .login-extra-row .remember-row {
+    margin: 0 0 0 auto;
   }
 }
 </style>

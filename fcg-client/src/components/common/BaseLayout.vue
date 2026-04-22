@@ -46,26 +46,28 @@ const memberName = computed(() => {
 const familyName = computed(() => userStore.family?.familyName || '我的家庭')
 const isCareMode = computed(() => userStore.isCareMode || isPreviewMode.value)
 
-// 桌面端导航菜单（所有人都是5个Tab）
+const defaultNavItems = [
+  { name: 'home', label: '首页', icon: 'HomeFilled' },
+  { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
+  { name: 'health', label: '健康', icon: 'Monitor' },
+  { name: 'ai', label: 'AI', icon: 'ChatDotRound' },
+  { name: 'profile', label: '我的', icon: 'User' }
+]
+
+const careNavItems = [
+  { name: 'home', label: '首页', icon: 'HomeFilled' },
+  { name: 'health', label: '健康', icon: 'Monitor' },
+  { name: 'profile', label: '我的', icon: 'User' }
+]
+
+// 桌面端导航菜单（关怀成员缩减为3个Tab）
 const navItems = computed(() => {
-  return [
-    { name: 'dashboard', label: '首页', icon: 'HomeFilled' },
-    { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
-    { name: 'health',   label: '健康', icon: 'Monitor' },
-    { name: 'ai',       label: 'AI',   icon: 'ChatDotRound' },
-    { name: 'profile',  label: '我的', icon: 'User' }
-  ]
+  return isCareMode.value ? careNavItems : defaultNavItems
 })
 
-// 移动端导航菜单（所有人都是5个Tab）
+// 移动端导航菜单（关怀成员缩减为3个Tab）
 const mobileNavItems = computed(() => {
-  return [
-    { name: 'dashboard', label: '首页', icon: 'HomeFilled' },
-    { name: 'medicine', label: '药品', icon: 'FirstAidKit' },
-    { name: 'health',   label: '健康', icon: 'Monitor' },
-    { name: 'ai',       label: 'AI',   icon: 'ChatDotRound' },
-    { name: 'profile',  label: '我的', icon: 'User' }
-  ]
+  return isCareMode.value ? careNavItems : defaultNavItems
 })
 
 const isActive = (name) => route.name === name
@@ -101,7 +103,7 @@ const handleUserCommand = (cmd) => {
     <header class="topbar">
       <div class="topbar-inner">
         <!-- 品牌 -->
-        <div class="brand" @click="go('dashboard')">
+        <div class="brand" @click="go('home')">
           <img src="/fcg.png" alt="FCG" class="brand-logo" />
           <div class="brand-text">
             <div class="brand-title">Family Care Guardian</div>

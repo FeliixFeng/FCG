@@ -58,7 +58,7 @@ const selectMember = async (member) => {
   try {
     switching.value = member.userId
     await userStore.switchMember(member.userId)
-    router.replace({ name: 'dashboard' })
+    router.replace({ name: 'home' })
   } catch (err) {
     error.value = err?.message || '切换成员失败'
     switching.value = null

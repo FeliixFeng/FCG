@@ -17,7 +17,7 @@ const primaryCtaText = computed(() => {
 
 const handlePrimaryCta = () => {
   if (!userStore.isLoggedIn) { openLogin(); return }
-  if (userStore.hasMember) { router.push({ name: 'dashboard' }); return }
+  if (userStore.hasMember) { router.push({ name: 'home' }); return }
   router.push({ name: 'select-member' })
 }
 
@@ -185,13 +185,41 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-inner">
-        <div class="footer-brand">
-          <span class="brand-dot brand-dot-sm"></span>
-          <span>FCG · Family Care Guardian</span>
+        <div class="footer-left">
+          <div class="footer-brand">
+            <span class="brand-dot brand-dot-sm"></span>
+            <span>Family Care Guardian</span>
+          </div>
         </div>
-        <div class="footer-info">
-          <span>© 2026 FCG · Family Care Guardian</span>
+        <div class="footer-main">
+          <div class="footer-info">
+            <span>© 2026 家庭健康管理系统</span>
+            <a
+              href="https://beian.miit.gov.cn/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="icp-link"
+            >
+              鄂ICP备2026002512号
+            </a>
+          </div>
+          <div class="footer-contact">
+            <a href="mailto:3288733739@qq.com" class="footer-icon-link" aria-label="发送邮件">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8"/>
+                <path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </a>
+            <a href="https://github.com/FeliixFeng/FCG" target="_blank" rel="noopener noreferrer" class="footer-icon-link" aria-label="打开 GitHub 仓库">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M9 19c-4 1.2-4-2-6-2m12 4v-3.1a2.7 2.7 0 0 0-.8-2.1c2.7-.3 5.5-1.3 5.5-6A4.6 4.6 0 0 0 18.5 6.5 4.2 4.2 0 0 0 18.4 3S17.4 2.7 15 4.3a13 13 0 0 0-6 0C6.6 2.7 5.6 3 5.6 3A4.2 4.2 0 0 0 5.5 6.5 4.6 4.6 0 0 0 4.3 9.8c0 4.7 2.8 5.7 5.5 6a2.7 2.7 0 0 0-.8 2.1V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          </div>
         </div>
+        <p class="footer-disclaimer">
+          仅供健康管理参考，不替代医生诊疗建议。
+        </p>
       </div>
     </footer>
 
@@ -641,9 +669,13 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 40px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "left right"
+    "disclaimer right";
   align-items: center;
+  row-gap: 8px;
   font-size: 0.81rem;
   color: #bbb;
 }
@@ -652,6 +684,73 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.footer-left {
+  grid-area: left;
+  max-width: 620px;
+}
+
+.footer-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.footer-main {
+  grid-area: right;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.footer-contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-icon-link {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #d9d9d9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.footer-icon-link svg {
+  width: 15px;
+  height: 15px;
+}
+
+.footer-icon-link:hover {
+  color: #2d5f5d;
+  border-color: rgba(45, 95, 93, 0.5);
+  background: rgba(45, 95, 93, 0.06);
+}
+
+.icp-link {
+  color: #8e8e8e;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.icp-link:hover {
+  color: #2d5f5d;
+}
+
+.footer-disclaimer {
+  grid-area: disclaimer;
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: left;
 }
 
 /* ─── 响应式 ─── */
@@ -694,9 +793,37 @@ const openRegister = () => { authTab.value = 'register'; showAuth.value = true }
   .br-pc { display: none; }
 
   .footer-inner {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "left"
+      "right"
+      "disclaimer";
+    gap: 8px;
+    justify-items: center;
+  }
+
+  .footer-main {
+    justify-items: center;
+  }
+
+  .footer-left {
+    justify-items: center;
+  }
+
+  .footer-info {
     flex-direction: column;
+    gap: 4px;
+  }
+
+  .footer-contact {
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 6px;
+  }
+
+  .footer-disclaimer {
     text-align: center;
+    white-space: nowrap;
   }
 }
 </style>
