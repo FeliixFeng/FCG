@@ -628,7 +628,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
         <article class="card summary-card">
           <div class="summary-head">
-            <h3>今日完成度</h3>
+            <h3>📊 今日完成度</h3>
             <span>{{ takenRecords.length }}/{{ planRecords.length || 0 }}</span>
           </div>
           <div class="summary-main">
@@ -676,7 +676,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
       <section class="card quick-section">
         <div class="section-head">
-          <h3>快捷入口</h3>
+          <h3>⚡ 快捷入口</h3>
         </div>
         <div class="quick-grid">
           <button
@@ -694,7 +694,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
       <section class="card records-section">
         <div class="section-head">
-          <h3>待处理任务</h3>
+          <h3>🕒 待处理任务</h3>
           <span class="count">{{ pendingSortedRecords.length }} 项</span>
         </div>
         <div v-if="!loading && pendingSortedRecords.length === 0" class="empty">
@@ -740,7 +740,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
       <section class="card records-section handled-section">
         <div class="section-head">
-          <h3>今日已处理</h3>
+          <h3>✅ 今日已处理</h3>
           <span class="count">{{ processedRecords.length }} 项</span>
         </div>
         <div v-if="!loading && processedRecords.length === 0" class="empty">

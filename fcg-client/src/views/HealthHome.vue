@@ -740,7 +740,7 @@ onUnmounted(() => {
     <BaseLayout>
       <div class="page-header">
         <h1 class="page-title">
-          健康数据
+          ❤️ 健康数据
           <span v-if="isViewingOther" class="viewer-tag">查看：{{ currentViewerName }}</span>
         </h1>
         <div v-if="isAdmin && familyMembers.length > 0" class="member-switch">
@@ -759,7 +759,7 @@ onUnmounted(() => {
       </div>
 
       <section class="today-vitals">
-        <h2 class="section-title">今日体征</h2>
+        <h2 class="section-title">🩺 今日体征</h2>
         <div class="vital-cards">
           <div v-for="t in typeOptions" :key="t.value" class="vital-card" @click="openAddDialog(t.value)">
             <div class="vital-card-content">
@@ -789,7 +789,7 @@ onUnmounted(() => {
 
       <section class="trend-chart">
         <div class="trend-header">
-          <h2 class="section-title">近7天趋势</h2>
+          <h2 class="section-title">📈 近7天趋势</h2>
           <div v-if="trendAnalysis" class="trend-analysis" :style="{ color: trendAnalysis.color }">
             {{ trendAnalysis.text }}
           </div>
@@ -810,7 +810,7 @@ onUnmounted(() => {
 
       <section id="section-health-report" class="health-report">
         <div class="report-section-header">
-          <h2 class="section-title">健康周报</h2>
+          <h2 class="section-title">🧾 健康周报</h2>
           <button class="regen-btn" @click="handleGenerateReport" :disabled="reportLoading">
             <Refresh class="btn-icon" :class="{ spinning: reportLoading }" />
             {{ latestReport ? '重新生成' : '生成周报' }}
@@ -819,7 +819,7 @@ onUnmounted(() => {
 
         <!-- 本周周报卡片 -->
         <div class="current-report-section">
-          <h3 class="section-subtitle">本周周报</h3>
+          <h3 class="section-subtitle">📌 本周周报</h3>
           <div v-if="latestReport" class="current-report-card" :style="{ '--risk-color': getRiskLevelInfo(latestReport.riskLevel).color }" @click="openReportDetail(latestReport)">
             <div class="card-main">
               <div class="card-period">{{ latestReport.weekStart?.slice(5) }} ~ {{ latestReport.weekEnd?.slice(5) }}</div>
@@ -839,7 +839,7 @@ onUnmounted(() => {
 
         <!-- 历史周报 -->
         <div v-if="reportList.length > 0" class="history-reports">
-          <h3 class="section-subtitle">历史周报</h3>
+          <h3 class="section-subtitle">🗂️ 历史周报</h3>
           <div class="report-grid">
             <div 
               v-for="report in reportList.slice(0, 6)" 

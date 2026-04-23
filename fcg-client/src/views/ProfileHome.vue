@@ -330,7 +330,7 @@ onMounted(async () => {
     <section class="profile-container">
       <div class="profile-grid">
         <div class="card profile-card">
-          <div class="card-title">我的资料</div>
+          <div class="card-title">👤 我的资料</div>
           <div class="profile-hero"></div>
           <AvatarIcon
             class="avatar"
@@ -375,7 +375,7 @@ onMounted(async () => {
 
         <div class="card health-summary-card">
           <div class="health-summary-head">
-            <h3>健康摘要</h3>
+            <h3>❤️ 健康摘要</h3>
             <button class="profile-edit-btn slim" @click="openHealthEdit">编辑健康档案</button>
           </div>
           <div v-if="loadingHealthProfile" class="summary-loading">加载中...</div>
@@ -414,7 +414,7 @@ onMounted(async () => {
         </div>
 
         <div class="card actions-card">
-          <div class="card-title">常用操作</div>
+          <div class="card-title">⚙️ 常用操作</div>
           <button @click="handleSwitchMember" class="action-btn">
             <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -440,7 +440,7 @@ onMounted(async () => {
         </div>
 
         <div v-if="userStore.isAdmin" class="card admin-entrance">
-          <div class="card-title">管理入口</div>
+          <div class="card-title">🛡️ 管理入口</div>
           <div class="admin-summary-grid">
             <div class="admin-summary-item">
               <span class="sum-label">成员总数</span>
