@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useUserStore } from '../stores/user'
-import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../utils/api'
-import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
-import BaseLayout from '../components/common/BaseLayout.vue'
+import { useUserStore } from '../../stores/user'
+import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../../utils/api'
+import VitalRecordDialog from '../../components/health/VitalRecordDialog.vue'
+import BaseLayout from '../../components/common/BaseLayout.vue'
 import * as echarts from 'echarts'
 import { Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

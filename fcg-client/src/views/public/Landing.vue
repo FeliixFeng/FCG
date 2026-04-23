@@ -1,8 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
-import AuthDialog from '../components/auth/AuthDialog.vue'
+import { useUserStore } from '../../stores/user'
+import AuthDialog from '../../components/auth/AuthDialog.vue'
 
 const router = useRouter()
 const userStore = useUserStore()

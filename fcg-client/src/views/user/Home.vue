@@ -2,8 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import BaseLayout from '../components/common/BaseLayout.vue'
-import { useUserStore } from '../stores/user'
+import BaseLayout from '../../components/common/BaseLayout.vue'
+import { useUserStore } from '../../stores/user'
 import {
   createMedicineRecord,
   fetchFamilyMembers,
@@ -11,7 +11,7 @@ import {
   fetchTodayPlanRecords,
   fetchTodayVitals,
   updateMedicineRecord
-} from '../utils/api'
+} from '../../utils/api'
 
 const userStore = useUserStore()
 const router = useRouter()

@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
-import AvatarIcon from '../components/common/AvatarIcon.vue'
+import { useUserStore } from '../../stores/user'
+import AvatarIcon from '../../components/common/AvatarIcon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()

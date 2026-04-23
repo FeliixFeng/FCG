@@ -2,10 +2,10 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
-import BaseLayout from '../components/common/BaseLayout.vue'
-import { useUserStore } from '../stores/user'
-import { chatWithAi, fetchAiContext } from '../utils/api'
-import { getToken } from '../utils/storage'
+import BaseLayout from '../../components/common/BaseLayout.vue'
+import { useUserStore } from '../../stores/user'
+import { chatWithAi, fetchAiContext } from '../../utils/api'
+import { getToken } from '../../utils/storage'
 
 const userStore = useUserStore()
 const inputText = ref('')

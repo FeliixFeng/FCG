@@ -1,8 +1,8 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
-import { fetchAdminOverview } from '../utils/api'
+import { useUserStore } from '../../stores/user'
+import { fetchAdminOverview } from '../../utils/api'
 
 const router = useRouter()
 const userStore = useUserStore()

@@ -1,11 +1,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
-import BaseLayout from '../components/common/BaseLayout.vue'
-import AvatarIcon from '../components/common/AvatarIcon.vue'
-import AvatarPicker from '../components/common/AvatarPicker.vue'
-import { fetchUserProfile, fetchVitalList, updateUserInfo, updateUserProfile } from '../utils/api'
+import { useUserStore } from '../../stores/user'
+import BaseLayout from '../../components/common/BaseLayout.vue'
+import AvatarIcon from '../../components/common/AvatarIcon.vue'
+import AvatarPicker from '../../components/common/AvatarPicker.vue'
+import { fetchUserProfile, fetchVitalList, updateUserInfo, updateUserProfile } from '../../utils/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()

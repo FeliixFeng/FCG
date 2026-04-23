@@ -1,11 +1,11 @@
 <script setup>
-import BaseLayout from '../components/common/BaseLayout.vue'
+import BaseLayout from '../../components/common/BaseLayout.vue'
 import { onMounted, onUnmounted, ref, reactive, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElCheckbox } from 'element-plus'
-import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, deletePlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, fetchFamilyMembers, fetchTodayPlanRecords } from '../utils/api'
-import { useUserStore } from '../stores/user'
+import { fetchMedicineList, createMedicine, fetchPlanList, createPlan, deletePlan, recognizeMedicine, uploadFile, updateMedicine, deleteMedicine, fetchMedicine, fetchFamilyMembers, fetchTodayPlanRecords } from '../../utils/api'
+import { useUserStore } from '../../stores/user'
 import { useRoute, useRouter } from 'vue-router'
-import { compressImage, fileToBase64 } from '../utils/image'
+import { compressImage, fileToBase64 } from '../../utils/image'
 
 const userStore = useUserStore()
 const route = useRoute()
