@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useUserStore } from '../stores/user'
-import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../utils/api'
-import VitalRecordDialog from '../components/health/VitalRecordDialog.vue'
-import BaseLayout from '../components/common/BaseLayout.vue'
+import { useUserStore } from '../../stores/user'
+import { fetchTodayVitals, fetchWeeklyVitals, fetchVitalList, deleteVital, fetchUserProfile, fetchLatestReport, generateHealthReport, fetchHealthReports } from '../../utils/api'
+import VitalRecordDialog from '../../components/health/VitalRecordDialog.vue'
+import BaseLayout from '../../components/common/BaseLayout.vue'
 import * as echarts from 'echarts'
 import { Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1176,6 +1176,20 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+@media (hover: hover) {
+  .tab-btn:hover:not(.active) {
+    transform: translateY(-1px);
+    border-color: #2d5f5d;
+    box-shadow: 0 6px 12px rgba(45, 95, 93, 0.08);
+  }
+
+  .chart-container:hover,
+  .record-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(45, 95, 93, 0.1);
+  }
 }
 
 .record-time {

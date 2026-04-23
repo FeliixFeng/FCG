@@ -2,19 +2,17 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
 // 懒加载所有页面
-const Landing = () => import('../views/Landing.vue')
-const SelectMember = () => import('../views/SelectMember.vue')
-const HomeEntry = () => import('../views/HomeEntry.vue')
-const FamilyHome = () => import('../views/FamilyHome.vue')
-const MedicineHome = () => import('../views/MedicineHome.vue')
-const HealthEntry = () => import('../views/HealthEntry.vue')
-const ProfileEntry = () => import('../views/ProfileEntry.vue')
+const Landing = () => import('../views/public/Landing.vue')
+const SelectMember = () => import('../views/public/SelectMember.vue')
+const HomeEntry = () => import('../views/entry/HomeEntry.vue')
+const MedicineHome = () => import('../views/user/MedicineHome.vue')
+const HealthEntry = () => import('../views/entry/HealthEntry.vue')
+const ProfileEntry = () => import('../views/entry/ProfileEntry.vue')
 const AdminLayout = () => import('../components/common/AdminLayout.vue')
-const AdminDashboard = () => import('../views/AdminHome.vue')
+const AdminDashboard = () => import('../views/admin/AdminDashboard.vue')
 const AdminMembers = () => import('../views/admin/AdminMembers.vue')
-const AdminMedicines = () => import('../views/admin/AdminMedicines.vue')
-const AdminSystem = () => import('../views/admin/AdminSystem.vue')
-const AdminData = () => import('../views/admin/AdminData.vue')
+const AdminPlans = () => import('../views/admin/AdminPlans.vue')
+const AdminSettings = () => import('../views/admin/AdminSettings.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -29,7 +27,7 @@ const router = createRouter({
     { path: '/home', name: 'home', component: HomeEntry, meta: { requireMember: true } },
     { path: '/medicine', name: 'medicine', component: MedicineHome, meta: { requireMember: true } },
     { path: '/health', name: 'health', component: HealthEntry, meta: { requireMember: true } },
-    { path: '/ai', name: 'ai', component: () => import('../views/AiHome.vue'), meta: { requireMember: true } },
+    { path: '/ai', name: 'ai', component: () => import('../views/user/AiHome.vue'), meta: { requireMember: true } },
     { path: '/profile', name: 'profile', component: ProfileEntry, meta: { requireMember: true } },
 
     // 管理界面路由（/admin 子路由）
@@ -40,9 +38,8 @@ const router = createRouter({
       children: [
         { path: '', name: 'admin', component: AdminDashboard },
         { path: 'members', name: 'admin-members', component: AdminMembers },
-        { path: 'medicines', name: 'admin-medicines', component: AdminMedicines },
-        { path: 'system', name: 'admin-system', component: AdminSystem },
-        { path: 'data', name: 'admin-data', component: AdminData },
+        { path: 'plans', name: 'admin-plans', component: AdminPlans },
+        { path: 'settings', name: 'admin-settings', component: AdminSettings },
       ]
     },
 

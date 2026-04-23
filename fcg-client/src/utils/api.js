@@ -22,6 +22,12 @@ export const loginFamily = (data) => http.post('/api/family/login', data)
 /** 获取家庭信息 */
 export const fetchFamilyInfo = () => http.get('/api/family/info')
 
+/** 更新家庭信息（仅管理员） */
+export const updateFamilyInfo = (data) => http.put('/api/family/info', data)
+
+/** 修改家庭登录密码（仅管理员） */
+export const updateFamilyPassword = (data) => http.put('/api/family/password', data)
+
 /** 获取家庭成员列表（选人页用） */
 export const fetchFamilyMembers = () => http.get('/api/family/members')
 
@@ -144,3 +150,14 @@ export const fetchAiContext = (params) => http.get('/api/ai/context', { params }
 
 /** AI 普通对话（非流式兜底） */
 export const chatWithAi = (data) => http.post('/api/ai/chat', data)
+
+// ========== 管理员模块 ==========
+
+/** 管理端总览数据 */
+export const fetchAdminOverview = () => http.get('/api/admin/dashboard/overview')
+
+/** 管理端今日计划总览（分页） */
+export const fetchAdminTodayPlans = (params) => http.get('/api/admin/plans/today', { params })
+
+/** 管理端日统计数据 */
+export const fetchAdminDailyStats = (params) => http.get('/api/admin/stats/daily', { params })

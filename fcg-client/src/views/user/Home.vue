@@ -2,8 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import BaseLayout from '../components/common/BaseLayout.vue'
-import { useUserStore } from '../stores/user'
+import BaseLayout from '../../components/common/BaseLayout.vue'
+import { useUserStore } from '../../stores/user'
 import {
   createMedicineRecord,
   fetchFamilyMembers,
@@ -11,7 +11,7 @@ import {
   fetchTodayPlanRecords,
   fetchTodayVitals,
   updateMedicineRecord
-} from '../utils/api'
+} from '../../utils/api'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -817,6 +817,7 @@ watch(selectedMemberId, (val, oldVal) => {
   border: 1px solid var(--c-line-soft);
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(34, 71, 68, 0.07);
+  transition: transform 0.2s ease, box-shadow 0.22s ease, border-color 0.2s ease;
 }
 
 .page-header {
@@ -1541,6 +1542,26 @@ watch(selectedMemberId, (val, oldVal) => {
 
 .record-item.is-pending {
   border-left-color: #f39c12;
+}
+
+@media (hover: hover) {
+  .home-page .card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(34, 71, 68, 0.1);
+    border-color: var(--c-line);
+  }
+
+  .quick-card:hover,
+  .record-item:hover,
+  .summary-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(34, 71, 68, 0.1);
+  }
+
+  .btn-done-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(34, 71, 68, 0.12);
+  }
 }
 
 .record-item.is-taken {

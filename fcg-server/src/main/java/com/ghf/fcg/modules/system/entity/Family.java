@@ -23,6 +23,12 @@ public class Family {
     /** 创建者成员ID */
     private Long creatorId;
 
+    /** 低库存阈值（库存小于该值视为紧张） */
+    private Integer lowStockThreshold;
+
+    /** 临期提醒阈值（距离过期天数 <= 该值视为临期） */
+    private Integer expiringDays;
+
     @TableLogic
     private Integer deleted;
 

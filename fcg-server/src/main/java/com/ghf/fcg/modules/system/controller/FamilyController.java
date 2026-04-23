@@ -5,7 +5,9 @@ import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.system.dto.FamilyLoginDTO;
+import com.ghf.fcg.modules.system.dto.FamilyPasswordUpdateDTO;
 import com.ghf.fcg.modules.system.dto.FamilyRegisterDTO;
+import com.ghf.fcg.modules.system.dto.FamilyUpdateDTO;
 import com.ghf.fcg.modules.system.dto.MemberCreateDTO;
 import com.ghf.fcg.modules.system.service.IFamilyService;
 import com.ghf.fcg.modules.system.vo.FamilyVO;
@@ -54,6 +56,34 @@ public class FamilyController {
     public Result<List<FamilyVO.MemberInfo>> getMembers() {
         Long familyId = UserContext.get().getFamilyId();
         return Result.success(familyService.getMembers(familyId));
+    }
+
+    /** 更新家庭设置（仅管理员） */
+    @PutMapping("/info")
+    @Operation(summary = "更新家庭设置（仅管理员）")
+    public Result<FamilyVO> updateFamilyInfo(@RequestBody @Valid FamilyUpdateDTO dto) {
+        UserContext.UserInfo ctx = UserContext.get();
+        if (ctx.getRole() == null || ctx.getRole() != 0) {
+            throw new BusinessException(MessageConstant.NO_PERMISSION);
+        }
+        return Result.success(familyService.updateFamilySettings(
+                ctx.getFamilyId(),
+                dto.getFamilyName(),
+                dto.getLowStockThreshold(),
+                dto.getExpiringDays()
+        ));
+    }
+
+    /** 修改家庭登录密码（仅管理员） */
+    @PutMapping("/password")
+    @Operation(summary = "修改家庭登录密码（仅管理员）")
+    public Result<Void> updateFamilyPassword(@RequestBody @Valid FamilyPasswordUpdateDTO dto) {
+        UserContext.UserInfo ctx = UserContext.get();
+        if (ctx.getRole() == null || ctx.getRole() != 0) {
+            throw new BusinessException(MessageConstant.NO_PERMISSION);
+        }
+        familyService.updateFamilyPassword(ctx.getFamilyId(), dto.getOldPassword(), dto.getNewPassword());
+        return Result.success();
     }
 
     /** 选择成员，返回成员级 token */

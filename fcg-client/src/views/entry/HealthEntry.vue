@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { useUserStore } from '../stores/user'
-import HealthHome from './HealthHome.vue'
-import HealthCare from './care/HealthCare.vue'
+import { useUserStore } from '../../stores/user'
+import HealthHome from '../user/HealthHome.vue'
+import HealthCare from '../care/HealthCare.vue'
 
 const userStore = useUserStore()
 const isControlledMember = computed(() => userStore.member?.role === 2)
@@ -12,4 +12,3 @@ const isControlledMember = computed(() => userStore.member?.role === 2)
   <HealthCare v-if="isControlledMember" />
   <HealthHome v-else />
 </template>
-

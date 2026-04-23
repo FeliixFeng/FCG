@@ -233,6 +233,7 @@ const handleInputEnter = (event) => {
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s;
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 .num-input::-webkit-outer-spin-button,

@@ -32,4 +32,10 @@ public interface IFamilyService extends IService<Family> {
 
     /** 获取家庭信息 */
     FamilyVO getFamilyInfo(Long familyId);
+
+    /** 更新家庭设置（仅管理员） */
+    FamilyVO updateFamilySettings(Long familyId, String familyName, Integer lowStockThreshold, Integer expiringDays);
+
+    /** 修改家庭登录密码（仅管理员） */
+    void updateFamilyPassword(Long familyId, String oldPassword, String newPassword);
 }

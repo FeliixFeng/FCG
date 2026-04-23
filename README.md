@@ -1,82 +1,108 @@
-# Family Care Guardian (FCG) - 家庭健康管理系统
+# Family Care Guardian (FCG)
 
-> 武汉纺织大学毕业设计项目（Spring Boot 3 + Vue 3）
+> 武汉纺织大学毕业设计项目  
+> 家庭健康管理系统（Spring Boot 3 + Vue 3）
 
-## 项目简介
+## 项目定位
 
-FCG 面向家庭健康管理场景，围绕“谁在什么时候该吃什么药”构建完整链路：药品管理、用药计划、首页打卡、健康数据、周报查看。
+FCG 面向家庭场景，围绕“计划制定 -> 当日提醒 -> 打卡记录 -> 健康追踪 -> 周报总结”形成闭环。  
+系统采用家庭账号 + 成员身份切换，覆盖管理员、普通成员、受控成员三类角色。
 
-## 当前核心能力（2026-04-20）
+## 核心功能（当前版本）
 
-- 家庭账号 + 成员切换 + 角色权限（管理员/普通成员/受控成员）
-- 药品页：药箱管理、OCR 识别、创建用药计划
-- 首页：今日任务中心（主任务卡 + 待处理任务 + 今日已处理）
-- 打卡链路：
-  - 首页按“计划表 + 记录表”联表展示今日任务
-  - 当天未打卡任务可补打到 23:59
-  - 打卡状态变为“已服”时自动扣减库存
-- 健康页：体征录入、趋势图、周报查看
-- 管理员可切换查看家庭其他成员
+### 1) 用户侧（全成员可用）
+- 首页任务中心：下一条任务、待处理列表、已处理列表、一键打卡/跳过/切换
+- 药品管理：家庭药箱增删改查、OCR 识别录入、库存与临期提示、计划创建
+- 健康管理：血压/血糖/体重录入、7天趋势图、周报生成与查看
+- AI 助手：流式对话（SSE）、基于成员上下文的问答（档案+任务+体征+周报）
+- 我的页面：成员资料、头像、档案信息、常用操作
 
-## 最新实现说明（重要）
+### 2) 关怀模式（受控成员 role=2）
+- 保留并放大核心能力：`首页 / 健康 / 我的`
+- 简化操作路径：更少入口、更大按钮、更强对比、更低误触成本
+- 药品与计划维护职责由管理员承担
 
-### 用药任务展示逻辑
+### 3) 管理侧（仅管理员）
+- 管理首页：家庭概览与快捷入口
+- 成员管理：成员新增/编辑、角色与关系维护、头像管理
+- 计划管理：家庭当日计划总览与筛选
+- 系统设置：家庭名称、低库存阈值、临期提醒天数、密码修改
 
-- 首页不再只依赖 `med_record`。
-- `/api/medicine/plan/records` 在传入 `scheduledDate` 时会：
-  1. 从 `med_plan` 生成当天应执行任务；
-  2. 再叠加 `med_record` 的实际状态；
-  3. 无记录时返回 `待服`（可直接打卡/跳过）。
+## 关键业务逻辑
 
-### 打卡与库存
+### 今日任务生成
+- 首页任务不是单看记录表，而是由 `med_plan` 生成当日应执行任务，再叠加 `med_record` 状态。
+- 没有历史记录时，任务也能正常显示为“待服”，可直接打卡。
 
-- 首次打卡可直接创建记录（不要求先有 recordId）。
-- 状态从“非已服”变为“已服”时自动扣库存。
-- 扣减量按计划剂量（最少 1）计算。
+### 打卡与库存联动
+- 首次打卡可直接创建记录（无需先有 recordId）。
+- 状态从“非已服”变更为“已服”时自动扣减库存。
+- 扣减量按计划剂量计算，最小扣减 1。
 
-### 数据一致性
-
-- `med_record` 已增加唯一索引：
-  - `(user_id, plan_id, scheduled_date, slot_name)`
-- 防止同用户同计划同日期同时间段出现重复记录。
+### 数据一致性保障
+- `med_record` 唯一索引：`(user_id, plan_id, scheduled_date, slot_name)`。
+- 防止同成员同计划同日期同时间段重复记录。
 
 ## 技术栈
 
-- 后端：Java 17, Spring Boot 3.2.5, MyBatis-Plus 3.5.6, MySQL 8.0
-- 前端：Vue 3.4, Vite 5, Pinia, Element Plus
-- 智能能力：GLM 多模态 OCR/解析（药品识别）
+- 后端：Java 17、Spring Boot 3.2.5、MyBatis-Plus 3.5.6、MySQL 8.0
+- 前端：Vue 3.4、Vite 5、Pinia、Element Plus
+- AI 能力：GLM（OCR + 对话）
+- 部署：Docker + GitHub Actions + Alibaba Cloud ACR
 
 ## 项目结构
 
 ```text
 fcg/
-├── fcg-server/              # Spring Boot 后端
-├── fcg-client/              # Vue 前端
-└── fcg-docs/                # 项目文档
+├── fcg-server/                    # Spring Boot 后端
+│   └── src/main/resources/sql/
+│       └── init.sql              # 基线建表脚本
+├── fcg-client/                    # Vue 前端
+│   └── src/
+│       ├── views/public          # Landing / SelectMember
+│       ├── views/entry           # HomeEntry / HealthEntry / ProfileEntry（角色分流）
+│       ├── views/user            # 普通用户页面
+│       ├── views/care            # 关怀模式页面
+│       └── views/admin           # 管理界面页面
+└── fcg-docs/                      # 文档
 ```
 
-## 本地启动
+## 本地开发
 
-### 后端
-
+### 启动后端
 ```bash
 cd fcg-server
 mvn spring-boot:run
 ```
 
-### 前端
-
+### 启动前端
 ```bash
 cd fcg-client
 npm install
 npm run dev
 ```
 
-## 文档导航（精简版）
+### 构建检查
+```bash
+cd fcg-server && mvn -q compile
+cd ../fcg-client && npm run build
+```
 
-- 项目状态：`fcg-docs/PROJECT_STATUS.md`
-- 开发运维：`fcg-docs/DEVELOPMENT.md`
-- 数据库设计：`fcg-docs/DATABASE_DESIGN.md`
+## 配置说明
+
+- 后端主配置：`fcg-server/src/main/resources/application.yml`
+- 本地私密配置：`application-local.yml`（不入库）
+- 前端接口配置：`fcg-client/src/utils/http.js`
+
+## 分支与发布约定
+
+- `dev`：日常开发联调分支
+- `main`：稳定发布分支（推送后触发部署）
+
+## 文档导航
+
+- 开发运维文档：`fcg-docs/DEVELOPMENT.md`
+- 数据库设计文档：`fcg-docs/DATABASE_DESIGN.md`
 
 ## 作者
 

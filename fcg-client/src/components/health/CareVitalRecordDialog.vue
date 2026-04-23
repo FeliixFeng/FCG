@@ -280,6 +280,7 @@ async function submitRecord() {
   font-weight: 700;
   color: #214846;
   background: transparent;
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 
