@@ -37,10 +37,12 @@ public class AdminController {
     public Result<PageResult<AdminPlanTodayItemVO>> todayPlans(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String slotName,
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") Long page,
             @RequestParam(defaultValue = "20") Long size) {
         Long familyId = requireAdminAndFamilyId();
-        return Result.success(adminService.listTodayPlans(familyId, userId, status, page, size));
+        return Result.success(adminService.listTodayPlans(familyId, userId, status, slotName, keyword, page, size));
     }
 
     @GetMapping("/stats/daily")
@@ -61,4 +63,3 @@ public class AdminController {
         return user.getFamilyId();
     }
 }
-

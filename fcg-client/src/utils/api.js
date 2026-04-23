@@ -22,6 +22,12 @@ export const loginFamily = (data) => http.post('/api/family/login', data)
 /** 获取家庭信息 */
 export const fetchFamilyInfo = () => http.get('/api/family/info')
 
+/** 更新家庭信息（仅管理员） */
+export const updateFamilyInfo = (data) => http.put('/api/family/info', data)
+
+/** 修改家庭登录密码（仅管理员） */
+export const updateFamilyPassword = (data) => http.put('/api/family/password', data)
+
 /** 获取家庭成员列表（选人页用） */
 export const fetchFamilyMembers = () => http.get('/api/family/members')
 

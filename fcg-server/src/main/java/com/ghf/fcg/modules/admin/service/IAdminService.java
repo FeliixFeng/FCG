@@ -9,8 +9,15 @@ public interface IAdminService {
 
     AdminOverviewVO getOverview(Long familyId);
 
-    PageResult<AdminPlanTodayItemVO> listTodayPlans(Long familyId, Long userId, Integer status, long page, long size);
+    PageResult<AdminPlanTodayItemVO> listTodayPlans(
+            Long familyId,
+            Long userId,
+            Integer status,
+            String slotName,
+            String keyword,
+            long page,
+            long size
+    );
 
     AdminDailyStatsVO getDailyStats(Long familyId, Integer days);
 }
-

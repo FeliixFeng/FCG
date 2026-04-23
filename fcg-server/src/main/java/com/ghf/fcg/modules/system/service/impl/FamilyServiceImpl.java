@@ -61,6 +61,8 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
         family.setUsername(dto.getUsername());
         family.setPassword(PasswordEncoder.encode(dto.getPassword()));
         family.setCreatorId(0L);
+        family.setLowStockThreshold(5);
+        family.setExpiringDays(30);
         this.save(family);
 
         // 创建第一个成员（管理员）
@@ -81,6 +83,8 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
                 .id(family.getId())
                 .familyName(family.getFamilyName())
                 .username(family.getUsername())
+                .lowStockThreshold(family.getLowStockThreshold())
+                .expiringDays(family.getExpiringDays())
                 .createTime(family.getCreateTime())
                 .build();
     }
@@ -105,6 +109,8 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
                 .familyName(family.getFamilyName())
                 .username(family.getUsername())
                 .token(token)
+                .lowStockThreshold(family.getLowStockThreshold())
+                .expiringDays(family.getExpiringDays())
                 .createTime(family.getCreateTime())
                 .build();
     }
@@ -216,7 +222,44 @@ public class FamilyServiceImpl extends ServiceImpl<FamilyMapper, Family> impleme
                 .id(family.getId())
                 .familyName(family.getFamilyName())
                 .username(family.getUsername())
+                .lowStockThreshold(family.getLowStockThreshold())
+                .expiringDays(family.getExpiringDays())
                 .createTime(family.getCreateTime())
                 .build();
+    }
+
+    @Override
+    public FamilyVO updateFamilySettings(Long familyId, String familyName, Integer lowStockThreshold, Integer expiringDays) {
+        Family family = this.getById(familyId);
+        if (family == null) {
+            throw new BusinessException(MessageConstant.FAMILY_NOT_EXIST);
+        }
+
+        String normalized = familyName == null ? "" : familyName.trim();
+        if (normalized.isEmpty() || normalized.length() > 30 || lowStockThreshold == null || expiringDays == null) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
+        if (lowStockThreshold < 1 || lowStockThreshold > 999 || expiringDays < 1 || expiringDays > 365) {
+            throw new BusinessException(MessageConstant.PARAM_ERROR);
+        }
+
+        family.setFamilyName(normalized);
+        family.setLowStockThreshold(lowStockThreshold);
+        family.setExpiringDays(expiringDays);
+        this.updateById(family);
+        return getFamilyInfo(familyId);
+    }
+
+    @Override
+    public void updateFamilyPassword(Long familyId, String oldPassword, String newPassword) {
+        Family family = this.getById(familyId);
+        if (family == null) {
+            throw new BusinessException(MessageConstant.FAMILY_NOT_EXIST);
+        }
+        if (!PasswordEncoder.matches(oldPassword, family.getPassword())) {
+            throw new BusinessException(MessageConstant.ADMIN_VERIFY_FAILED);
+        }
+        family.setPassword(PasswordEncoder.encode(newPassword));
+        this.updateById(family);
     }
 }

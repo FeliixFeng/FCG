@@ -1,10 +1,17 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../../stores/user'
-import { fetchFamilyMembers, addMember, fetchMemberDetail, updateMember, deleteMember, updateMemberRole } from '../../utils/api'
+import {
+  addMember,
+  deleteMember,
+  fetchFamilyMembers,
+  fetchMemberDetail,
+  updateMember,
+  updateMemberRole
+} from '../../utils/api'
 import AvatarIcon from '../../components/common/AvatarIcon.vue'
 import AvatarPicker from '../../components/common/AvatarPicker.vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const userStore = useUserStore()
 
@@ -12,7 +19,9 @@ const members = ref([])
 const loading = ref(false)
 const error = ref('')
 
-// 添加成员
+const searchKeyword = ref('')
+const roleFilter = ref('all')
+
 const showAddForm = ref(false)
 const adding = ref(false)
 const form = ref({
@@ -22,7 +31,6 @@ const form = ref({
   phone: ''
 })
 
-// 编辑弹窗
 const showEditModal = ref(false)
 const editing = ref(false)
 const editForm = ref({
@@ -40,45 +48,80 @@ const editForm = ref({
   remark: ''
 })
 
+const showViewModal = ref(false)
+const viewForm = ref({})
+const roleUpdatingId = ref(null)
+
 const roleOptions = [
   { value: 0, label: '管理员' },
   { value: 1, label: '普通成员' },
   { value: 2, label: '受控成员' }
 ]
 
-const relationOptions = [
+const baseRelationOptions = [
   { value: '爷爷', label: '爷爷' },
   { value: '奶奶', label: '奶奶' },
   { value: '爸爸', label: '爸爸' },
   { value: '妈妈', label: '妈妈' },
   { value: '儿子', label: '儿子' },
   { value: '女儿', label: '女儿' },
-  { value: '', label: '其他' }
+  { value: '__other__', label: '其他' }
 ]
 
-const roleLabel = (role) => {
-  return roleOptions.find(o => o.value === role)?.label || '未知'
+const roleLabel = (role) => roleOptions.find(item => item.value === role)?.label || '未知'
+const roleClass = (role) => `role-${role}`
+
+const totalCount = computed(() => members.value.length)
+const adminCount = computed(() => members.value.filter(item => item.role === 0).length)
+const normalCount = computed(() => members.value.filter(item => item.role === 1).length)
+const careCount = computed(() => members.value.filter(item => item.role === 2).length)
+
+const roleOrder = {
+  0: 1,
+  2: 2,
+  1: 3
 }
 
-// 从生日计算年龄
+const filteredMembers = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  return members.value
+    .filter(item => {
+      const hitKeyword =
+        !keyword ||
+        String(item.nickname || '').toLowerCase().includes(keyword) ||
+        String(item.relation || '').toLowerCase().includes(keyword) ||
+        String(item.phone || '').toLowerCase().includes(keyword)
+      const hitRole = roleFilter.value === 'all' || Number(roleFilter.value) === item.role
+      return hitKeyword && hitRole
+    })
+    .slice()
+    .sort((a, b) => {
+      const roleDiff = (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99)
+      if (roleDiff !== 0) return roleDiff
+      return String(a.nickname || '').localeCompare(String(b.nickname || ''), 'zh-Hans-CN')
+    })
+})
+
 const getAge = (birthday) => {
   if (!birthday) return null
   const birth = new Date(birthday)
   const today = new Date()
   let age = today.getFullYear() - birth.getFullYear()
-  const m = today.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-    age--
+  const monthDiff = today.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age -= 1
   }
   return age >= 0 ? age : null
 }
 
-// 病史简写（取前两个）
 const getDiseaseShort = (disease) => {
-  if (!disease) return null
-  const list = disease.split(',').map(d => d.trim()).filter(d => d)
-  if (list.length === 0) return null
-  return list.slice(0, 2).join(',') + (list.length > 2 ? '...' : '')
+  if (!disease) return ''
+  const parts = disease
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+  if (!parts.length) return ''
+  return parts.slice(0, 2).join('、') + (parts.length > 2 ? '...' : '')
 }
 
 async function loadMembers() {
@@ -86,7 +129,7 @@ async function loadMembers() {
   error.value = ''
   try {
     const res = await fetchFamilyMembers()
-    members.value = res.data
+    members.value = res.data || []
   } catch (err) {
     error.value = err?.message || '获取成员失败'
   } finally {
@@ -94,25 +137,37 @@ async function loadMembers() {
   }
 }
 
-const resetForm = () => {
-  form.value = { nickname: '', relation: '', role: 1, phone: '' }
+function resetForm() {
+  form.value = {
+    nickname: '',
+    relation: '',
+    role: 1,
+    phone: ''
+  }
 }
 
-const closeAddForm = () => {
+function closeAddForm() {
   showAddForm.value = false
   resetForm()
-  error.value = ''
 }
 
-const handleAddMember = async () => {
-  if (!form.value.nickname) {
+function openAddForm() {
+  resetForm()
+  showAddForm.value = true
+}
+
+async function handleAddMember() {
+  if (!form.value.nickname.trim()) {
     ElMessage.warning('请填写昵称')
     return
   }
   try {
     adding.value = true
-    error.value = ''
-    await addMember({ ...form.value })
+    const payload = {
+      ...form.value,
+      relation: form.value.relation === '__other__' ? '' : form.value.relation
+    }
+    await addMember(payload)
     ElMessage.success('添加成功')
     closeAddForm()
     await loadMembers()
@@ -123,18 +178,31 @@ const handleAddMember = async () => {
   }
 }
 
-// 编辑成员
-const handleEdit = async (member) => {
-  error.value = ''
+async function handleView(member) {
   try {
     const res = await fetchMemberDetail(member.userId)
-    const data = res.data
+    viewForm.value = res.data || {}
+    showViewModal.value = true
+  } catch (err) {
+    ElMessage.error('获取成员信息失败')
+  }
+}
+
+function handleViewConfirm() {
+  showViewModal.value = false
+  handleEdit({ userId: viewForm.value.userId || viewForm.value.id })
+}
+
+async function handleEdit(member) {
+  try {
+    const res = await fetchMemberDetail(member.userId)
+    const data = res.data || {}
     editForm.value = {
       userId: data.id,
       avatar: data.avatar || '',
-      nickname: data.nickname,
-      relation: data.relation || '',
-      role: data.role,
+      nickname: data.nickname || '',
+      relation: data.relation || '__other__',
+      role: data.role ?? 1,
       phone: data.phone || '',
       birthday: data.birthday || '',
       height: data.height || '',
@@ -149,32 +217,8 @@ const handleEdit = async (member) => {
   }
 }
 
-const closeEditModal = () => {
-  showEditModal.value = false
-  error.value = ''
-}
-
-// 查看弹窗
-const showViewModal = ref(false)
-const viewForm = ref({})
-
-const handleView = async (member) => {
-  error.value = ''
-  try {
-    const res = await fetchMemberDetail(member.userId)
-    viewForm.value = res.data
-    showViewModal.value = true
-  } catch (err) {
-    ElMessage.error('获取成员信息失败')
-  }
-}
-
-const closeViewModal = () => {
-  showViewModal.value = false
-}
-
-const handleUpdate = async () => {
-  if (!editForm.value.nickname) {
+async function handleUpdate() {
+  if (!editForm.value.nickname.trim()) {
     ElMessage.warning('请填写昵称')
     return
   }
@@ -183,7 +227,7 @@ const handleUpdate = async () => {
     await updateMember(editForm.value.userId, {
       avatar: editForm.value.avatar || null,
       nickname: editForm.value.nickname,
-      relation: editForm.value.relation,
+      relation: editForm.value.relation === '__other__' ? '' : editForm.value.relation,
       role: editForm.value.role,
       phone: editForm.value.phone,
       birthday: editForm.value.birthday || null,
@@ -193,7 +237,7 @@ const handleUpdate = async () => {
       allergy: editForm.value.allergy || '',
       remark: editForm.value.remark || ''
     })
-    ElMessage.success('更新成功')
+    ElMessage.success('保存成功')
     showEditModal.value = false
     await loadMembers()
   } catch (err) {
@@ -203,20 +247,21 @@ const handleUpdate = async () => {
   }
 }
 
-// 删除成员
-const handleDelete = async (member) => {
+async function handleDelete(member) {
   if (member.userId === userStore.member?.userId) {
     ElMessage.warning('不能删除自己')
     return
   }
-  
   try {
     await ElMessageBox.confirm(
-      `确定要删除成员 "${member.nickname}" 吗？此操作不可恢复。`,
+      `确定删除成员“${member.nickname}”吗？此操作不可恢复。`,
       '删除确认',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
     )
-    
     await deleteMember(member.userId)
     ElMessage.success('删除成功')
     await loadMembers()
@@ -227,21 +272,38 @@ const handleDelete = async (member) => {
   }
 }
 
-// 修改角色
-const handleRoleChange = async (member, newRole) => {
-  if (member.userId === userStore.member?.userId && newRole !== member.role) {
+async function handleRoleChange(member, targetRoleValue) {
+  const targetRole = Number(targetRoleValue)
+  if (targetRole === member.role) return
+  if (member.userId === userStore.member?.userId) {
     ElMessage.warning('不能修改自己的角色')
     await loadMembers()
     return
   }
-  
+
   try {
-    await updateMemberRole(member.userId, newRole)
+    await ElMessageBox.confirm(
+      `将“${member.nickname}”的角色修改为“${roleLabel(targetRole)}”？`,
+      '角色变更确认',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    roleUpdatingId.value = member.userId
+    await updateMemberRole(member.userId, targetRole)
     ElMessage.success('角色已更新')
     await loadMembers()
   } catch (err) {
-    ElMessage.error(err?.message || '更新角色失败')
-    await loadMembers()
+    if (err !== 'cancel') {
+      ElMessage.error(err?.message || '更新角色失败')
+      await loadMembers()
+    } else {
+      await loadMembers()
+    }
+  } finally {
+    roleUpdatingId.value = null
   }
 }
 
@@ -252,187 +314,233 @@ onMounted(() => {
 
 <template>
   <div class="admin-members">
-    <div class="page-header">
-      <div class="header-row">
+    <header class="page-header card">
+      <div class="header-main">
         <div>
           <h2>成员管理</h2>
-          <p class="page-desc">这里负责全员资料与权限管理；成员自己的头像和昵称建议在“我的”页面自助修改。</p>
+          <p>统一管理家庭成员资料、角色权限与关怀对象。</p>
         </div>
-        <button class="btn-add" @click="showAddForm = !showAddForm">
-          {{ showAddForm ? '取消' : '+ 添加成员' }}
+        <button class="btn-add" @click="openAddForm">
+          + 添加成员
         </button>
       </div>
-    </div>
 
-    <!-- 添加成员表单 -->
-    <div v-if="showAddForm" class="add-form">
-      <div class="form-title">添加新成员</div>
-      <div class="form-fields">
-        <div class="form-field">
-          <label>昵称 *</label>
-          <input v-model="form.nickname" placeholder="例如：爷爷、妈妈" />
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-head">
+            <span class="stat-icon">👥</span>
+            <span class="stat-label">总成员</span>
+          </span>
+          <strong class="stat-value">{{ totalCount }}</strong>
         </div>
-        <div class="form-field">
-          <label>家庭关系</label>
-          <select v-model="form.relation">
-            <option value="" disabled>选择关系</option>
-            <option v-for="opt in relationOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+        <div class="stat-card role-0">
+          <span class="stat-head">
+            <span class="stat-icon">🛡️</span>
+            <span class="stat-label">管理员</span>
+          </span>
+          <strong class="stat-value">{{ adminCount }}</strong>
         </div>
-        <div class="form-field">
-          <label>手机号</label>
-          <input v-model="form.phone" placeholder="选填" />
+        <div class="stat-card role-2">
+          <span class="stat-head">
+            <span class="stat-icon">❤️</span>
+            <span class="stat-label">受控成员</span>
+          </span>
+          <strong class="stat-value">{{ careCount }}</strong>
         </div>
-        <div class="form-field">
-          <label>角色</label>
-          <select v-model="form.role">
-            <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+        <div class="stat-card role-1">
+          <span class="stat-head">
+            <span class="stat-icon">🙂</span>
+            <span class="stat-label">普通成员</span>
+          </span>
+          <strong class="stat-value">{{ normalCount }}</strong>
         </div>
       </div>
-      <div class="form-actions">
-        <button class="btn-cancel" @click="closeAddForm">取消</button>
-        <button class="btn-submit" :disabled="adding" @click="handleAddMember">
-          {{ adding ? '添加中...' : '确认添加' }}
-        </button>
-      </div>
-    </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    
-    <div v-else class="member-table">
-      <div class="table-header">
-        <span class="col-avatar">头像</span>
-        <span class="col-name">昵称</span>
-        <span class="col-relation">关系</span>
-        <span class="col-phone">手机号</span>
-        <span class="col-role">角色</span>
-        <span class="col-actions">操作</span>
+      <div class="filters-row">
+        <input v-model="searchKeyword" class="search-input" placeholder="搜索昵称 / 关系 / 手机号" />
+        <select v-model="roleFilter" class="filter-select">
+          <option value="all">全部角色</option>
+          <option v-for="item in roleOptions" :key="item.value" :value="String(item.value)">
+            {{ item.label }}
+          </option>
+        </select>
       </div>
-      
-      <div v-for="member in members" :key="member.userId" class="table-row">
-        <div class="col-avatar">
+    </header>
+
+    <div v-if="loading" class="state card">加载中...</div>
+    <div v-else-if="error" class="state card error-text">{{ error }}</div>
+
+    <section v-else class="member-grid">
+      <article
+        v-for="member in filteredMembers"
+        :key="member.userId"
+        class="member-card card"
+        :class="roleClass(member.role)"
+      >
+        <div class="member-head">
           <AvatarIcon
             :avatar="member.avatar"
             :relation="member.relation"
             :role="member.role"
             :nickname="member.nickname"
-            :size="40"
+            :size="44"
           />
+          <div class="member-title">
+            <div class="name-line">
+              <span class="nickname">{{ member.nickname }}</span>
+              <span v-if="member.userId === userStore.member?.userId" class="self-tag">我</span>
+            </div>
+            <div class="sub-line">
+              <span>👪 {{ member.relation || '未设置关系' }}</span>
+              <span>📱 {{ member.phone || '未填写手机号' }}</span>
+            </div>
+          </div>
         </div>
-        <div class="col-name">
-          {{ member.nickname }}
-          <span v-if="member.userId === userStore.member?.userId" class="self-tag">我</span>
+
+        <div class="member-meta">
+          <span v-if="member.birthday" class="meta-tag">年龄 {{ getAge(member.birthday) ?? '--' }} 岁</span>
+          <span v-if="member.disease" class="meta-tag warn">{{ getDiseaseShort(member.disease) }}</span>
+          <span v-if="!member.birthday && !member.disease" class="meta-tag plain">资料待完善</span>
         </div>
-        <div class="col-relation">{{ member.relation || '-' }}</div>
-        <div class="col-phone">{{ member.phone || '-' }}</div>
-        <div class="col-role">
-          <select 
-            class="role-select" 
-            :class="`role-${member.role}`"
-            :value="member.role"
-            @change="handleRoleChange(member, parseInt($event.target.value))"
+
+        <div class="member-role-row">
+          <label>角色权限</label>
+          <select
+            class="role-select"
+            :class="roleClass(member.role)"
+            :disabled="roleUpdatingId === member.userId"
+            :value="String(member.role)"
+            @change="handleRoleChange(member, $event.target.value)"
           >
-            <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
+            <option v-for="item in roleOptions" :key="item.value" :value="String(item.value)">
+              {{ item.label }}
             </option>
           </select>
         </div>
-        <div class="col-actions">
-          <button class="btn-action btn-view" @click="handleView(member)">查看</button>
-          <button class="btn-action btn-edit" @click="handleEdit(member)">编辑</button>
-          <button 
-            class="btn-action btn-delete" 
-            @click="handleDelete(member)"
-            :disabled="member.userId === userStore.member?.userId"
-          >删除</button>
-        </div>
-      </div>
-      
-      <div v-if="members.length === 0" class="empty">暂无成员</div>
-    </div>
 
-    <!-- 查看弹窗 -->
-    <div v-if="showViewModal" class="modal-mask" @click.self="showViewModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>查看成员信息</h3>
-          <button class="btn-close" @click="closeViewModal">&times;</button>
+        <div class="member-actions">
+          <button class="btn-view" @click="handleView(member)">查看</button>
+          <button class="btn-edit" @click="handleEdit(member)">编辑</button>
+          <button
+            class="btn-delete"
+            :disabled="member.userId === userStore.member?.userId"
+            @click="handleDelete(member)"
+          >
+            删除
+          </button>
         </div>
-        <div class="modal-body view-body">
-          <div class="view-row">
-            <span class="view-label">昵称</span>
-            <span class="view-value">{{ viewForm.nickname }}</span>
-          </div>
-          <div class="view-row">
-            <span class="view-label">关系</span>
-            <span class="view-value">{{ viewForm.relation || '-' }}</span>
-          </div>
-          <div class="view-row">
-            <span class="view-label">手机号</span>
-            <span class="view-value">{{ viewForm.phone || '-' }}</span>
-          </div>
-          <div class="view-row">
-            <span class="view-label">角色</span>
-            <span class="view-value">{{ roleLabel(viewForm.role) }}</span>
-          </div>
-          
-          <div v-if="viewForm.birthday || viewForm.height || viewForm.weight || viewForm.disease || viewForm.allergy || viewForm.remark" class="view-section">
-            <div class="view-section-title">扩展信息</div>
-            <div v-if="viewForm.birthday" class="view-row">
-              <span class="view-label">出生日期</span>
-              <span class="view-value">{{ viewForm.birthday }} ({{ getAge(viewForm.birthday) }}岁)</span>
+      </article>
+
+      <div v-if="filteredMembers.length === 0" class="state card">没有匹配成员，试试更换筛选条件。</div>
+    </section>
+
+    <div v-if="showAddForm" class="modal-mask" @click.self="closeAddForm">
+      <div class="modal-content modal-content-form" @keydown.enter.prevent="handleAddMember">
+        <div class="modal-header modal-header-accent">
+          <h3>添加新成员</h3>
+          <button class="btn-close" @click="closeAddForm">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-field">
+              <label>昵称 *</label>
+              <input v-model="form.nickname" placeholder="例如：爷爷、妈妈" />
             </div>
-            <div v-if="viewForm.height" class="view-row">
-              <span class="view-label">身高</span>
-              <span class="view-value">{{ viewForm.height }} cm</span>
+            <div class="form-field">
+              <label>家庭关系</label>
+              <select v-model="form.relation">
+                <option value="" disabled>选择关系</option>
+                <option v-for="item in baseRelationOptions" :key="item.value" :value="item.value">
+                  {{ item.label }}
+                </option>
+              </select>
             </div>
-            <div v-if="viewForm.weight" class="view-row">
-              <span class="view-label">体重</span>
-              <span class="view-value">{{ viewForm.weight }} kg</span>
+            <div class="form-field">
+              <label>手机号</label>
+              <input v-model="form.phone" placeholder="选填" />
             </div>
-            <div v-if="viewForm.disease" class="view-row">
-              <span class="view-label">病史</span>
-              <span class="view-value">{{ viewForm.disease }}</span>
-            </div>
-            <div v-if="viewForm.allergy" class="view-row">
-              <span class="view-label">过敏史</span>
-              <span class="view-value">{{ viewForm.allergy }}</span>
-            </div>
-            <div v-if="viewForm.remark" class="view-row">
-              <span class="view-label">备注</span>
-              <span class="view-value">{{ viewForm.remark }}</span>
+            <div class="form-field">
+              <label>角色</label>
+              <select v-model="form.role">
+                <option v-for="item in roleOptions" :key="item.value" :value="item.value">
+                  {{ item.label }}
+                </option>
+              </select>
             </div>
           </div>
-          
-          <div v-else class="view-empty">暂无扩展信息</div>
         </div>
         <div class="modal-footer">
-          <button class="btn-submit" @click="showViewModal = false; handleEdit({userId: viewForm.id})">编辑信息</button>
+          <button class="btn-ghost" @click="closeAddForm">取消</button>
+          <button class="btn-primary" :disabled="adding" @click="handleAddMember">
+            {{ adding ? '添加中...' : '确认添加' }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- 编辑弹窗 -->
+    <div v-if="showViewModal" class="modal-mask" @click.self="showViewModal = false">
+      <div class="modal-content modal-content-view" @keydown.enter.prevent="handleViewConfirm">
+        <div class="modal-header modal-header-accent">
+          <h3>查看成员信息</h3>
+          <button class="btn-close" @click="showViewModal = false">&times;</button>
+        </div>
+        <div class="modal-body modal-body-view">
+          <div class="view-row">
+            <span>昵称</span>
+            <strong>{{ viewForm.nickname || '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>关系</span>
+            <strong>{{ viewForm.relation || '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>手机号</span>
+            <strong>{{ viewForm.phone || '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>角色</span>
+            <strong>{{ roleLabel(viewForm.role) }}</strong>
+          </div>
+          <div class="view-divider">扩展信息</div>
+          <div class="view-row">
+            <span>出生日期</span>
+            <strong>{{ viewForm.birthday || '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>身高</span>
+            <strong>{{ viewForm.height ? `${viewForm.height} cm` : '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>体重</span>
+            <strong>{{ viewForm.weight ? `${viewForm.weight} kg` : '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>病史</span>
+            <strong>{{ viewForm.disease || '-' }}</strong>
+          </div>
+          <div class="view-row">
+            <span>备注</span>
+            <strong>{{ viewForm.remark || '-' }}</strong>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" @click="handleViewConfirm">
+            编辑信息
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showEditModal" class="modal-mask" @click.self="showEditModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
+      <div class="modal-content modal-content-form" @keydown.enter.prevent="handleUpdate">
+        <div class="modal-header modal-header-accent">
           <h3>编辑成员</h3>
-          <button class="btn-close" @click="closeEditModal">&times;</button>
+          <button class="btn-close" @click="showEditModal = false">&times;</button>
         </div>
         <div class="modal-body">
           <div class="form-field">
             <label>头像</label>
-            <AvatarPicker 
-              v-model="editForm.avatar" 
-              :current-relation="editForm.relation"
-              :current-role="editForm.role"
-            />
+            <AvatarPicker v-model="editForm.avatar" :current-relation="editForm.relation" :current-role="editForm.role" />
           </div>
           <div class="form-field">
             <label>昵称 *</label>
@@ -441,9 +549,8 @@ onMounted(() => {
           <div class="form-field">
             <label>家庭关系</label>
             <select v-model="editForm.relation">
-              <option value="" disabled>选择关系</option>
-              <option v-for="opt in relationOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
+              <option v-for="item in baseRelationOptions" :key="item.value" :value="item.value">
+                {{ item.label }}
               </option>
             </select>
           </div>
@@ -454,30 +561,31 @@ onMounted(() => {
           <div class="form-field">
             <label>角色</label>
             <select v-model="editForm.role">
-              <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
+              <option v-for="item in roleOptions" :key="item.value" :value="item.value">
+                {{ item.label }}
               </option>
             </select>
           </div>
-          
-          <div class="form-section-title">扩展信息（选填）</div>
-          <div class="form-field">
-            <label>出生日期</label>
-            <input type="date" v-model="editForm.birthday" />
-          </div>
-          <div class="form-field-row">
+          <div class="view-divider">扩展信息（选填）</div>
+          <div class="double-field">
+            <div class="form-field">
+              <label>出生日期</label>
+              <input type="date" v-model="editForm.birthday" />
+            </div>
             <div class="form-field">
               <label>身高(cm)</label>
               <input type="number" v-model="editForm.height" placeholder="如：170" />
             </div>
+          </div>
+          <div class="double-field">
             <div class="form-field">
               <label>体重(kg)</label>
               <input type="number" v-model="editForm.weight" placeholder="如：65" />
             </div>
-          </div>
-          <div class="form-field">
-            <label>病史</label>
-            <input v-model="editForm.disease" placeholder="高血压,糖尿病" />
+            <div class="form-field">
+              <label>病史</label>
+              <input v-model="editForm.disease" placeholder="高血压,糖尿病" />
+            </div>
           </div>
           <div class="form-field">
             <label>过敏史</label>
@@ -485,12 +593,12 @@ onMounted(() => {
           </div>
           <div class="form-field">
             <label>备注</label>
-            <textarea v-model="editForm.remark" placeholder="其他说明..." />
+            <textarea v-model="editForm.remark" placeholder="其他说明..." @keydown.enter.stop />
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn-cancel" @click="showEditModal = false">取消</button>
-          <button class="btn-submit" :disabled="editing" @click="handleUpdate">
+          <button class="btn-ghost" @click="showEditModal = false">取消</button>
+          <button class="btn-primary" :disabled="editing" @click="handleUpdate">
             {{ editing ? '保存中...' : '保存' }}
           </button>
         </div>
@@ -499,503 +607,551 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
 .admin-members {
-  max-width: 100%;
+  display: grid;
+  gap: 14px;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(45, 95, 93, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(45, 95, 93, 0.08);
 }
 
 .page-header {
-  margin-bottom: 24px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
 }
 
-.header-row {
+.header-main {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   align-items: flex-start;
 }
 
-.page-header h2 {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
-  color: #2d5f5d;
+.header-main h2 {
+  margin: 0 0 6px;
+  font-size: 1.4rem;
+  color: #1f4543;
 }
 
-.page-desc {
+.header-main p {
   margin: 0;
-  color: #666;
-  font-size: 0.9rem;
+  color: #607876;
+  font-size: 0.92rem;
 }
 
-.btn-add {
-  padding: 8px 16px;
-  background: #2d5f5d;
-  color: white;
+.btn-add,
+.btn-primary,
+.btn-ghost {
+  height: 38px;
+  border-radius: 10px;
   border: none;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  padding: 0 14px;
   cursor: pointer;
+  font-size: 0.88rem;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-.btn-add:hover {
-  background: #234947;
+.btn-add,
+.btn-primary {
+  background: #2d5f5d;
+  color: #fff;
+}
+
+.btn-add:hover,
+.btn-primary:hover {
+  background: #234a48;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 14px rgba(35, 74, 72, 0.24);
+}
+
+.btn-ghost {
+  border: 1px solid rgba(45, 95, 93, 0.2);
+  background: rgba(245, 250, 249, 0.92);
+  color: #315b58;
+}
+
+.btn-ghost:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(45, 95, 93, 0.12);
+  border-color: rgba(45, 95, 93, 0.32);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat-card {
+  border: 1px solid rgba(45, 95, 93, 0.14);
+  border-radius: 12px;
+  padding: 11px 12px;
+  display: grid;
+  gap: 7px;
+  background: linear-gradient(145deg, rgba(245, 251, 250, 0.85), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 4px 10px rgba(45, 95, 93, 0.05);
+  color: #2d5f5d;
+  transition: transform 0.2s ease, box-shadow 0.22s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 16px rgba(45, 95, 93, 0.12);
+}
+
+.stat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  background: rgba(45, 95, 93, 0.11);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #5f7b78;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  color: #1f4543;
+  line-height: 1;
+}
+
+.stat-card.role-0 {
+  background: linear-gradient(145deg, rgba(255, 249, 238, 0.9), rgba(255, 255, 255, 0.98));
+  border-color: rgba(214, 137, 16, 0.28);
+  color: #a96a07;
+}
+
+.stat-card.role-1 {
+  background: linear-gradient(145deg, rgba(241, 248, 253, 0.9), rgba(255, 255, 255, 0.98));
+  border-color: rgba(40, 116, 166, 0.26);
+  color: #1d6593;
+}
+
+.stat-card.role-2 {
+  background: linear-gradient(145deg, rgba(255, 243, 242, 0.9), rgba(255, 255, 255, 0.98));
+  border-color: rgba(192, 57, 43, 0.24);
+  color: #a73328;
+}
+
+.filters-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 180px;
+  gap: 8px;
+}
+
+.search-input,
+.filter-select,
+.form-field input,
+.form-field select,
+.form-field textarea,
+.role-select {
+  width: 100%;
+  border: 1px solid rgba(45, 95, 93, 0.2);
+  border-radius: 10px;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 0.88rem;
+  color: #2a4846;
+  background: #fff;
+  box-sizing: border-box;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.search-input:hover,
+.filter-select:hover,
+.form-field input:hover,
+.form-field select:hover,
+.form-field textarea:hover,
+.role-select:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(45, 95, 93, 0.08);
+  border-color: rgba(45, 95, 93, 0.32);
+}
+
+.form-field textarea {
+  height: 86px;
+  padding: 8px 12px;
+  resize: vertical;
+}
+
+.search-input::placeholder {
+  color: #9bb0af;
 }
 
 .add-form {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 12px rgba(45, 95, 93, 0.08);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
 }
 
 .form-title {
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.95rem;
+  color: #315b58;
   font-weight: 600;
-  color: #333;
-  margin-bottom: 16px;
 }
 
-.form-fields {
+.form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .form-field {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 6px;
 }
 
 .form-field label {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.form-field input,
-.form-field select,
-.form-field textarea {
-  padding: 10px 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
-
-.form-field input::placeholder,
-.form-field textarea::placeholder {
-  color: #aaa;
-}
-
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
-  outline: none;
-  border-color: #2d5f5d;
+  font-size: 0.83rem;
+  color: #5f7976;
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.btn-cancel {
-  padding: 10px 20px;
-  background: #f5f5f5;
-  color: #666;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.btn-submit {
-  padding: 10px 20px;
-  background: #2d5f5d;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.btn-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #e74c3c;
-  margin-top: 12px;
-  font-size: 0.9rem;
-}
-
-.loading, .empty {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-}
-
-.member-table {
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(45, 95, 93, 0.08);
-  width: 100%;
-}
-
-.table-header {
-  display: flex;
-  align-items: center;
-  padding: 14px 20px;
-  background: #f8f9fa;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: #666;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.table-row {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #f5f5f5;
-}
-
-.table-row:last-child {
-  border-bottom: none;
-}
-
-.table-row:hover {
-  background: #fafafa;
-}
-
-.col-avatar {
-  flex-shrink: 0;
-  width: 50px;
-}
-
-.col-name {
-  flex: 1;
-  min-width: 100px;
-  padding-left: 16px;
-  font-weight: 500;
-}
-
-.self-tag {
-  margin-left: 8px;
-  padding: 2px 8px;
-  background: #e4f0ef;
-  color: #2d5f5d;
-  font-size: 0.7rem;
-  border-radius: 4px;
-  font-weight: normal;
-}
-
-.col-relation {
-  flex: 1;
-  min-width: 80px;
-  color: #666;
-}
-
-.col-phone {
-  flex: 1;
-  min-width: 100px;
-  color: #888;
-  font-size: 0.85rem;
-}
-
-.col-role {
-  flex: 1;
-  min-width: 80px;
-}
-
-.profile-age {
-  color: #2d5f5d;
-  font-weight: 500;
-}
-
-.profile-disease {
-  background: #fef3e7;
-  color: #d68910;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-}
-
-.profile-allergy {
-  background: #fdecea;
-  color: #c0392b;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-}
-
-.profile-empty {
-  color: #bbb;
-}
-
-.col-actions {
-  flex: 1;
-  min-width: 160px;
-  display: flex;
   gap: 8px;
 }
 
-.btn-action {
-  flex: 1;
-  padding: 6px 8px;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  text-align: center;
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.role-select {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
+.member-card {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.member-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 16px rgba(45, 95, 93, 0.09);
+}
+
+.member-card.role-0 {
+  background: linear-gradient(145deg, rgba(255, 251, 243, 0.92), rgba(255, 255, 255, 0.99));
+  border-color: rgba(214, 137, 16, 0.22);
+}
+
+.member-card.role-1 {
+  background: linear-gradient(145deg, rgba(244, 250, 254, 0.92), rgba(255, 255, 255, 0.99));
+  border-color: rgba(40, 116, 166, 0.2);
+}
+
+.member-card.role-2 {
+  background: linear-gradient(145deg, rgba(255, 246, 245, 0.92), rgba(255, 255, 255, 0.99));
+  border-color: rgba(192, 57, 43, 0.2);
+}
+
+.member-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nickname {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #214644;
+}
+
+.self-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: #2d5f5d;
+  background: rgba(45, 95, 93, 0.12);
+}
+
+.sub-line {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: #718886;
+}
+
+.member-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta-tag {
+  font-size: 0.76rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #406764;
+  background: rgba(45, 95, 93, 0.1);
+}
+
+.meta-tag.warn {
+  background: #fff5ea;
+  color: #b66c0e;
+}
+
+.meta-tag.plain {
+  background: #f3f6f6;
+  color: #899d9b;
+}
+
+.member-role-row {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-role-row label {
+  font-size: 0.82rem;
+  color: #637d7a;
 }
 
 .role-select.role-0 {
   background: #fef3e7;
-  color: #d68910;
+  color: #a96a07;
 }
 
 .role-select.role-1 {
   background: #e8f4f8;
-  color: #2874a6;
+  color: #1d6593;
 }
 
 .role-select.role-2 {
   background: #fdecea;
-  color: #c0392b;
+  color: #a73328;
 }
 
-.btn-action {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.75rem;
+.member-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.member-actions button {
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
   cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.member-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 10px rgba(45, 95, 93, 0.14);
+  filter: saturate(1.04);
+}
+
+.btn-view {
+  background: #eaf4f3;
+  color: #2d5f5d;
 }
 
 .btn-edit {
   background: #e8f4f8;
-  color: #2874a6;
-}
-
-.btn-view {
-  background: #e4f0ef;
-  color: #2d5f5d;
+  color: #1d6593;
 }
 
 .btn-delete {
   background: #fdecea;
-  color: #c0392b;
+  color: #bf3e31;
 }
 
 .btn-delete:disabled {
-  opacity: 0.4;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
-/* 弹窗样式 */
+.state {
+  padding: 28px 12px;
+  text-align: center;
+  color: #6f8684;
+}
+
+.error-text {
+  color: #c0392b;
+}
+
 .modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  background: rgba(8, 15, 15, 0.46);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
 }
 
 .modal-content {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 480px;
+  width: min(760px, 94vw);
   max-height: 90vh;
   overflow: auto;
+  background: linear-gradient(180deg, #ffffff, #fbfdfd);
+  border: 1px solid rgba(45, 95, 93, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(12, 32, 31, 0.22);
+}
+
+.modal-content-form {
+  width: min(760px, 94vw);
+}
+
+.modal-content-view {
+  width: min(620px, 94vw);
+}
+
+.modal-header,
+.modal-footer {
+  padding: 13px 16px;
+  border-bottom: 1px solid #edf2f2;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #eee;
+}
+
+.modal-header-accent {
+  background: linear-gradient(145deg, rgba(239, 248, 247, 0.9), rgba(255, 255, 255, 0.92));
 }
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.1rem;
-  color: #333;
+  color: #224a47;
+  font-size: 1.03rem;
+  letter-spacing: 0.01em;
 }
 
 .btn-close {
-  background: none;
   border: none;
-  font-size: 1.5rem;
-  color: #999;
+  background: transparent;
+  font-size: 1.4rem;
+  color: #8da3a1;
   cursor: pointer;
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 16px;
   display: grid;
-  gap: 16px;
+  gap: 11px;
 }
 
-.form-section-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #2d5f5d;
-  padding: 8px 0;
-  border-top: 1px dashed #eee;
-  margin-top: 8px;
-}
-
-/* 查看弹窗 */
-.view-body {
-  padding: 20px;
-}
-
-.view-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.view-label {
-  color: #888;
-}
-
-.view-value {
-  color: #333;
-  font-weight: 500;
-}
-
-.view-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed #ddd;
-}
-
-.view-section-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #2d5f5d;
-  margin-bottom: 12px;
-}
-
-.view-empty {
-  padding: 20px;
-  text-align: center;
-  color: #aaa;
-}
-
-.form-field-row {
-  display: flex;
-  gap: 12px;
-}
-
-.form-field-row .form-field {
-  flex: 1;
+.modal-body-view {
+  gap: 8px;
 }
 
 .modal-footer {
+  border-top: 1px solid #edf2f2;
+  border-bottom: none;
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid #eee;
+  gap: 8px;
+}
+
+.view-row {
+  display: grid;
+  grid-template-columns: 98px 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.88rem;
+  color: #5f7976;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(244, 250, 249, 0.72);
+  border: 1px solid rgba(45, 95, 93, 0.08);
+}
+
+.view-row strong {
+  color: #264a48;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.view-divider {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed #d8e3e2;
+  font-size: 0.82rem;
+  color: #587673;
+  font-weight: 600;
+}
+
+.double-field {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 1024px) {
+  .member-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .header-row {
+  .header-main {
     flex-direction: column;
-    gap: 12px;
+    align-items: stretch;
   }
-  
+
+  .stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters-row {
+    grid-template-columns: 1fr;
+  }
+
   .btn-add {
     width: 100%;
   }
-  
-  .form-fields {
+
+  .form-grid,
+  .double-field {
     grid-template-columns: 1fr;
   }
-  
-  .table-header {
-    display: none;
+
+  .member-actions {
+    grid-template-columns: 1fr 1fr 1fr;
   }
-  
-  .member-table {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    background: transparent;
-    box-shadow: none;
-  }
-  
-  .table-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 16px;
-    background: white;
-    border-radius: 12px;
-    align-items: center;
-  }
-  
-  .col-avatar {
-    width: 48px;
-    flex-shrink: 0;
-  }
-  
-  .col-name {
-    flex: 1;
-    font-weight: 600;
-    font-size: 1rem;
-  }
-  
-  .self-tag {
-    margin-left: 6px;
-    font-size: 0.65rem;
-    padding: 2px 6px;
-  }
-  
-  .col-relation,
-  .col-phone,
-  .col-role {
-    flex: 1;
-    font-size: 0.8rem;
-    color: #666;
-  }
-  
-  .col-phone {
-    color: #888;
-  }
-  
-  .col-actions {
-    width: 100%;
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  
-  .btn-action {
-    flex: 1;
-    padding: 8px 12px;
-    font-size: 0.85rem;
-    text-align: center;
+
+  .modal-content {
+    width: 95vw;
   }
 }
 </style>

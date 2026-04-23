@@ -17,6 +17,8 @@ public class FamilyVO {
     private String familyName;
     private String username;
     private String token;
+    private Integer lowStockThreshold;
+    private Integer expiringDays;
     private LocalDateTime createTime;
 
     /**

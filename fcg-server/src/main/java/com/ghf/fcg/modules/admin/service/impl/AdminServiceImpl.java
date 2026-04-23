@@ -18,6 +18,8 @@ import com.ghf.fcg.modules.medicine.service.IMedicinePlanService;
 import com.ghf.fcg.modules.medicine.service.IMedicineRecordService;
 import com.ghf.fcg.modules.medicine.service.IMedicineService;
 import com.ghf.fcg.modules.system.entity.User;
+import com.ghf.fcg.modules.system.entity.Family;
+import com.ghf.fcg.modules.system.service.IFamilyService;
 import com.ghf.fcg.modules.system.service.IUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,19 +44,24 @@ public class AdminServiceImpl implements IAdminService {
     private final IMedicinePlanService planService;
     private final IMedicineRecordService recordService;
     private final IVitalService vitalService;
+    private final IFamilyService familyService;
 
     @Override
     public AdminOverviewVO getOverview(Long familyId) {
+        Family family = familyService.getById(familyId);
+        int lowStockThreshold = family != null && family.getLowStockThreshold() != null ? family.getLowStockThreshold() : 5;
+        int expiringDays = family != null && family.getExpiringDays() != null ? family.getExpiringDays() : 30;
+
         List<User> members = listFamilyMembers(familyId);
         List<Medicine> medicines = listFamilyMedicines(familyId);
-        List<AdminPlanTodayItemVO> todayPlans = buildTodayPlanItems(familyId, null, null);
+        List<AdminPlanTodayItemVO> todayPlans = buildTodayPlanItems(familyId, null, null, null, null);
 
         int lowStockCount = (int) medicines.stream()
-                .filter(med -> med.getStock() != null && med.getStock() < 5)
+                .filter(med -> med.getStock() != null && med.getStock() < lowStockThreshold)
                 .count();
 
         LocalDate today = LocalDate.now();
-        LocalDate expiringDeadline = today.plusDays(30);
+        LocalDate expiringDeadline = today.plusDays(expiringDays);
         int expiringCount = (int) medicines.stream()
                 .filter(med -> med.getExpireDate() != null
                         && !med.getExpireDate().isBefore(today)
@@ -77,8 +84,16 @@ public class AdminServiceImpl implements IAdminService {
     }
 
     @Override
-    public PageResult<AdminPlanTodayItemVO> listTodayPlans(Long familyId, Long userId, Integer status, long page, long size) {
-        List<AdminPlanTodayItemVO> all = buildTodayPlanItems(familyId, userId, status);
+    public PageResult<AdminPlanTodayItemVO> listTodayPlans(
+            Long familyId,
+            Long userId,
+            Integer status,
+            String slotName,
+            String keyword,
+            long page,
+            long size
+    ) {
+        List<AdminPlanTodayItemVO> all = buildTodayPlanItems(familyId, userId, status, slotName, keyword);
         long safePage = Math.max(page, 1);
         long safeSize = Math.max(size, 1);
         long fromIndex = (safePage - 1) * safeSize;
@@ -97,7 +112,7 @@ public class AdminServiceImpl implements IAdminService {
     public AdminDailyStatsVO getDailyStats(Long familyId, Integer days) {
         int safeDays = days == null ? 7 : Math.max(1, Math.min(days, 30));
         List<User> members = listFamilyMembers(familyId);
-        List<AdminPlanTodayItemVO> todayPlans = buildTodayPlanItems(familyId, null, null);
+        List<AdminPlanTodayItemVO> todayPlans = buildTodayPlanItems(familyId, null, null, null, null);
 
         int pending = (int) todayPlans.stream().filter(item -> item.getRecordStatus() != null && item.getRecordStatus() == 0).count();
         int done = (int) todayPlans.stream().filter(item -> item.getRecordStatus() != null && item.getRecordStatus() == 1).count();
@@ -181,7 +196,13 @@ public class AdminServiceImpl implements IAdminService {
                 .eq(Medicine::getFamilyId, familyId));
     }
 
-    private List<AdminPlanTodayItemVO> buildTodayPlanItems(Long familyId, Long userId, Integer status) {
+    private List<AdminPlanTodayItemVO> buildTodayPlanItems(
+            Long familyId,
+            Long userId,
+            Integer status,
+            String slotName,
+            String keyword
+    ) {
         List<User> members = listFamilyMembers(familyId);
         if (members.isEmpty()) {
             return List.of();
@@ -242,16 +263,29 @@ public class AdminServiceImpl implements IAdminService {
                 if (status != null && !status.equals(recordStatus)) {
                     continue;
                 }
+                if (slotName != null && !slotName.isBlank() && !slotName.equals(slot)) {
+                    continue;
+                }
 
                 Medicine medicine = medicineMap.get(plan.getMedicineId());
                 User user = userMap.get(plan.getUserId());
+                String userName = user == null ? null : user.getNickname();
+                String medicineName = medicine == null ? null : medicine.getName();
+                if (keyword != null && !keyword.isBlank()) {
+                    String normalized = keyword.trim().toLowerCase();
+                    String combined = ((userName == null ? "" : userName) + " " + (medicineName == null ? "" : medicineName))
+                            .toLowerCase();
+                    if (!combined.contains(normalized)) {
+                        continue;
+                    }
+                }
                 items.add(AdminPlanTodayItemVO.builder()
                         .recordId(record != null ? record.getId() : null)
                         .planId(plan.getId())
                         .userId(plan.getUserId())
-                        .userName(user == null ? null : user.getNickname())
+                        .userName(userName)
                         .medicineId(plan.getMedicineId())
-                        .medicineName(medicine == null ? null : medicine.getName())
+                        .medicineName(medicineName)
                         .medicineImageUrl(medicine == null ? null : medicine.getImageUrl())
                         .medicineStock(medicine == null ? null : medicine.getStock())
                         .medicineStockUnit(medicine == null ? null : medicine.getStockUnit())
@@ -314,4 +348,3 @@ public class AdminServiceImpl implements IAdminService {
         return 99;
     }
 }
-

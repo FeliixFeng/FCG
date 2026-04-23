@@ -16,6 +16,8 @@ CREATE TABLE `sys_family` (
   `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '家庭账号',
   `password` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '家庭密码（BCrypt加密）',
   `creator_id` bigint NOT NULL COMMENT '创建者用户ID',
+  `low_stock_threshold` int NOT NULL DEFAULT '5' COMMENT '低库存阈值（小于该值视为紧张）',
+  `expiring_days` int NOT NULL DEFAULT '30' COMMENT '临期提醒天数（距离过期<=该值）',
   `deleted` tinyint NOT NULL DEFAULT '0' COMMENT '逻辑删除 0-未删 1-已删',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
