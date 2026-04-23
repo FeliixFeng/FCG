@@ -144,3 +144,14 @@ export const fetchAiContext = (params) => http.get('/api/ai/context', { params }
 
 /** AI 普通对话（非流式兜底） */
 export const chatWithAi = (data) => http.post('/api/ai/chat', data)
+
+// ========== 管理员模块 ==========
+
+/** 管理端总览数据 */
+export const fetchAdminOverview = () => http.get('/api/admin/dashboard/overview')
+
+/** 管理端今日计划总览（分页） */
+export const fetchAdminTodayPlans = (params) => http.get('/api/admin/plans/today', { params })
+
+/** 管理端日统计数据 */
+export const fetchAdminDailyStats = (params) => http.get('/api/admin/stats/daily', { params })

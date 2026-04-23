@@ -2,36 +2,36 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { fetchFamilyMembers, fetchMedicineList, fetchTodayPlanRecords } from '../utils/api'
+import { fetchAdminOverview } from '../utils/api'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const members = ref([])
-const medicines = ref([])
-const todayRecords = ref([])
 const loading = ref(false)
-
-const memberCount = computed(() => members.value.length)
-const medicineCount = computed(() => medicines.value.length)
-
-const pendingCount = computed(() => {
-  return todayRecords.value.filter(r => r.status === 0 || r.status === 'pending').length
+const overview = ref({
+  memberCount: 0,
+  medicineCount: 0,
+  todayPendingCount: 0,
+  todayDoneCount: 0,
+  todaySkippedCount: 0,
+  lowStockCount: 0
 })
 
-const completedCount = computed(() => {
-  return todayRecords.value.filter(r => r.status === 1 || r.status === 'done').length
-})
+const memberCount = computed(() => Number(overview.value.memberCount || 0))
+const medicineCount = computed(() => Number(overview.value.medicineCount || 0))
+const lowStockCount = computed(() => Number(overview.value.lowStockCount || 0))
+const pendingCount = computed(() => Number(overview.value.todayPendingCount || 0))
+const completedCount = computed(() => Number(overview.value.todayDoneCount || 0))
+const skippedCount = computed(() => Number(overview.value.todaySkippedCount || 0))
 
 const loadData = async () => {
   loading.value = true
   try {
-    const [membersRes, medicinesRes] = await Promise.all([
-      fetchFamilyMembers(),
-      fetchMedicineList({ page: 1, size: 100 })
-    ])
-    members.value = membersRes.data
-    medicines.value = medicinesRes.data.records || []
+    const res = await fetchAdminOverview()
+    overview.value = {
+      ...overview.value,
+      ...(res?.data || {})
+    }
   } catch (err) {
     console.error('加载数据失败', err)
   } finally {
@@ -41,8 +41,8 @@ const loadData = async () => {
 
 const goToMembers = () => router.push({ name: 'admin-members' })
 const goToMedicines = () => router.push({ name: 'admin-medicines' })
-const goToSystem = () => router.push({ name: 'admin-system' })
 const goToData = () => router.push({ name: 'admin-data' })
+const backToUserHome = () => router.push({ name: 'home' })
 
 onMounted(() => {
   loadData()
@@ -50,7 +50,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="admin-dashboard">
+  <div class="admin-dashboard" v-loading="loading">
     <div class="page-header">
       <h2>管理中心</h2>
       <p class="page-desc">家庭：{{ userStore.family?.familyName }}</p>
@@ -82,11 +82,11 @@ onMounted(() => {
         </div>
         <div class="stat-info">
           <div class="stat-value">{{ medicineCount }}</div>
-          <div class="stat-label">药品库存</div>
+          <div class="stat-label">药品总数</div>
         </div>
       </div>
 
-      <div class="stat-card" @click="goToMembers">
+      <div class="stat-card" @click="goToData">
         <div class="stat-icon today-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
@@ -95,7 +95,15 @@ onMounted(() => {
         </div>
         <div class="stat-info">
           <div class="stat-value">{{ completedCount }}/{{ pendingCount + completedCount }}</div>
-          <div class="stat-label">今日打卡</div>
+          <div class="stat-label">今日完成</div>
+        </div>
+      </div>
+
+      <div class="stat-card" @click="goToMedicines">
+        <div class="stat-icon warn-icon">⚠️</div>
+        <div class="stat-info">
+          <div class="stat-value">{{ lowStockCount }}</div>
+          <div class="stat-label">库存紧张</div>
         </div>
       </div>
     </div>
@@ -105,31 +113,33 @@ onMounted(() => {
       <h3>快捷操作</h3>
       <div class="action-grid">
         <div class="action-item" @click="goToMembers">
-          <div class="action-icon">+</div>
-          <div class="action-text">添加成员</div>
+          <div class="action-icon">👥</div>
+          <div class="action-text">成员管理</div>
         </div>
         <div class="action-item" @click="goToMedicines">
-          <div class="action-icon">+</div>
-          <div class="action-text">添加药品</div>
-        </div>
-        <div class="action-item" @click="goToSystem">
-          <div class="action-icon">⚙</div>
-          <div class="action-text">系统设置</div>
+          <div class="action-icon">🗓️</div>
+          <div class="action-text">计划总览</div>
         </div>
         <div class="action-item" @click="goToData">
           <div class="action-icon">📊</div>
           <div class="action-text">数据统计</div>
         </div>
+        <div class="action-item" @click="backToUserHome">
+          <div class="action-icon">↩</div>
+          <div class="action-text">返回用户页</div>
+        </div>
       </div>
+    </div>
+
+    <div class="quick-summary">
+      <div class="summary-chip">待处理 {{ pendingCount }}</div>
+      <div class="summary-chip">已完成 {{ completedCount }}</div>
+      <div class="summary-chip">已跳过 {{ skippedCount }}</div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.admin-dashboard {
-  max-width: 900px;
-}
-
 .page-header {
   margin-bottom: 24px;
 }
@@ -148,7 +158,7 @@ onMounted(() => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 32px;
 }
@@ -193,6 +203,12 @@ onMounted(() => {
 .today-icon {
   background: #e4f0ef;
   color: #2d5f5d;
+}
+
+.warn-icon {
+  background: #fff3e9;
+  color: #d68910;
+  font-size: 1.1rem;
 }
 
 .stat-value {
@@ -244,7 +260,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .action-text {
@@ -252,13 +268,36 @@ onMounted(() => {
   color: #333;
 }
 
+.quick-summary {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.summary-chip {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.84rem;
+  color: #2d5f5d;
+  background: rgba(45, 95, 93, 0.1);
+  border: 1px solid rgba(45, 95, 93, 0.16);
+}
+
 @media (max-width: 767px) {
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .action-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quick-summary {
+    gap: 8px;
   }
 }
 </style>

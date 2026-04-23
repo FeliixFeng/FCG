@@ -13,7 +13,6 @@ const AdminLayout = () => import('../components/common/AdminLayout.vue')
 const AdminDashboard = () => import('../views/AdminHome.vue')
 const AdminMembers = () => import('../views/admin/AdminMembers.vue')
 const AdminMedicines = () => import('../views/admin/AdminMedicines.vue')
-const AdminSystem = () => import('../views/admin/AdminSystem.vue')
 const AdminData = () => import('../views/admin/AdminData.vue')
 
 const router = createRouter({
@@ -41,7 +40,6 @@ const router = createRouter({
         { path: '', name: 'admin', component: AdminDashboard },
         { path: 'members', name: 'admin-members', component: AdminMembers },
         { path: 'medicines', name: 'admin-medicines', component: AdminMedicines },
-        { path: 'system', name: 'admin-system', component: AdminSystem },
         { path: 'data', name: 'admin-data', component: AdminData },
       ]
     },

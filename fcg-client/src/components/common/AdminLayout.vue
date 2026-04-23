@@ -36,9 +36,8 @@ const familyName = computed(() => userStore.family?.familyName || '我的家庭'
 const adminNavItems = [
   { name: 'admin', label: '首页', icon: 'HomeFilled' },
   { name: 'admin-members', label: '成员', icon: 'User' },
-  { name: 'admin-medicines', label: '药品', icon: 'FirstAidKit' },
+  { name: 'admin-medicines', label: '计划', icon: 'FirstAidKit' },
   { name: 'admin-data', label: '统计', icon: 'DataLine' },
-  { name: 'admin-system', label: '设置', icon: 'Setting' },
 ]
 
 const isActive = (name) => route.name === name
