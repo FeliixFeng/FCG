@@ -235,6 +235,14 @@ function getMainActionLabel(record) {
   return '打卡'
 }
 
+function getActionTopText(record) {
+  if (!record) return '确认药品无误后，点击打卡'
+  if (record.recordStatus === 1) return '本条已完成，可切换下一条'
+  if (record.recordStatus === 2) return '本条已跳过，今天仍可补打'
+  if (getSlotPhase(record.slotName) === 'overdue') return '当前已超时，今天仍可补打'
+  return '确认药品无误后，点击打卡'
+}
+
 function isMainActionDisabled(record) {
   if (!record) return true
   if (record.recordStatus !== 0) return true
@@ -560,33 +568,36 @@ watch(selectedMemberId, (val, oldVal) => {
               </div>
 
               <div class="check-action-panel pending-panel">
-                <button
-                  class="btn-check-circle"
-                  @click="checkin(currentTask)"
-                  :disabled="isMainActionDisabled(currentTask)"
-                >
-                  <span class="circle-icon">{{ operatingTaskKey === getTaskKey(currentTask) ? '…' : '✓' }}</span>
-                  <span class="circle-text">{{ operatingTaskKey === getTaskKey(currentTask) ? '处理中' : getMainActionLabel(currentTask) }}</span>
-                </button>
-                <div v-if="taskOrderedRecords.length > 1" class="switch-row">
-                  <button class="switch-btn" @click="goPrevPending" :disabled="taskCursor <= 0">上一条</button>
-                  <span class="switch-index">{{ taskCursor + 1 }} / {{ taskOrderedRecords.length }}</span>
+                <p class="action-top-chip">{{ getActionTopText(currentTask) }}</p>
+                <div class="action-main">
                   <button
-                    class="switch-btn"
-                    @click="goNextPending"
-                    :disabled="taskCursor >= taskOrderedRecords.length - 1"
+                    class="btn-check-circle"
+                    @click="checkin(currentTask)"
+                    :disabled="isMainActionDisabled(currentTask)"
                   >
-                    下一条
+                    <span class="circle-icon">{{ operatingTaskKey === getTaskKey(currentTask) ? '…' : '✓' }}</span>
+                    <span class="circle-text">{{ operatingTaskKey === getTaskKey(currentTask) ? '处理中' : getMainActionLabel(currentTask) }}</span>
                   </button>
+                  <button
+                    class="btn-check-skip"
+                    :class="{ 'is-hidden': currentTask.recordStatus !== 0 }"
+                    @click="confirmSkipRecord(currentTask)"
+                    :disabled="currentTask.recordStatus !== 0 || operatingTaskKey === getTaskKey(currentTask)"
+                  >
+                    本次跳过
+                  </button>
+                  <div v-if="taskOrderedRecords.length > 1" class="switch-row">
+                    <button class="switch-btn" @click="goPrevPending" :disabled="taskCursor <= 0">上一条</button>
+                    <span class="switch-index">{{ taskCursor + 1 }} / {{ taskOrderedRecords.length }}</span>
+                    <button
+                      class="switch-btn"
+                      @click="goNextPending"
+                      :disabled="taskCursor >= taskOrderedRecords.length - 1"
+                    >
+                      下一条
+                    </button>
+                  </div>
                 </div>
-                <button
-                  class="btn-check-skip"
-                  :class="{ 'is-hidden': currentTask.recordStatus !== 0 }"
-                  @click="confirmSkipRecord(currentTask)"
-                  :disabled="currentTask.recordStatus !== 0 || operatingTaskKey === getTaskKey(currentTask)"
-                >
-                  本次跳过
-                </button>
                 <p class="action-helper action-helper-right">剩余 {{ pendingRecords.length }} 项，可补打至今日 23:59</p>
               </div>
             </div>
@@ -617,7 +628,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
         <article class="card summary-card">
           <div class="summary-head">
-            <h3>今日完成度</h3>
+            <h3>📊 今日完成度</h3>
             <span>{{ takenRecords.length }}/{{ planRecords.length || 0 }}</span>
           </div>
           <div class="summary-main">
@@ -665,7 +676,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
       <section class="card quick-section">
         <div class="section-head">
-          <h3>快捷入口</h3>
+          <h3>⚡ 快捷入口</h3>
         </div>
         <div class="quick-grid">
           <button
@@ -683,7 +694,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
       <section class="card records-section">
         <div class="section-head">
-          <h3>待处理任务</h3>
+          <h3>🕒 待处理任务</h3>
           <span class="count">{{ pendingSortedRecords.length }} 项</span>
         </div>
         <div v-if="!loading && pendingSortedRecords.length === 0" class="empty">
@@ -729,7 +740,7 @@ watch(selectedMemberId, (val, oldVal) => {
 
       <section class="card records-section handled-section">
         <div class="section-head">
-          <h3>今日已处理</h3>
+          <h3>✅ 今日已处理</h3>
           <span class="count">{{ processedRecords.length }} 项</span>
         </div>
         <div v-if="!loading && processedRecords.length === 0" class="empty">
@@ -1099,9 +1110,36 @@ watch(selectedMemberId, (val, oldVal) => {
 
 .pending-panel {
   min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: stretch;
+  justify-items: center;
+  gap: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.action-main {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 12px;
+  min-height: 0;
+}
+
+.action-top-chip {
+  margin: 0;
+  min-height: 18px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(63, 111, 107, 0.2);
+  background: rgba(63, 111, 107, 0.08);
+  color: var(--c-primary-deep);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .btn-check-circle {
@@ -1155,13 +1193,14 @@ watch(selectedMemberId, (val, oldVal) => {
 .action-helper-right {
   width: 100%;
   text-align: center;
-  margin-top: 4px;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .switch-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-top: 2px;
 }
 
@@ -1172,8 +1211,15 @@ watch(selectedMemberId, (val, oldVal) => {
   font-size: 0.72rem;
   font-weight: 600;
   border-radius: 999px;
-  padding: 3px 9px;
+  padding: 4px 10px;
   cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.switch-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(63, 111, 107, 0.15);
+  color: #234a47;
 }
 
 .switch-btn:disabled {
@@ -1195,13 +1241,14 @@ watch(selectedMemberId, (val, oldVal) => {
   font-size: 0.74rem;
   font-weight: 600;
   border-radius: 999px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
-  margin-top: -2px;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+  margin-top: 0;
 }
 
 .btn-check-skip:hover {
+  transform: translateY(-1px);
   color: #8f4d44;
   background: rgba(190, 90, 77, 0.08);
 }
@@ -1827,12 +1874,28 @@ watch(selectedMemberId, (val, oldVal) => {
   }
 
   .pending-panel {
+    display: flex;
     gap: 8px;
+    justify-content: flex-start;
+    align-items: center;
+    padding-top: 10px;
+    padding-bottom: 12px;
+  }
+
+  .action-main {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .action-top-chip {
+    font-size: 0.68rem;
+    min-height: 0;
+    padding: 2px 8px;
   }
 
   .switch-row {
     margin-top: 0;
-    gap: 6px;
+    gap: 8px;
   }
 
   .switch-btn {

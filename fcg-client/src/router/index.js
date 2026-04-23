@@ -4,11 +4,11 @@ import { useUserStore } from '../stores/user'
 // 懒加载所有页面
 const Landing = () => import('../views/Landing.vue')
 const SelectMember = () => import('../views/SelectMember.vue')
-const Home = () => import('../views/Home.vue')
+const HomeEntry = () => import('../views/HomeEntry.vue')
 const FamilyHome = () => import('../views/FamilyHome.vue')
 const MedicineHome = () => import('../views/MedicineHome.vue')
-const HealthHome = () => import('../views/HealthHome.vue')
-const ProfileHome = () => import('../views/ProfileHome.vue')
+const HealthEntry = () => import('../views/HealthEntry.vue')
+const ProfileEntry = () => import('../views/ProfileEntry.vue')
 const AdminLayout = () => import('../components/common/AdminLayout.vue')
 const AdminDashboard = () => import('../views/AdminHome.vue')
 const AdminMembers = () => import('../views/admin/AdminMembers.vue')
@@ -26,11 +26,11 @@ const router = createRouter({
     { path: '/select-member', name: 'select-member', component: SelectMember, meta: { requireFamily: true } },
 
     // 业务页面（需要成员级 token）
-    { path: '/dashboard', name: 'dashboard', component: Home, meta: { requireMember: true } },
+    { path: '/home', name: 'home', component: HomeEntry, meta: { requireMember: true } },
     { path: '/medicine', name: 'medicine', component: MedicineHome, meta: { requireMember: true } },
-    { path: '/health', name: 'health', component: HealthHome, meta: { requireMember: true } },
+    { path: '/health', name: 'health', component: HealthEntry, meta: { requireMember: true } },
     { path: '/ai', name: 'ai', component: () => import('../views/AiHome.vue'), meta: { requireMember: true } },
-    { path: '/profile', name: 'profile', component: ProfileHome, meta: { requireMember: true } },
+    { path: '/profile', name: 'profile', component: ProfileEntry, meta: { requireMember: true } },
 
     // 管理界面路由（/admin 子路由）
     {
@@ -104,7 +104,7 @@ router.beforeEach(async (to) => {
     // 管理员页面权限检查
     if (to.meta.requireAdmin && !userStore.isAdmin) {
       console.log('[Router Guard] 非管理员，跳转首页')
-      return { name: 'dashboard' }
+      return { name: 'home' }
     }
     
     return true

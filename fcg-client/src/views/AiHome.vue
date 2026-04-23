@@ -528,7 +528,7 @@ onMounted(() => {
         <div class="chat-shell">
           <header class="ai-header">
             <div class="header-main">
-              <h1>AI 健康助手</h1>
+              <h1>🤖 AI 健康助手</h1>
               <p>和我聊聊健康问题，我会结合当前成员数据给你建议</p>
             </div>
             <div class="header-actions">
@@ -541,7 +541,7 @@ onMounted(() => {
               <div class="empty-logo">AI</div>
               <h3>欢迎提问，{{ memberName }}</h3>
               <p>你可以直接提问，也可以点击下面的快捷问题开始。</p>
-              <div class="quick-title">快捷提问</div>
+              <div class="quick-title">⚡ 快捷提问</div>
               <div class="empty-quick-list">
                 <button
                   v-for="item in quickActions"

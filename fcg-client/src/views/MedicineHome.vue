@@ -718,7 +718,7 @@ watch(
     <div class="medicine-page-container">
       
       <!-- 模块 1：顶部数据看板 (代替废话欢迎语，提供3个核心指标) -->
-      <div class="page-section-title">用药概览</div>
+      <div class="page-section-title">📦 用药概览</div>
       <div class="stats-dashboard">
         <div class="stat-card blue" @click="scrollToSection('plans')" style="cursor: pointer;">
           <div class="stat-icon">💊</div>
@@ -746,7 +746,7 @@ watch(
       <!-- 模块 2：用药计划 -->
       <section id="section-plans" class="med-section">
         <h2 class="section-title">
-          提醒计划
+          🗓️ 提醒计划
           <span v-if="currentViewerName" class="viewer-tag">查看：{{ currentViewerName }}</span>
         </h2>
         
@@ -799,7 +799,7 @@ watch(
 
       <!-- 模块 3：我的药箱 -->
       <section id="section-meds" class="med-section">
-        <h2 class="section-title">我的药箱 <span class="title-count">({{ medicineList.length }})</span></h2>
+        <h2 class="section-title">💊 我的药箱 <span class="title-count">({{ medicineList.length }})</span></h2>
         
         <div class="plan-header-row">
           <div class="search-wrapper">

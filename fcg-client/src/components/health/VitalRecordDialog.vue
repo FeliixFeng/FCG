@@ -39,7 +39,7 @@ const isBloodSugar = computed(() => props.type === 2)
 
 watch(() => props.visible, (val) => {
   if (val) {
-    form.value = { valueSystolic: '', valueDiastolic: '', value: '', measurePoint: null, notes: '' }
+    form.value = { valueSystolic: '', valueDiastolic: '', value: '', measurePoint: 1, notes: '' }
   }
 })
 
