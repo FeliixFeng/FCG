@@ -75,8 +75,8 @@ const loadData = async () => {
 }
 
 const goToMembers = () => router.push({ name: 'admin-members' })
-const goToMedicines = () => router.push({ name: 'admin-medicines' })
-const goToSettings = () => router.push({ name: 'admin-data' })
+const goToPlans = () => router.push({ name: 'admin-plans' })
+const goToSettings = () => router.push({ name: 'admin-settings' })
 const backToUserHome = () => router.push({ name: 'home' })
 
 onMounted(() => {
@@ -102,17 +102,17 @@ onMounted(() => {
           <strong class="stat-value">{{ initialized ? memberCount : '--' }}</strong>
         </button>
 
-        <button class="stat-card blue" @click="goToMedicines">
+        <button class="stat-card blue" @click="goToPlans">
           <span class="stat-head">💊 药品总数</span>
           <strong class="stat-value">{{ initialized ? medicineCount : '--' }}</strong>
         </button>
 
-        <button class="stat-card green" @click="goToMedicines">
+        <button class="stat-card green" @click="goToPlans">
           <span class="stat-head">✅ 今日完成</span>
           <strong class="stat-value">{{ initialized ? `${completedCount}/${totalTaskCount}` : '--/--' }}</strong>
         </button>
 
-        <button class="stat-card warn" @click="goToMedicines">
+        <button class="stat-card warn" @click="goToPlans">
           <span class="stat-head">⚠️ 库存紧张</span>
           <strong class="stat-value">{{ initialized ? lowStockCount : '--' }}</strong>
         </button>
@@ -130,7 +130,7 @@ onMounted(() => {
           <span class="action-icon">👥</span>
           <span class="action-text">成员管理</span>
         </button>
-        <button class="action-item" @click="goToMedicines">
+        <button class="action-item" @click="goToPlans">
           <span class="action-icon">🗓️</span>
           <span class="action-text">计划总览</span>
         </button>

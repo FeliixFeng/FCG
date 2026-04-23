@@ -5,15 +5,14 @@ import { useUserStore } from '../stores/user'
 const Landing = () => import('../views/Landing.vue')
 const SelectMember = () => import('../views/SelectMember.vue')
 const HomeEntry = () => import('../views/HomeEntry.vue')
-const FamilyHome = () => import('../views/FamilyHome.vue')
 const MedicineHome = () => import('../views/MedicineHome.vue')
 const HealthEntry = () => import('../views/HealthEntry.vue')
 const ProfileEntry = () => import('../views/ProfileEntry.vue')
 const AdminLayout = () => import('../components/common/AdminLayout.vue')
 const AdminDashboard = () => import('../views/AdminHome.vue')
 const AdminMembers = () => import('../views/admin/AdminMembers.vue')
-const AdminMedicines = () => import('../views/admin/AdminMedicines.vue')
-const AdminData = () => import('../views/admin/AdminData.vue')
+const AdminPlans = () => import('../views/admin/AdminPlans.vue')
+const AdminSettings = () => import('../views/admin/AdminSettings.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -39,8 +38,10 @@ const router = createRouter({
       children: [
         { path: '', name: 'admin', component: AdminDashboard },
         { path: 'members', name: 'admin-members', component: AdminMembers },
-        { path: 'medicines', name: 'admin-medicines', component: AdminMedicines },
-        { path: 'data', name: 'admin-data', component: AdminData },
+        { path: 'plans', name: 'admin-plans', component: AdminPlans },
+        { path: 'medicines', redirect: { name: 'admin-plans' } },
+        { path: 'settings', name: 'admin-settings', component: AdminSettings },
+        { path: 'data', redirect: { name: 'admin-settings' } },
       ]
     },
 

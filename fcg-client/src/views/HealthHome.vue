@@ -1178,6 +1178,20 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+@media (hover: hover) {
+  .tab-btn:hover:not(.active) {
+    transform: translateY(-1px);
+    border-color: #2d5f5d;
+    box-shadow: 0 6px 12px rgba(45, 95, 93, 0.08);
+  }
+
+  .chart-container:hover,
+  .record-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(45, 95, 93, 0.1);
+  }
+}
+
 .record-time {
   font-size: 0.85rem;
   color: #666;

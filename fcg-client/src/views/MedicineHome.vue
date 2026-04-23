@@ -1318,6 +1318,29 @@ watch(
 .info-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 
 .detail-footer { display: flex; justify-content: space-between; align-items: center; }
+
+@media (hover: hover) {
+  .tab-item:hover:not(.active) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(45, 95, 93, 0.08);
+  }
+
+  .btn-create:hover,
+  .btn-solid:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(45, 95, 93, 0.2);
+  }
+
+  .search-wrapper:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(45, 95, 93, 0.08);
+  }
+
+  .detail-info-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(45, 95, 93, 0.1);
+  }
+}
 .detail-actions { display: flex; gap: 8px; }
 
 /* 编辑药品抽屉样式 */

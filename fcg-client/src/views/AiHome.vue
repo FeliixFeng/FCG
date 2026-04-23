@@ -661,6 +661,7 @@ onMounted(() => {
   box-shadow: 0 24px 56px rgba(22, 52, 50, 0.12);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  transition: transform 0.2s ease, box-shadow 0.24s ease;
 }
 
 .ai-header {
@@ -1062,6 +1063,28 @@ onMounted(() => {
 .send-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .chat-shell:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 28px 62px rgba(22, 52, 50, 0.16);
+  }
+
+  .ghost-btn:hover,
+  .quick-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .send-btn:hover:not(:disabled),
+  .stop-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(45, 95, 93, 0.2);
+  }
+
+  .input-wrap textarea:hover {
+    border-color: #b9d2d0;
+  }
 }
 
 .input-hint {

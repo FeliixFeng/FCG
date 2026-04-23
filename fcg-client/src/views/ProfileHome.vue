@@ -583,6 +583,7 @@ onMounted(async () => {
   height: 100%;
   position: relative;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.22s ease;
 }
 
 .avatar {
@@ -727,6 +728,7 @@ onMounted(async () => {
   box-shadow: 0 10px 24px rgba(45, 95, 93, 0.08);
   min-height: 260px;
   height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.22s ease;
 }
 
 .admin-summary-grid {
@@ -806,6 +808,7 @@ onMounted(async () => {
   box-shadow: 0 10px 24px rgba(45, 95, 93, 0.07);
   min-height: 260px;
   height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.22s ease;
 }
 
 .action-btn {
@@ -851,6 +854,7 @@ onMounted(async () => {
   gap: 12px;
   border: 1px solid rgba(45, 95, 93, 0.1);
   box-shadow: 0 10px 24px rgba(45, 95, 93, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.22s ease;
 }
 
 .family-info h3 {
@@ -888,6 +892,26 @@ onMounted(async () => {
   box-shadow: 0 10px 24px rgba(45, 95, 93, 0.06);
   min-height: 260px;
   height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.22s ease;
+}
+
+@media (hover: hover) {
+  .profile-card:hover,
+  .admin-entrance:hover,
+  .actions-card:hover,
+  .family-info:hover,
+  .health-summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(45, 95, 93, 0.12);
+  }
+
+  .extra-item:hover,
+  .admin-summary-item:hover,
+  .summary-item:hover,
+  .info-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(45, 95, 93, 0.08);
+  }
 }
 
 .health-summary-head {
