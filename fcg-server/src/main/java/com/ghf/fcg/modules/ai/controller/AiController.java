@@ -5,20 +5,14 @@ import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.modules.ai.service.AiService;
-import com.ghf.fcg.modules.ai.service.AiContextService;
+import com.ghf.fcg.modules.ai.service.IAiContextService;
 import com.ghf.fcg.modules.ai.dto.ChatDTO;
 import com.ghf.fcg.modules.ai.vo.AiContextVO;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.health.entity.HealthReport;
 import com.ghf.fcg.modules.health.entity.Vital;
 import com.ghf.fcg.modules.health.service.IHealthReportService;
-import com.ghf.fcg.modules.health.service.IVitalService;
-import com.ghf.fcg.modules.medicine.entity.Medicine;
-import com.ghf.fcg.modules.medicine.entity.MedicinePlan;
 import com.ghf.fcg.modules.medicine.entity.MedicineRecord;
-import com.ghf.fcg.modules.medicine.service.IMedicinePlanService;
-import com.ghf.fcg.modules.medicine.service.IMedicineRecordService;
-import com.ghf.fcg.modules.medicine.service.IMedicineService;
 import com.ghf.fcg.modules.system.entity.User;
 import com.ghf.fcg.modules.system.entity.UserProfile;
 import com.ghf.fcg.modules.system.service.IUserProfileService;
@@ -36,18 +30,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -60,12 +49,8 @@ public class AiController {
     private final ObjectMapper objectMapper;
     private final IUserService userService;
     private final IUserProfileService userProfileService;
-    private final IVitalService vitalService;
     private final IHealthReportService healthReportService;
-    private final IMedicinePlanService planService;
-    private final IMedicineRecordService recordService;
-    private final IMedicineService medicineService;
-    private final AiContextService aiContextService;
+    private final IAiContextService aiContextService;
     private final Map<String, ContextCacheItem> contextCache = new ConcurrentHashMap<>();
     private static final long CONTEXT_CACHE_TTL_MS = 20_000L;
 
@@ -97,9 +82,9 @@ public class AiController {
 
         User targetUser = userService.getById(targetUserId);
         UserProfile profile = userProfileService.getByUserId(targetUserId);
-        List<Map<String, Object>> todayTasks = buildTodayTasks(targetUserId, targetDate);
-        List<Vital> todayVitals = listTodayVitals(familyId, targetUserId, targetDate);
-        Map<String, List<Vital>> weeklyVitals = buildWeeklyVitals(familyId, targetUserId, targetDate);
+        List<Map<String, Object>> todayTasks = aiContextService.buildTodayTasks(targetUserId, targetDate);
+        List<Vital> todayVitals = aiContextService.listTodayVitals(familyId, targetUserId, targetDate);
+        Map<String, List<Vital>> weeklyVitals = aiContextService.buildWeeklyVitals(familyId, targetUserId, targetDate);
         HealthReport latestReport = healthReportService.getOne(new LambdaQueryWrapper<HealthReport>()
                 .eq(HealthReport::getFamilyId, familyId)
                 .eq(HealthReport::getUserId, targetUserId)
@@ -214,134 +199,6 @@ public class AiController {
         if (user == null || !familyId.equals(user.getFamilyId())) {
             throw new BusinessException(MessageConstant.USER_FAMILY_MISMATCH);
         }
-    }
-
-    private List<Map<String, Object>> buildTodayTasks(Long userId, LocalDate date) {
-        int day = date.getDayOfWeek().getValue();
-        String dayToken = String.valueOf(day);
-
-        List<MedicinePlan> plans = planService.list(new LambdaQueryWrapper<MedicinePlan>()
-                .eq(MedicinePlan::getUserId, userId)
-                .eq(MedicinePlan::getStatus, MedicinePlan.STATUS_ENABLED)
-                .le(MedicinePlan::getStartDate, date)
-                .and(w -> w.isNull(MedicinePlan::getEndDate).or().ge(MedicinePlan::getEndDate, date)));
-        if (plans.isEmpty()) {
-            return List.of();
-        }
-
-        List<MedicinePlan> validPlans = plans.stream()
-                .filter(plan -> containsTakeDay(plan.getTakeDays(), dayToken))
-                .toList();
-        if (validPlans.isEmpty()) {
-            return List.of();
-        }
-
-        Set<Long> medicineIds = validPlans.stream().map(MedicinePlan::getMedicineId).collect(Collectors.toSet());
-        Map<Long, Medicine> medicineMap = medicineService.listByIds(medicineIds).stream()
-                .collect(Collectors.toMap(Medicine::getId, m -> m));
-
-        List<MedicineRecord> records = recordService.list(new LambdaQueryWrapper<MedicineRecord>()
-                .eq(MedicineRecord::getUserId, userId)
-                .eq(MedicineRecord::getScheduledDate, date));
-        Map<String, MedicineRecord> recordMap = records.stream()
-                .collect(Collectors.toMap(
-                        r -> recordKey(r.getPlanId(), r.getSlotName()),
-                        r -> r,
-                        (a, b) -> a.getId() > b.getId() ? a : b
-                ));
-
-        List<Map<String, Object>> tasks = new java.util.ArrayList<>();
-        for (MedicinePlan plan : validPlans) {
-            Medicine medicine = medicineMap.get(plan.getMedicineId());
-            for (String slot : parseSlots(plan.getRemindSlots())) {
-                MedicineRecord record = recordMap.get(recordKey(plan.getId(), slot));
-                Integer status = record != null ? record.getStatus() : MedicineRecord.STATUS_PENDING;
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("planId", plan.getId());
-                item.put("recordId", record != null ? record.getId() : null);
-                item.put("medicineId", plan.getMedicineId());
-                item.put("medicineName", medicine != null ? medicine.getName() : null);
-                item.put("dosage", plan.getDosage());
-                item.put("unit", medicine != null ? medicine.getStockUnit() : null);
-                item.put("slot", slot);
-                item.put("status", status);
-                tasks.add(item);
-            }
-        }
-        return tasks;
-    }
-
-    private List<Vital> listTodayVitals(Long familyId, Long userId, LocalDate date) {
-        LocalDateTime dayStart = date.atStartOfDay();
-        LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
-        List<Vital> today = vitalService.list(new LambdaQueryWrapper<Vital>()
-                .eq(Vital::getFamilyId, familyId)
-                .eq(Vital::getUserId, userId)
-                .ge(Vital::getMeasureTime, dayStart)
-                .le(Vital::getMeasureTime, dayEnd)
-                .orderByDesc(Vital::getMeasureTime));
-        if (today.isEmpty()) {
-            return List.of();
-        }
-        Set<String> seen = new LinkedHashSet<>();
-        List<Vital> result = new java.util.ArrayList<>();
-        for (Vital v : today) {
-            String key = v.getType() != null && v.getType().equals(Vital.TYPE_BLOOD_SUGAR)
-                    ? v.getType() + "_" + v.getMeasurePoint() + "_" + v.getId()
-                    : String.valueOf(v.getType());
-            if (v.getType() != null && v.getType().equals(Vital.TYPE_BLOOD_SUGAR)) {
-                result.add(v);
-                continue;
-            }
-            if (seen.add(key)) {
-                result.add(v);
-            }
-        }
-        return result;
-    }
-
-    private Map<String, List<Vital>> buildWeeklyVitals(Long familyId, Long userId, LocalDate date) {
-        LocalDateTime start = date.minusDays(6).atStartOfDay();
-        LocalDateTime end = date.atTime(LocalTime.MAX);
-        List<Vital> all = vitalService.list(new LambdaQueryWrapper<Vital>()
-                .eq(Vital::getFamilyId, familyId)
-                .eq(Vital::getUserId, userId)
-                .ge(Vital::getMeasureTime, start)
-                .le(Vital::getMeasureTime, end)
-                .orderByDesc(Vital::getMeasureTime));
-
-        Map<String, List<Vital>> map = new LinkedHashMap<>();
-        map.put("blood_pressure", all.stream().filter(v -> eq(v.getType(), Vital.TYPE_BLOOD_PRESSURE)).toList());
-        map.put("blood_sugar_fasting", all.stream().filter(v -> eq(v.getType(), Vital.TYPE_BLOOD_SUGAR) && eq(v.getMeasurePoint(), Vital.POINT_FASTING)).toList());
-        map.put("blood_sugar_postmeal", all.stream().filter(v -> eq(v.getType(), Vital.TYPE_BLOOD_SUGAR) && eq(v.getMeasurePoint(), Vital.POINT_AFTER_MEAL)).toList());
-        map.put("weight", all.stream().filter(v -> eq(v.getType(), Vital.TYPE_WEIGHT)).toList());
-        return map;
-    }
-
-    private List<String> parseSlots(String remindSlots) {
-        if (remindSlots == null || remindSlots.isBlank()) {
-            return List.of("08:00");
-        }
-        return List.of(remindSlots.split(",")).stream()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .distinct()
-                .toList();
-    }
-
-    private boolean containsTakeDay(String takeDays, String dayToken) {
-        if (takeDays == null || takeDays.isBlank()) {
-            return true;
-        }
-        List<String> tokens = List.of(takeDays.split(",")).stream()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        return tokens.contains(dayToken);
-    }
-
-    private String recordKey(Long planId, String slotName) {
-        return planId + "_" + (slotName == null ? "" : slotName.trim());
     }
 
     private boolean eq(Integer a, int b) {

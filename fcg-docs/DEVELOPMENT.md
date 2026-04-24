@@ -1,7 +1,52 @@
 # 开发运维文档
 
 > 文档定位：保留长期有效的开发、运维、排障信息。  
-> 当前状态：第一阶段核心功能开发已收尾（2026-04-23）。
+> 当前状态：第一阶段核心功能开发已收尾（2026-04-24），项目进入论文撰写优先阶段。
+
+## 项目结构说明（当前版）
+
+### 后端目录
+
+`fcg-server/src/main/java/com/ghf/fcg`
+
+- `config`：全局配置（Web、MyBatis、AI、OSS）
+- `common`：统一返回、异常、上下文、拦截器、通用工具
+- `modules/system`：家庭、成员、档案与鉴权基础
+- `modules/medicine`：药品、计划、打卡记录
+- `modules/health`：体征与周报
+- `modules/ai`：AI 对话、上下文聚合
+- `modules/admin`：管理端聚合查询
+
+模块内通用分层约定：
+- 入参：`dto`
+- 出参：`vo`
+- 领域对象：`entity`
+- 数据访问：`mapper`
+- 业务接口：`I*Service`
+- 业务实现：`service/impl/*ServiceImpl`
+
+### 前端目录
+
+`fcg-client/src`
+
+- `views/public`：Landing、成员选择
+- `views/entry`：角色分流入口页
+- `views/user`：普通成员页面
+- `views/care`：关怀模式页面
+- `views/admin`：管理端页面
+- `components`：组件库（通用/业务组件）
+- `stores`：Pinia 状态管理
+- `router`：路由与守卫
+- `utils`：请求、缓存、图片处理等工具
+
+## 当前阶段建议
+
+- 主策略：冻结大功能开发，优先论文初稿
+- 代码侧仅做：
+  1. 小范围体验优化
+  2. 风险可控的结构规范化
+  3. 演示稳定性修复
+- 测试文档与测试执行可在论文阶段统一补齐
 
 ## 本地开发
 
