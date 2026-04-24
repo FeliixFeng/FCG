@@ -5,6 +5,7 @@ import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.common.result.PageResult;
 import com.ghf.fcg.common.result.Result;
+import com.ghf.fcg.modules.admin.dto.AdminPlanQueryDTO;
 import com.ghf.fcg.modules.admin.service.IAdminService;
 import com.ghf.fcg.modules.admin.vo.AdminDailyStatsVO;
 import com.ghf.fcg.modules.admin.vo.AdminOverviewVO;
@@ -12,6 +13,7 @@ import com.ghf.fcg.modules.admin.vo.AdminPlanTodayItemVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,14 +37,17 @@ public class AdminController {
     @GetMapping("/plans/today")
     @Operation(summary = "管理端今日计划总览")
     public Result<PageResult<AdminPlanTodayItemVO>> todayPlans(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String slotName,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(defaultValue = "1") Long page,
-            @RequestParam(defaultValue = "20") Long size) {
+            @ParameterObject AdminPlanQueryDTO query) {
         Long familyId = requireAdminAndFamilyId();
-        return Result.success(adminService.listTodayPlans(familyId, userId, status, slotName, keyword, page, size));
+        return Result.success(adminService.listTodayPlans(
+                familyId,
+                query.getUserId(),
+                query.getStatus(),
+                query.getSlotName(),
+                query.getKeyword(),
+                query.getPage(),
+                query.getSize()
+        ));
     }
 
     @GetMapping("/stats/daily")

@@ -50,6 +50,30 @@ FCG 面向家庭场景，围绕“计划制定 -> 当日提醒 -> 打卡记录 -
 - AI 能力：GLM（OCR + 对话）
 - 部署：Docker + GitHub Actions + Alibaba Cloud ACR
 
+## 系统架构（论文可用）
+
+### 后端架构（Spring Boot）
+- 基础层：`config`（MVC、MyBatis、AI、OSS 配置）
+- 公共层：`common`（拦截器、异常、统一返回、上下文、工具）
+- 业务层：`modules`
+  - `system`：家庭与成员、权限基础
+  - `medicine`：药品、计划、记录与打卡链路
+  - `health`：体征与周报
+  - `ai`：上下文聚合、流式对话
+  - `admin`：管理端聚合查询与统计
+
+### 前端架构（Vue 3）
+- 布局与导航：按角色与场景分层
+- 页面目录：
+  - `views/public`：落地页与成员选择
+  - `views/entry`：角色分流入口（普通/关怀）
+  - `views/user`：普通成员功能页面
+  - `views/care`：关怀模式页面
+  - `views/admin`：管理端页面
+- 状态与网络：
+  - `stores`：用户与身份状态
+  - `utils`：HTTP 封装、存储、图片处理
+
 ## 项目结构
 
 ```text
@@ -66,6 +90,11 @@ fcg/
 │       └── views/admin           # 管理界面页面
 └── fcg-docs/                      # 文档
 ```
+
+## 当前开发阶段
+
+- 状态：核心功能开发已收尾，可进入论文初稿撰写阶段
+- 后续工作：以小修小补和展示优化为主，不再进行大规模功能重构
 
 ## 本地开发
 
