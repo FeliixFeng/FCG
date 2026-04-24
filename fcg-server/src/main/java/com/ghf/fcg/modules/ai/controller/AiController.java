@@ -5,6 +5,9 @@ import com.ghf.fcg.common.constant.MessageConstant;
 import com.ghf.fcg.common.context.UserContext;
 import com.ghf.fcg.common.exception.BusinessException;
 import com.ghf.fcg.modules.ai.service.AiService;
+import com.ghf.fcg.modules.ai.service.AiContextService;
+import com.ghf.fcg.modules.ai.dto.ChatDTO;
+import com.ghf.fcg.modules.ai.vo.AiContextVO;
 import com.ghf.fcg.common.result.Result;
 import com.ghf.fcg.modules.health.entity.HealthReport;
 import com.ghf.fcg.modules.health.entity.Vital;
@@ -32,7 +35,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -63,19 +65,20 @@ public class AiController {
     private final IMedicinePlanService planService;
     private final IMedicineRecordService recordService;
     private final IMedicineService medicineService;
+    private final AiContextService aiContextService;
     private final Map<String, ContextCacheItem> contextCache = new ConcurrentHashMap<>();
     private static final long CONTEXT_CACHE_TTL_MS = 20_000L;
 
     @PostMapping("/chat")
     @Operation(summary = "AI对话")
-    public Result<String> chat(@RequestBody ChatRequest request) {
+    public Result<String> chat(@RequestBody ChatDTO request) {
         String response = aiService.chat(request.getSystemPrompt(), request.getUserPrompt());
         return Result.success(response);
     }
 
     @GetMapping("/context")
     @Operation(summary = "获取 AI 对话上下文", description = "聚合成员档案、今日任务、体征趋势、最新周报，并返回 contextText")
-    public Result<Map<String, Object>> context(
+    public Result<AiContextVO> context(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
@@ -103,18 +106,18 @@ public class AiController {
                 .orderByDesc(HealthReport::getWeekStart)
                 .last("LIMIT 1"));
 
-        String contextText = buildContextText(targetUser, targetDate, profile, todayTasks, todayVitals, weeklyVitals, latestReport);
+        String contextText = aiContextService.buildContextText(targetUser, targetDate, profile, todayTasks, todayVitals, weeklyVitals, latestReport);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("userId", targetUserId);
-        data.put("nickname", targetUser != null ? targetUser.getNickname() : null);
-        data.put("date", targetDate);
-        data.put("profile", profile);
-        data.put("todayTasks", todayTasks);
-        data.put("todayVitals", todayVitals);
-        data.put("weeklyVitals", weeklyVitals);
-        data.put("latestReport", latestReport);
-        data.put("contextText", contextText);
+        AiContextVO data = new AiContextVO();
+        data.setUserId(targetUserId);
+        data.setNickname(targetUser != null ? targetUser.getNickname() : null);
+        data.setDate(targetDate);
+        data.setProfile(profile);
+        data.setTodayTasks(todayTasks);
+        data.setTodayVitals(todayVitals);
+        data.setWeeklyVitals(weeklyVitals);
+        data.setLatestReport(latestReport);
+        data.setContextText(contextText);
         log.info("AI context built: userId={}, date={}, tasks={}, todayVitals={}, weeklyBP={}, weeklyBSF={}, weeklyBSP={}, weeklyWeight={}, report={}",
                 targetUserId,
                 targetDate,
@@ -131,7 +134,7 @@ public class AiController {
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "AI流式对话")
-    public SseEmitter chatStream(@RequestBody ChatRequest request, HttpServletResponse response) {
+    public SseEmitter chatStream(@RequestBody ChatDTO request, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Connection", "keep-alive");
         response.setHeader("X-Accel-Buffering", "no");
@@ -315,92 +318,6 @@ public class AiController {
         return map;
     }
 
-    private String buildContextText(
-            User user,
-            LocalDate date,
-            UserProfile profile,
-            List<Map<String, Object>> todayTasks,
-            List<Vital> todayVitals,
-            Map<String, List<Vital>> weeklyVitals,
-            HealthReport latestReport
-    ) {
-        String memberLine = String.format("当前成员：%s（userId=%s）", safe(user != null ? user.getNickname() : null), user != null ? user.getId() : "-");
-        String profileLine = profile == null
-                ? "健康档案：暂无"
-                : String.format("健康档案：身高%scm，体重%skg，病史%s，过敏%s",
-                safe(profile.getHeight()), safe(profile.getWeight()), safe(profile.getDisease()), safe(profile.getAllergy()));
-
-        long taken = todayTasks.stream().filter(t -> eq((Integer) t.get("status"), MedicineRecord.STATUS_TAKEN)).count();
-        long skipped = todayTasks.stream().filter(t -> eq((Integer) t.get("status"), MedicineRecord.STATUS_SKIPPED)).count();
-        long pending = todayTasks.size() - taken - skipped;
-        String taskSummary = String.format("今日用药任务：共%d条，已打卡%d条，已跳过%d条，待处理%d条", todayTasks.size(), taken, skipped, pending);
-        String taskDetail = todayTasks.isEmpty()
-                ? "- 暂无任务"
-                : todayTasks.stream().limit(10).map(this::formatTaskLine).collect(Collectors.joining("\n"));
-
-        String todayVitalLine = todayVitals.isEmpty()
-                ? "今日体征：暂无"
-                : "今日体征：\n" + todayVitals.stream().map(this::formatVitalLine).collect(Collectors.joining("\n"));
-
-        String weeklyLine = "近7天体征趋势：\n"
-                + formatWeeklyTypeLine("血压", weeklyVitals.get("blood_pressure"))
-                + "\n" + formatWeeklyTypeLine("空腹血糖", weeklyVitals.get("blood_sugar_fasting"))
-                + "\n" + formatWeeklyTypeLine("餐后血糖", weeklyVitals.get("blood_sugar_postmeal"))
-                + "\n" + formatWeeklyTypeLine("体重", weeklyVitals.get("weight"));
-
-        String reportLine = latestReport == null
-                ? "最新周报：暂无"
-                : String.format("最新周报：风险等级%s，依从率%s%%", safe(latestReport.getRiskLevel()), safe(latestReport.getComplianceRate()));
-
-        return String.join("\n", memberLine, "日期：" + date, profileLine, weeklyLine, taskSummary, taskDetail, todayVitalLine, reportLine);
-    }
-
-    private String formatTaskLine(Map<String, Object> task) {
-        Integer status = (Integer) task.get("status");
-        String statusText = switch (status == null ? -1 : status) {
-            case 0 -> "待处理";
-            case 1 -> "已打卡";
-            case 2 -> "已跳过";
-            default -> "未知";
-        };
-        return String.format("- %s %s%s（%s，%s）",
-                safe(task.get("medicineName")),
-                safe(task.get("dosage")),
-                safe(task.get("unit")),
-                safe(task.get("slot")),
-                statusText
-        );
-    }
-
-    private String formatVitalLine(Vital vital) {
-        if (vital == null) {
-            return "- 暂无";
-        }
-        if (eq(vital.getType(), Vital.TYPE_BLOOD_PRESSURE)) {
-            return String.format("- 血压：%s/%s mmHg", safe(vital.getValueSystolic()), safe(vital.getValueDiastolic()));
-        }
-        if (eq(vital.getType(), Vital.TYPE_BLOOD_SUGAR)) {
-            String label = eq(vital.getMeasurePoint(), Vital.POINT_AFTER_MEAL) ? "餐后血糖" : "空腹血糖";
-            return String.format("- %s：%s mmol/L", label, safe(vital.getValue()));
-        }
-        if (eq(vital.getType(), Vital.TYPE_WEIGHT)) {
-            return String.format("- 体重：%s kg", safe(vital.getValue()));
-        }
-        return String.format("- 类型%s：%s", safe(vital.getType()), safe(vital.getValue()));
-    }
-
-    private String formatWeeklyTypeLine(String label, List<Vital> list) {
-        if (list == null || list.isEmpty()) {
-            return "- " + label + "：近7天暂无记录";
-        }
-        Vital latest = list.get(0);
-        if ("血压".equals(label)) {
-            return String.format("- %s：近7天%d条，最新%s/%s mmHg", label, list.size(), safe(latest.getValueSystolic()), safe(latest.getValueDiastolic()));
-        }
-        String unit = "体重".equals(label) ? "kg" : "mmol/L";
-        return String.format("- %s：近7天%d条，最新%s %s", label, list.size(), safe(latest.getValue()), unit);
-    }
-
     private List<String> parseSlots(String remindSlots) {
         if (remindSlots == null || remindSlots.isBlank()) {
             return List.of("08:00");
@@ -431,42 +348,17 @@ public class AiController {
         return a != null && a == b;
     }
 
-    private String safe(Object v) {
-        if (v == null) {
-            return "-";
-        }
-        if (v instanceof String s && s.isBlank()) {
-            return "-";
-        }
-        if (v instanceof BigDecimal bd) {
-            return bd.stripTrailingZeros().toPlainString();
-        }
-        return String.valueOf(v);
-    }
-
     private int sizeOf(List<?> list) {
         return list == null ? 0 : list.size();
     }
 
     private static class ContextCacheItem {
         private final long ts;
-        private final Map<String, Object> data;
+        private final AiContextVO data;
 
-        private ContextCacheItem(long ts, Map<String, Object> data) {
+        private ContextCacheItem(long ts, AiContextVO data) {
             this.ts = ts;
             this.data = data;
         }
-    }
-
-    // ========== DTO ==========
-
-    public static class ChatRequest {
-        private String systemPrompt;
-        private String userPrompt;
-
-        public String getSystemPrompt() { return systemPrompt; }
-        public void setSystemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; }
-        public String getUserPrompt() { return userPrompt; }
-        public void setUserPrompt(String userPrompt) { this.userPrompt = userPrompt; }
     }
 }
